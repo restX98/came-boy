@@ -1,6 +1,11 @@
 # Build artifacts
 build/
 
+# ROMs (copyrighted)
+roms/*.gb
+roms/*.gbc
+roms/*.gba
+
 # Editor
 .vscode/
 
