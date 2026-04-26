@@ -1,0 +1,13 @@
+# Build artifacts
+build/
+
+# Editor
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled object files
+*.o
+*.d
