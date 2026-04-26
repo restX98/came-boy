@@ -1,0 +1,14 @@
+#include "logger.h"
+#include <stdio.h>
+#include <stdarg.h>
+
+static const char *level_strings[] = { "DEBUG", "INFO", "WARN", "ERROR" };
+
+void log_msg(log_level_t level, const char *file, int line, const char *fmt, ...) {
+    fprintf(stderr, "[%s] %s:%d: ", level_strings[level], file, line);
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fprintf(stderr, "\n");
+}
