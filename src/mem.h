@@ -1,8 +1,8 @@
 #ifndef MEM_H
 #define MEM_H
 
-#define WRAM_SIZE 8 * 1024 // 8KB of WRAM
-#define VRAM_SIZE 8 * 1024 // 8KB of VRAM
+#define WRAM_SIZE (8 * 1024) // 8KB of WRAM
+#define VRAM_SIZE (8 * 1024) // 8KB of VRAM
 #define HRAM_SIZE 127 // 127 bytes of HRAM
 
 #include <stdint.h>

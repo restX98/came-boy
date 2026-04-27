@@ -19,13 +19,18 @@ int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     LOG_DEBUG("NOP at PC=0x%04X", cpu->pc);
 
-    cpu->pc += 1;
-
     return 4; // NOP takes 4 cycles
 }
 
 int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
-    uint16_t immediate_value = (bus_read(bus, cpu->pc + 2) << 8) | bus_read(bus, cpu->pc + 1); // Read 16-bit immediate value
+
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint8_t lo = bus_read(bus, cpu->pc);
+    uint8_t hi = bus_read(bus, cpu->pc + 1);
+    uint16_t immediate_value = (hi << 8) | lo;
+
+    cpu->pc += 2;
 
     // Extract the register code from the opcode
     uint8_t register_code = (opcode >> 4) & 0x03;
@@ -45,10 +50,8 @@ int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     }
 
 
-    LOG_DEBUG("LD r16,d16 (%u, %d) at PC=0x%04X (opcode=0x%02X)",
-        register_code, immediate_value, cpu->pc, opcode);
-
-    cpu->pc += 3;
+    LOG_DEBUG("LD r16,d16 register=%u value=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        register_code, immediate_value, instr_pc, opcode);
 
     return 12; // LD r16,d16 takes 12 cycles
 }

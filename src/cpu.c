@@ -32,11 +32,12 @@ int cpu_step(cpu_t *cpu, bus_t *bus) {
 
     opcode_fn fn = opcode_table[instruction];
     if (fn) {
-        return fn(cpu, bus, instruction);
-    } else {
-        LOG_ERROR("Unknown opcode 0x%02X at PC=0x%04X - halting", instruction, cpu->pc);
-        return -1;
+        cpu->pc++;
+        int cycles = fn(cpu, bus, instruction);
+        LOG_DEBUG("Executed opcode 0x%02X in %d cycles", instruction, cycles);
+        return cycles;
     }
 
-    return 0;
+    LOG_ERROR("Unknown opcode 0x%02X at PC=0x%04X - halting", instruction, cpu->pc);
+    return -1;
 }
