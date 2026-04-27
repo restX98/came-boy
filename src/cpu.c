@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "logger.h"
+#include "opcodes.h"
 
 void cpu_init(cpu_t *cpu) {
     LOG_INFO("Initializing CPU");
@@ -29,14 +30,12 @@ int cpu_step(cpu_t *cpu, bus_t *bus) {
     uint8_t instruction = bus_read(bus, cpu->pc);
     LOG_DEBUG("PC=0x%04X opcode=0x%02X", cpu->pc, instruction);
 
-    switch (instruction) {
-        case 0x00: // NOP
-            LOG_DEBUG("NOP at PC=0x%04X", cpu->pc);
-            cpu->pc += 1;
-            break;
-        default:
-            LOG_ERROR("Unknown opcode 0x%02X at PC=0x%04X - halting", instruction, cpu->pc);
-            return -1;
+    opcode_fn fn = opcode_table[instruction];
+    if (fn) {
+        return fn(cpu, bus, instruction);
+    } else {
+        LOG_ERROR("Unknown opcode 0x%02X at PC=0x%04X - halting", instruction, cpu->pc);
+        return -1;
     }
 
     return 0;

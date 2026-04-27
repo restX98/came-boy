@@ -1,0 +1,15 @@
+#ifndef OPCODES_H
+#define OPCODES_H
+
+#include <stdint.h>
+#include "cpu.h"
+#include "bus.h"
+
+typedef int (*opcode_fn)(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+
+extern opcode_fn opcode_table[256];
+
+// Opcode function declarations
+int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+
+#endif // OPCODES_H
