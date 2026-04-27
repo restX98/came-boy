@@ -17,7 +17,11 @@ int main(void) {
         return -1;
     }
 
-    bus_init(&bus, &cartridge);
+    if (bus_init(&bus, &cartridge) != 0) {
+        LOG_ERROR("Could not initialize bus");
+        return -1;
+    }
+
     cpu_init(&cpu);
 
     while (1) {
@@ -30,6 +34,7 @@ int main(void) {
 
     // free resources
     cartridge_unload(&cartridge);
+    bus_free(&bus);
 
     return 0;
 }

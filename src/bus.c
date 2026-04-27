@@ -1,12 +1,39 @@
 #include "bus.h"
+#include "mem.h"
 #include "logger.h"
 
-void bus_init(bus_t *bus, cartridge_t *cartridge) {
+int bus_init(bus_t *bus, cartridge_t *cartridge) {
     LOG_INFO("Initializing bus");
 
     bus->cartridge = cartridge;
 
+    if (mem_init(&bus->wram, WRAM_SIZE, "WRAM") != 0) {
+        LOG_ERROR("Could not initialize WRAM");
+        return -1;
+    }
+    if (mem_init(&bus->vram, VRAM_SIZE, "VRAM") != 0) {
+        LOG_ERROR("Could not initialize VRAM");
+        mem_free(&bus->wram);
+        return -1;
+    }
+    if (mem_init(&bus->hram, HRAM_SIZE, "HRAM") != 0) {
+        LOG_ERROR("Could not initialize HRAM");
+        mem_free(&bus->wram);
+        mem_free(&bus->vram);
+        return -1;
+    }
+
     // TODO: Later add other components like RAM, PPU, APU, etc.
+
+    return 0;
+}
+
+void bus_free(bus_t *bus) {
+    LOG_INFO("Freeing bus resources");
+
+    mem_free(&bus->wram);
+    mem_free(&bus->vram);
+    mem_free(&bus->hram);
 }
 
 uint8_t bus_read(bus_t *bus, uint16_t addr) {
