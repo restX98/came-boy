@@ -10,13 +10,13 @@ typedef union {
         uint8_t lo;
         uint8_t hi;
     };
-} register_t;
+} reg16_t;
 
 typedef struct {
-    register_t af;
-    register_t bc;
-    register_t de;
-    register_t hl;
+    reg16_t af;
+    reg16_t bc;
+    reg16_t de;
+    reg16_t hl;
     uint16_t sp;
     uint16_t pc;
 } cpu_t;
