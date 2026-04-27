@@ -54,6 +54,8 @@ int cartridge_load(cartridge_t *cartridge, const char *filename) {
 }
 
 void cartridge_unload(cartridge_t *cartridge) {
+    LOG_INFO("Unloading cartridge");
+
     if (cartridge->rom) {
         free(cartridge->rom);
         cartridge->rom = NULL;
