@@ -2,6 +2,20 @@
 #include "mem.h"
 #include "logger.h"
 
+static const mem_region_t memory_map[] = {
+    {"ROM Bank 0", 0x0000, 0x3FFF, read_rom0},                        // 16 KiB ROM bank 00 (fixed)
+    {"ROM Bank 1", 0x4000, 0x7FFF, read_rom1},                        // 16 KiB ROM bank 01~NN (switchable, if supported)
+    {"VRAM", 0x8000, 0x9FFF, read_vram},                              // 8 KiB Video RAM (VRAM)
+    {"External RAM", 0xA000, 0xBFFF, read_external_ram},              // 8 KiB External RAM (if supported)
+    {"WRAM", 0xC000, 0xDFFF, read_wram},                              // 8 KiB Work RAM (WRAM)
+    {"Echo RAM", 0xE000, 0xFDFF, read_echo_ram},                      // Echo RAM (mirrors 0xC000~0xDDFF)
+    {"OAM", 0xFE00, 0xFE9F, read_oam},                                // Object Attribute Memory (OAM)
+    {"Not Usable", 0xFEA0, 0xFEFF, read_not_usable},                  // Not usable
+    {"I/O Registers", 0xFF00, 0xFF7F, read_io_reg},                   // I/O Registers
+    {"HRAM", 0xFF80, 0xFFFE, read_hram},                              // High RAM (HRAM) - 127 bytes
+    {"Interrupt Enable Register", 0xFFFF, 0xFFFF, read_interrupt_reg} // Interrupt Enable Register (IE)
+};
+
 int bus_init(bus_t *bus, cartridge_t *cartridge) {
     LOG_INFO("Initializing bus");
 
@@ -39,19 +53,93 @@ void bus_free(bus_t *bus) {
 uint8_t bus_read(bus_t *bus, uint16_t addr) {
     LOG_DEBUG("Reading from address: 0x%04X", addr);
 
-    if (addr <= 0x3FFF) {
-        uint8_t value = bus->cartridge->rom[addr];
-        LOG_DEBUG("ROM bank 0 read: [0x%04X] = 0x%02X", addr, value);
-        return value;
-    }
-
-    if (addr <= 0x7FFF) {
-        // TODO: Implement MBC support to read from switchable ROM banks
-        uint8_t value = bus->cartridge->rom[addr];
-        LOG_DEBUG("ROM bank 1 read: [0x%04X] = 0x%02X", addr, value);
-        return value;
+    for (size_t i = 0; i < sizeof(memory_map) / sizeof(mem_region_t); i++) {
+        mem_region_t region = memory_map[i];
+        if (addr >= region.start && addr <= region.end) {
+            return region.read_fn(bus, addr);
+        }
     }
 
     LOG_WARN("Attempted to read from unsupported address: 0x%04X", addr);
     return 0xFF; // Return 0xFF for unsupported addresses
+}
+
+uint8_t read_rom0(bus_t *bus, uint16_t addr) {
+    uint8_t value = bus->cartridge->rom[addr];
+    LOG_DEBUG("ROM bank 0 read: [0x%04X] = 0x%02X", addr, value);
+
+    return value;
+}
+
+uint8_t read_rom1(bus_t *bus, uint16_t addr) {
+    // TODO: Implement MBC support to read from switchable ROM banks
+    uint8_t value = bus->cartridge->rom[addr];
+    LOG_DEBUG("ROM bank 1 read: [0x%04X] = 0x%02X", addr, value);
+
+    return value;
+}
+
+uint8_t read_vram(bus_t *bus, uint16_t addr) {
+    uint8_t value = bus->vram.mem[addr - 0x8000];
+    LOG_DEBUG("VRAM read: [0x%04X] = 0x%02X", addr, value);
+
+    return value;
+}
+
+uint8_t read_external_ram(bus_t *bus, uint16_t addr) {
+    (void)bus;
+    (void)addr;
+    // TODO: Implement MBC support to read from external RAM
+    return 0xFF;
+}
+
+uint8_t read_wram(bus_t *bus, uint16_t addr) {
+    uint8_t value = bus->wram.mem[addr - 0xC000];
+    LOG_DEBUG("WRAM read: [0x%04X] = 0x%02X", addr, value);
+
+    return value;
+}
+
+uint8_t read_echo_ram(bus_t *bus, uint16_t addr) {
+    (void)bus;
+    (void)addr;
+    // TODO: Implement echo RAM support (?) Understand how it works and whether it's necessary to implement
+    return 0xFF; // Temporary return 0xFF
+}
+
+uint8_t read_oam(bus_t *bus, uint16_t addr) {
+    (void)bus;
+    (void)addr;
+    // TODO: Implement OAM support to read from sprite attribute memory
+    return 0xFF; // Temporary return 0xFF
+}
+
+uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
+    (void)bus;
+    (void)addr;
+    LOG_WARN("Attempted to read from not usable address: 0x%04X", addr);
+    // TODO: Implement proper handling for not usable addresses (e.g., return 0xFF, log a warning, etc.)
+    // something about OAM corruption, to understand how it works and whether it's necessary to implement
+    return 0xFF; // Return 0xFF for not usable addresses
+}
+
+uint8_t read_io_reg(bus_t *bus, uint16_t addr) {
+    (void)bus;
+    (void)addr;
+    // TODO: Implement I/O register support
+    return 0xFF;
+}
+
+uint8_t read_hram(bus_t *bus, uint16_t addr) {
+    uint8_t value = bus->hram.mem[addr - 0xFF80];
+    LOG_DEBUG("HRAM read: [0x%04X] = 0x%02X", addr, value);
+
+    return value;
+}
+
+uint8_t read_interrupt_reg(bus_t *bus, uint16_t addr) {
+    (void)bus;
+    (void)addr;
+    // TODO: Implement interrupt register support
+    return 0xFF;
 }
