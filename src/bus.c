@@ -2,6 +2,18 @@
 #include "mem.h"
 #include "logger.h"
 
+static uint8_t read_rom0(bus_t *bus, uint16_t addr);
+static uint8_t read_rom1(bus_t *bus, uint16_t addr);
+static uint8_t read_vram(bus_t *bus, uint16_t addr);
+static uint8_t read_external_ram(bus_t *bus, uint16_t addr);
+static uint8_t read_wram(bus_t *bus, uint16_t addr);
+static uint8_t read_echo_ram(bus_t *bus, uint16_t addr);
+static uint8_t read_oam(bus_t *bus, uint16_t addr);
+static uint8_t read_not_usable(bus_t *bus, uint16_t addr);
+static uint8_t read_io_reg(bus_t *bus, uint16_t addr);
+static uint8_t read_hram(bus_t *bus, uint16_t addr);
+static uint8_t read_interrupt_reg(bus_t *bus, uint16_t addr);
+
 static const mem_region_t memory_map[] = {
     {"ROM Bank 0", 0x0000, 0x3FFF, read_rom0},                        // 16 KiB ROM bank 00 (fixed)
     {"ROM Bank 1", 0x4000, 0x7FFF, read_rom1},                        // 16 KiB ROM bank 01~NN (switchable, if supported)
