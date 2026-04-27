@@ -1,11 +1,12 @@
 #ifndef CARTRIDGE_H
 #define CARTRIDGE_H
 
+#include <stdlib.h>
 #include <stdint.h>
 
 typedef struct {
     uint8_t *rom;
-    uint32_t size;
+    size_t size;
     uint8_t bank;
 } cartridge_t;
 
