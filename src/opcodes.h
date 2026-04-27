@@ -12,4 +12,6 @@ extern opcode_fn opcode_table[256];
 // Opcode function declarations
 int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
+int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+
 #endif // OPCODES_H
