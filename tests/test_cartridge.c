@@ -78,6 +78,10 @@ void test_cartridge_unload_frees_rom_memory(void) {
     TEST_ASSERT_EQUAL_UINT8(0, cartridge.bank);
 }
 
+void test_cartridge_unload_does_not_crash_on_null_pointer(void) {
+    cartridge_unload(NULL); // should not crash
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -88,6 +92,7 @@ int main(void) {
     RUN_TEST(test_cartridge_load_rom_pointer_not_null);
     RUN_TEST(test_cartridge_load_rom_content_is_correct);
     RUN_TEST(test_cartridge_unload_frees_rom_memory);
+    RUN_TEST(test_cartridge_unload_does_not_crash_on_null_pointer);
 
     return UNITY_END();
 }
