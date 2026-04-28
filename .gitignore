@@ -16,3 +16,6 @@ Thumbs.db
 # Compiled object files
 *.o
 *.d
+
+# Test binaries
+tests/bin/
