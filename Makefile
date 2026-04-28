@@ -35,5 +35,7 @@ $(TEST_BIN_DIR)/%: tests/%.c $(UNITY_DIR)/unity.c $(TEST_OBJ)
 	@mkdir -p $(TEST_BIN_DIR)
 	$(CC) $(CFLAGS) -I$(UNITY_DIR) $< $(UNITY_DIR)/unity.c $(TEST_OBJ) -o $@ $(LDFLAGS)
 
+# TODO: add coverage target using gcov/lcov
+
 clean:
 	rm -rf build tests/bin
