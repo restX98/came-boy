@@ -26,7 +26,7 @@ build/%.o: src/%.c
 test: $(TEST_BINS)
 	@printf "\n=========================\n\n"
 	@for t in $(TEST_BINS); do \
-		printf "Running $$t:"; \
+		printf "Running $$t: \n"; \
 		./$$t; \
 		printf "\n=========================\n\n"; \
 	done
