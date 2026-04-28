@@ -1,7 +1,9 @@
 #include "mem.h"
-#include "logger.h"
+
 #include <stdlib.h>
 #include <string.h>
+
+#include "logger.h"
 
 int mem_init(mem_t *memory, size_t size, const char *name) {
     LOG_INFO("Initializing %s memory, size: %zu", name, size);

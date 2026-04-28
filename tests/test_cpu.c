@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "test_helpers.h"
-#include "cpu.h"
 
+#include "cpu.h"
 
 void setUp(void) {
     suppress_logs();

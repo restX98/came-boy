@@ -1,9 +1,11 @@
 #include "cartridge.h"
-#include "logger.h"
+
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
+
+#include "logger.h"
 
 int cartridge_load(cartridge_t *cartridge, const char *filename) {
     LOG_INFO("Loading ROM: %s", filename);

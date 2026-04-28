@@ -5,8 +5,8 @@
 #define VRAM_SIZE (8 * 1024) // 8KB of VRAM
 #define HRAM_SIZE 127 // 127 bytes of HRAM
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct {
     uint8_t *mem;

@@ -1,4 +1,5 @@
 #include "opcodes.h"
+
 #include "logger.h"
 
 opcode_fn opcode_table[256] = {

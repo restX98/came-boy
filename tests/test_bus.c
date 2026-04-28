@@ -1,7 +1,9 @@
 #include "unity.h"
 #include "test_helpers.h"
-#include "bus.h"
+
 #include <string.h>
+
+#include "bus.h"
 
 #define FAKE_ROM_SIZE 0x8000 // 32 KiB, covers ROM bank 0 and 1
 

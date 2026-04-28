@@ -1,7 +1,9 @@
 #include "bus.h"
-#include "mem.h"
-#include "logger.h"
+
 #include <assert.h>
+
+#include "logger.h"
+#include "mem.h"
 
 static uint8_t read_rom0(bus_t *bus, uint16_t addr);
 static uint8_t read_rom1(bus_t *bus, uint16_t addr);

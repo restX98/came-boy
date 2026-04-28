@@ -1,8 +1,10 @@
 #include "unity.h"
 #include "test_helpers.h"
-#include "cartridge.h"
+
 #include <stdio.h>
 #include <string.h>
+
+#include "cartridge.h"
 
 #define DUMMY_ROM_PATH "/tmp/test_rom.gb"
 #define DUMMY_ROM_SIZE 32

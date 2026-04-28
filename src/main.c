@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "logger.h"
-#include "cartridge.h"
 #include "bus.h"
+#include "cartridge.h"
 #include "cpu.h"
+#include "logger.h"
 
 int main(void) {
 

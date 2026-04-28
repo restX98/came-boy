@@ -1,6 +1,7 @@
 #include "logger.h"
-#include <stdio.h>
+
 #include <stdarg.h>
+#include <stdio.h>
 
 static const char *level_strings[] = { "DEBUG", "INFO", "WARN", "ERROR" };
 

@@ -1,8 +1,8 @@
 #ifndef CARTRIDGE_H
 #define CARTRIDGE_H
 
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef struct {
     uint8_t *rom;
