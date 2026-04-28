@@ -1,6 +1,7 @@
 #include "bus.h"
 #include "mem.h"
 #include "logger.h"
+#include <assert.h>
 
 static uint8_t read_rom0(bus_t *bus, uint16_t addr);
 static uint8_t read_rom1(bus_t *bus, uint16_t addr);
@@ -72,8 +73,8 @@ uint8_t bus_read(bus_t *bus, uint16_t addr) {
         }
     }
 
-    LOG_WARN("Attempted to read from unsupported address: 0x%04X", addr);
-    return 0xFF; // Return 0xFF for unsupported addresses
+    LOG_WARN("bus_read: address 0x%04X not mapped - this should never happen", addr);
+    assert(0 && "Address not mapped in bus_read");
 }
 
 uint8_t read_rom0(bus_t *bus, uint16_t addr) {
