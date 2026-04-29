@@ -79,14 +79,14 @@ uint8_t bus_read(bus_t *bus, uint16_t addr) {
     assert(0 && "Address not mapped in bus_read");
 }
 
-uint8_t read_rom0(bus_t *bus, uint16_t addr) {
+static uint8_t read_rom0(bus_t *bus, uint16_t addr) {
     uint8_t value = bus->cartridge->rom[addr];
     LOG_DEBUG("ROM bank 0 read: [0x%04X] = 0x%02X", addr, value);
 
     return value;
 }
 
-uint8_t read_rom1(bus_t *bus, uint16_t addr) {
+static uint8_t read_rom1(bus_t *bus, uint16_t addr) {
     // TODO: Implement MBC support to read from switchable ROM banks
     uint8_t value = bus->cartridge->rom[addr];
     LOG_DEBUG("ROM bank 1 read: [0x%04X] = 0x%02X", addr, value);
@@ -94,42 +94,42 @@ uint8_t read_rom1(bus_t *bus, uint16_t addr) {
     return value;
 }
 
-uint8_t read_vram(bus_t *bus, uint16_t addr) {
+static uint8_t read_vram(bus_t *bus, uint16_t addr) {
     uint8_t value = bus->vram.mem[addr - 0x8000];
     LOG_DEBUG("VRAM read: [0x%04X] = 0x%02X", addr, value);
 
     return value;
 }
 
-uint8_t read_external_ram(bus_t *bus, uint16_t addr) {
+static uint8_t read_external_ram(bus_t *bus, uint16_t addr) {
     (void)bus;
     (void)addr;
     // TODO: Implement MBC support to read from external RAM
     return 0xFF;
 }
 
-uint8_t read_wram(bus_t *bus, uint16_t addr) {
+static uint8_t read_wram(bus_t *bus, uint16_t addr) {
     uint8_t value = bus->wram.mem[addr - 0xC000];
     LOG_DEBUG("WRAM read: [0x%04X] = 0x%02X", addr, value);
 
     return value;
 }
 
-uint8_t read_echo_ram(bus_t *bus, uint16_t addr) {
+static uint8_t read_echo_ram(bus_t *bus, uint16_t addr) {
     (void)bus;
     (void)addr;
     // TODO: Implement echo RAM support (?) Understand how it works and whether it's necessary to implement
     return 0xFF; // Temporary return 0xFF
 }
 
-uint8_t read_oam(bus_t *bus, uint16_t addr) {
+static uint8_t read_oam(bus_t *bus, uint16_t addr) {
     (void)bus;
     (void)addr;
     // TODO: Implement OAM support to read from sprite attribute memory
     return 0xFF; // Temporary return 0xFF
 }
 
-uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
+static uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
     (void)bus;
     (void)addr;
     LOG_WARN("Attempted to read from not usable address: 0x%04X", addr);
@@ -138,21 +138,21 @@ uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
     return 0xFF; // Return 0xFF for not usable addresses
 }
 
-uint8_t read_io_reg(bus_t *bus, uint16_t addr) {
+static uint8_t read_io_reg(bus_t *bus, uint16_t addr) {
     (void)bus;
     (void)addr;
     // TODO: Implement I/O register support
     return 0xFF;
 }
 
-uint8_t read_hram(bus_t *bus, uint16_t addr) {
+static uint8_t read_hram(bus_t *bus, uint16_t addr) {
     uint8_t value = bus->hram.mem[addr - 0xFF80];
     LOG_DEBUG("HRAM read: [0x%04X] = 0x%02X", addr, value);
 
     return value;
 }
 
-uint8_t read_interrupt_reg(bus_t *bus, uint16_t addr) {
+static uint8_t read_interrupt_reg(bus_t *bus, uint16_t addr) {
     (void)bus;
     (void)addr;
     // TODO: Implement interrupt register support

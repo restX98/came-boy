@@ -2,6 +2,9 @@
 
 #include "logger.h"
 
+static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+
 opcode_fn opcode_table[256] = {
     // Block 0
     [0x00] = op_nop, // NOP
@@ -14,7 +17,7 @@ opcode_fn opcode_table[256] = {
 };
 
 
-int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus; // Unused parameter
     (void)opcode; // Unused parameter
 
@@ -23,7 +26,7 @@ int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return 4; // NOP takes 4 cycles
 }
 
-int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     uint16_t instr_pc = cpu->pc - 1;
 
