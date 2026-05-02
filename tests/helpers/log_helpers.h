@@ -1,5 +1,5 @@
-#ifndef TEST_HELPERS_H
-#define TEST_HELPERS_H
+#ifndef LOG_HELPERS_H
+#define LOG_HELPERS_H
 
 #include <stdio.h>
 
@@ -18,4 +18,4 @@ static void restore_logs(void) {
     }
 }
 
-#endif // TEST_HELPERS_H
+#endif // LOG_HELPERS_H
