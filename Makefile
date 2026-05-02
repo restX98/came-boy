@@ -6,7 +6,7 @@ SRC     = $(wildcard src/*.c)
 OBJ     = $(SRC:src/%.c=build/%.o)
 
 # --- Test config ---
-UNITY_DIR    = tests/unity
+UNITY_DIR        = tests/unity
 HELPERS_DIR      = tests/helpers
 
 UNIT_SRC         = $(wildcard tests/unit/test_*.c)
@@ -17,14 +17,22 @@ INTEG_SRC        = $(wildcard tests/integration/test_*.c)
 INTEG_BIN_DIR    = tests/bin/integration
 INTEG_BINS       = $(INTEG_SRC:tests/integration/%.c=$(INTEG_BIN_DIR)/%)
 
-TEST_COMMON_OBJ = build/logger.o
+TEST_COMMON_OBJ  = build/logger.o
 
-# old
-TEST_SRC     = $(wildcard tests/test_*.c)
-TEST_BIN_DIR = tests/bin
-TEST_BINS 	 = $(TEST_SRC:tests/%.c=$(TEST_BIN_DIR)/%)
+# --- Coverage config ---
+COV_DIR          = build/coverage
+COV_BIN_UNIT     = tests/bin/coverage/unit
+COV_BIN_INTEG    = tests/bin/coverage/integration
+COV_REPORT_DIR   = tests/coverage_report
+COV_FLAGS        = -fprofile-arcs -ftest-coverage
+COV_CFLAGS       = $(CFLAGS) $(COV_FLAGS)
 
-.PHONY: all clean test test_unit test_integration
+# Derive coverage objects directly from SRC, excluding main.c
+COV_SRC          = $(filter-out src/main.c, $(SRC))
+COV_SRC_OBJS     = $(COV_SRC:src/%.c=$(COV_DIR)/%.o)
+COV_COMMON_OBJ   = $(COV_DIR)/logger.o
+
+.PHONY: all clean test test_unit test_integration coverage coverage_unit
 
 all: build/came-boy
 
@@ -47,21 +55,17 @@ test_unit: $(UNIT_BINS)
 		printf "\n=========================\n\n"; \
 	done
 
-# Run a single unit test
 unit_%: $(UNIT_BIN_DIR)/test_%
 	./$(UNIT_BIN_DIR)/test_$*
 
-# Extract the module name from test_foo -> foo, then link only build/foo.o
 define UNIT_TEST_RULE
 $(UNIT_BIN_DIR)/test_$(1): tests/unit/test_$(1).c $(UNITY_DIR)/unity.c build/$(1).o $(TEST_COMMON_OBJ)
 	@mkdir -p $(UNIT_BIN_DIR)
 	$(CC) $(CFLAGS) -I$(UNITY_DIR) -I$(HELPERS_DIR) $$< $(UNITY_DIR)/unity.c build/$(1).o $(TEST_COMMON_OBJ) -o $$@ $(LDFLAGS)
 endef
 
-# Generate a rule for each test, extracting module name by stripping "test_" prefix
 UNIT_MODULES = $(patsubst tests/unit/test_%.c,%,$(UNIT_SRC))
 $(foreach mod,$(UNIT_MODULES),$(eval $(call UNIT_TEST_RULE,$(mod))))
-
 
 # --- Integration tests ---
 test_integration: $(INTEG_BINS)
@@ -72,11 +76,9 @@ test_integration: $(INTEG_BINS)
 		printf "\n=========================\n\n"; \
 	done
 
-# Run a single integration test
 integ_%: $(INTEG_BIN_DIR)/test_%
 	./$(INTEG_BIN_DIR)/test_$*
 
-# Integration tests link ALL real src objects (minus main.o if you have one)
 INTEG_SRC_OBJS = $(filter-out build/main.o, $(OBJ))
 
 define INTEG_TEST_RULE
@@ -88,8 +90,70 @@ endef
 INTEG_MODULES = $(patsubst tests/integration/test_%.c,%,$(INTEG_SRC))
 $(foreach mod,$(INTEG_MODULES),$(eval $(call INTEG_TEST_RULE,$(mod))))
 
+# --- Coverage ---
 
-# TODO: add coverage target using gcov/lcov
+# Pattern rule for instrumented object files — must be a standalone rule, not inside a define
+$(COV_DIR)/%.o: src/%.c
+	@mkdir -p $(COV_DIR)
+	$(CC) $(COV_CFLAGS) -c $< -o $@
+
+define UNIT_COV_RULE
+$(COV_BIN_UNIT)/test_$(1): tests/unit/test_$(1).c $(UNITY_DIR)/unity.c $(COV_DIR)/$(1).o $(COV_COMMON_OBJ)
+	@mkdir -p $(COV_BIN_UNIT)
+	$(CC) $(COV_CFLAGS) -I$(UNITY_DIR) -I$(HELPERS_DIR) $$< $(UNITY_DIR)/unity.c $(COV_DIR)/$(1).o $(COV_COMMON_OBJ) -o $$@ $(LDFLAGS) $(COV_FLAGS)
+endef
+
+define INTEG_COV_RULE
+$(COV_BIN_INTEG)/test_$(1): tests/integration/test_$(1).c $(UNITY_DIR)/unity.c $(COV_SRC_OBJS)
+	@mkdir -p $(COV_BIN_INTEG)
+	$(CC) $(COV_CFLAGS) -I$(UNITY_DIR) -I$(HELPERS_DIR) $$< $(UNITY_DIR)/unity.c $(COV_SRC_OBJS) -o $$@ $(LDFLAGS) $(COV_FLAGS)
+endef
+
+$(foreach mod,$(UNIT_MODULES),$(eval $(call UNIT_COV_RULE,$(mod))))
+$(foreach mod,$(INTEG_MODULES),$(eval $(call INTEG_COV_RULE,$(mod))))
+
+COV_UNIT_BINS  = $(UNIT_MODULES:%=$(COV_BIN_UNIT)/test_%)
+COV_INTEG_BINS = $(INTEG_MODULES:%=$(COV_BIN_INTEG)/test_%)
+
+coverage_unit: $(COV_UNIT_BINS)
+	@printf "\n=== Running unit tests for coverage ===\n\n"
+	lcov --zerocounters --directory build/coverage --directory tests/bin/coverage
+	@for t in $(COV_UNIT_BINS); do ./$$t; done
+	lcov --capture \
+		--directory build/coverage \
+		--directory tests/bin/coverage/unit \
+		--output-file $(COV_DIR)/coverage_unit.info \
+		--rc branch_coverage=1
+	lcov --remove $(COV_DIR)/coverage_unit.info \
+		'*/tests/*' \
+		--output-file $(COV_DIR)/coverage_unit_filtered.info \
+		--rc branch_coverage=1 \
+		--ignore-errors unused
+	genhtml $(COV_DIR)/coverage_unit_filtered.info \
+		--output-directory $(COV_REPORT_DIR)/unit \
+		--branch-coverage \
+		--title "Unit Test Coverage"
+	@printf "\nReport ready: $(COV_REPORT_DIR)/unit/index.html\n"
+
+coverage: $(COV_UNIT_BINS) $(COV_INTEG_BINS)
+	@printf "\n=== Running all tests for coverage ===\n\n"
+	lcov --zerocounters --directory build/coverage --directory tests/bin/coverage
+	@for t in $(COV_UNIT_BINS) $(COV_INTEG_BINS); do ./$$t; done
+	lcov --capture \
+		--directory build/coverage \
+		--directory tests/bin/coverage \
+		--output-file $(COV_DIR)/coverage.info \
+		--rc branch_coverage=1
+	lcov --remove $(COV_DIR)/coverage.info \
+		'*/tests/*' \
+		--output-file $(COV_DIR)/coverage_filtered.info \
+		--rc branch_coverage=1 \
+		--ignore-errors unused
+	genhtml $(COV_DIR)/coverage_filtered.info \
+		--output-directory $(COV_REPORT_DIR)/global \
+		--branch-coverage \
+		--title "Game Boy Emulator Coverage"
+	@printf "\nReport ready: $(COV_REPORT_DIR)/global/index.html\n"
 
 clean:
-	rm -rf build tests/bin
+	rm -rf build tests/bin $(COV_REPORT_DIR)

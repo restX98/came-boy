@@ -17,5 +17,6 @@ Thumbs.db
 *.o
 *.d
 
-# Test binaries
+# Test
 tests/bin/
+coverage_report
