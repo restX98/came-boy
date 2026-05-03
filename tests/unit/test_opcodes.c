@@ -229,6 +229,22 @@ void test_op_ld_a_hld_mem(void) {
     TEST_ASSERT_EQUAL_UINT8(value, mock_cpu.af.hi);
 }
 
+// ---- op_ld_imm16mem_sp ----
+void test_op_ld_imm16mem_sp(void) {
+    mock_cpu.sp = 0x1234;
+    mock_memory[0] = 0x05; // Low byte of target address
+    mock_memory[1] = 0x00; // High byte of target address
+
+    uint8_t opcode = 0x08; // LD [n16], SP
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(20, cycles);
+    TEST_ASSERT_EQUAL_UINT16(2, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x34, mock_memory[0x0005]); // Save cpu->sp >> 8 at address
+    TEST_ASSERT_EQUAL_UINT16(0x12, mock_memory[0x0006]); // Save cpu->sp & 0xFF at adress+1
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -245,6 +261,6 @@ int main(void) {
     RUN_TEST(test_op_ld_a_de_mem);
     RUN_TEST(test_op_ld_a_hli_mem);
     RUN_TEST(test_op_ld_a_hld_mem);
-
+    RUN_TEST(test_op_ld_imm16mem_sp);
     return UNITY_END();
 }

@@ -2,10 +2,26 @@
 
 #include "logger.h"
 
+/*-------------------------------------------------------
+ * Private helpers
+ *-------------------------------------------------------*/
+
+static uint16_t read_imm16(cpu_t *cpu, bus_t *bus) {
+    uint8_t lo = bus_read(bus, cpu->pc);
+    uint8_t hi = bus_read(bus, cpu->pc + 1);
+    cpu->pc += 2;
+    return (hi << 8) | lo;
+}
+
+/*-------------------------------------------------------
+ * Opcode implementations
+ *-------------------------------------------------------*/
+
 static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -25,6 +41,9 @@ opcode_fn opcode_table[256] = {
     [0x1A] = op_ld_a_r16mem, // LD A,[DE]
     [0x2A] = op_ld_a_r16mem, // LD A,[HL+]
     [0x3A] = op_ld_a_r16mem, // LD A,[HL-]
+    // Type: LD [imm16], sp
+    [0x08] = op_ld_imm16mem_sp,
+
 
     // ... (initialize other opcodes as needed)
 };
@@ -40,11 +59,7 @@ static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 }
 
 static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
-    uint8_t lo = bus_read(bus, cpu->pc);
-    uint8_t hi = bus_read(bus, cpu->pc + 1);
-    uint16_t immediate_value = (hi << 8) | lo;
-
-    cpu->pc += 2;
+    uint16_t immediate_value = read_imm16(cpu, bus);
 
     const char *reg_name = NULL;
     uint8_t register_code = (opcode >> 4) & 0x03;// Extract the register code from the opcode
@@ -133,3 +148,16 @@ static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return 8; // LD a,[r16mem] takes 8 cycles
 }
+
+static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t address = read_imm16(cpu, bus);
+
+    bus_write(bus, address, cpu->sp & 0xFF);
+    bus_write(bus, address + 1, cpu->sp >> 8);
+
+    LOG_DEBUG("LD [0x%04X],SP SP=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        address, cpu->sp, cpu->pc - 1, opcode);
+
+    return 20;
+}
+
