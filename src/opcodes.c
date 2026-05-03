@@ -22,6 +22,7 @@ static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_inc_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -43,8 +44,11 @@ opcode_fn opcode_table[256] = {
     [0x3A] = op_ld_a_r16mem, // LD A,[HL-]
     // Type: LD [imm16], sp
     [0x08] = op_ld_imm16mem_sp,
-
-
+    // Type: INC r16
+    [0x03] = op_inc_r16,     // INC BC
+    [0x13] = op_inc_r16,     // INC DE
+    [0x23] = op_inc_r16,     // INC HL
+    [0x33] = op_inc_r16,     // INC SP
     // ... (initialize other opcodes as needed)
 };
 
@@ -158,6 +162,36 @@ static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     LOG_DEBUG("LD [0x%04X],SP SP=0x%04X at PC=0x%04X (opcode=0x%02X)",
         address, cpu->sp, cpu->pc - 1, opcode);
 
-    return 20;
+    return 20; // LD [imm16],sp takes 20 cycles
+}
+
+static int op_inc_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    (void)bus;
+
+    const char *reg_name = NULL;
+    uint8_t register_code = (opcode >> 4) & 0x03;// Extract the register code from the opcode
+    switch (register_code) {
+        case 0b00: // BC:
+            cpu->bc.reg++;
+            reg_name = "BC";
+            break;
+        case 0b01: // DE:
+            cpu->de.reg++;
+            reg_name = "DE";
+            break;
+        case 0b10: // HL:
+            cpu->hl.reg++;
+            reg_name = "HL";
+            break;
+        case 0b11: // SP:
+            cpu->sp++;
+            reg_name = "SP";
+            break;
+    }
+
+    LOG_DEBUG("INC %s at PC=0x%04X (opcode=0x%02X)",
+        reg_name, cpu->pc - 1, opcode);
+
+    return 8; // INC r16 takes 8 cycles
 }
 
