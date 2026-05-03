@@ -5,6 +5,11 @@
 
 #include "bus.h"
 
+#define FLAG_Z (1 << 7) // 10000000
+#define FLAG_N (1 << 6) // 01000000
+#define FLAG_H (1 << 5) // 00100000
+#define FLAG_C (1 << 4) // 00010000
+
 typedef union {
     uint16_t reg;
     struct {

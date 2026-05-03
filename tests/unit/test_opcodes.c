@@ -343,6 +343,107 @@ void test_op_dec_sp(void) {
     TEST_ASSERT_EQUAL_UINT16(0x0F, mock_cpu.sp);
 }
 
+// ---- op_add_hl_r16 ----
+void test_op_add_hl_bc(void) {
+    mock_cpu.bc.reg = 0x06;
+    mock_cpu.hl.reg = 0x03;
+
+    uint8_t opcode = 0x09; // ADD HL, BC
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x09, mock_cpu.hl.reg);
+}
+
+void test_op_add_hl_de(void) {
+    mock_cpu.de.reg = 0x06;
+    mock_cpu.hl.reg = 0x03;
+
+    uint8_t opcode = 0x19; // ADD HL, DE
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x09, mock_cpu.hl.reg);
+}
+
+void test_op_add_hl_hl(void) {
+    mock_cpu.hl.reg = 0x03;
+
+    uint8_t opcode = 0x29; // ADD HL, HL
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x06, mock_cpu.hl.reg);
+}
+
+void test_op_add_hl_sp(void) {
+    mock_cpu.sp = 0x06;
+    mock_cpu.hl.reg = 0x03;
+
+    uint8_t opcode = 0x39; // ADD HL, SP
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x09, mock_cpu.hl.reg);
+}
+
+void test_op_add_hl_r16_reset_nhc_flags_if_no_overflow(void) {
+    // 0000000000000101+
+    // 0000000000000011=
+    // 0001000000001000
+    mock_cpu.bc.reg = 0x0005;
+    mock_cpu.hl.reg = 0x0003;
+
+    uint8_t opcode = 0x09; // ADD HL, BC
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT16(0x0008, mock_cpu.hl.reg);
+    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_N);
+    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_H);
+    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_C);
+}
+
+void test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11(void) {
+    // 0000111111111111+
+    // 0000000000000001=
+    // 0001000000000000
+    mock_cpu.bc.reg = 0x0FFF;
+    mock_cpu.hl.reg = 0x0001;
+
+    uint8_t opcode = 0x09; // ADD HL, BC
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT16(0x1000, mock_cpu.hl.reg);
+    TEST_ASSERT_EQUAL_UINT8(FLAG_H, mock_cpu.af.lo & FLAG_H);
+    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_C);
+}
+
+void test_op_add_hl_r16_set_carry_if_overflow_from_bit_15(void) {
+    // 1111111111111111+
+    // 0000000000000001=
+    // 0000000000000000
+    mock_cpu.bc.reg = 0xFFFF;
+    mock_cpu.hl.reg = 0x0001;
+
+    uint8_t opcode = 0x09; // ADD HL, BC
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT16(0x0000, mock_cpu.hl.reg);
+    TEST_ASSERT_EQUAL_UINT8(FLAG_H, mock_cpu.af.lo & FLAG_H);
+    TEST_ASSERT_EQUAL_UINT8(FLAG_C, mock_cpu.af.lo & FLAG_C);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -368,6 +469,13 @@ int main(void) {
     RUN_TEST(test_op_dec_de);
     RUN_TEST(test_op_dec_hl);
     RUN_TEST(test_op_dec_sp);
+    RUN_TEST(test_op_add_hl_bc);
+    RUN_TEST(test_op_add_hl_de);
+    RUN_TEST(test_op_add_hl_hl);
+    RUN_TEST(test_op_add_hl_sp);
+    RUN_TEST(test_op_add_hl_r16_reset_nhc_flags_if_no_overflow);
+    RUN_TEST(test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11);
+    RUN_TEST(test_op_add_hl_r16_set_carry_if_overflow_from_bit_15);
 
     return UNITY_END();
 }

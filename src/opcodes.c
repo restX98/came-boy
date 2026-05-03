@@ -1,5 +1,7 @@
 #include "opcodes.h"
 
+#include <stdbool.h>
+
 #include "logger.h"
 
 /*-------------------------------------------------------
@@ -21,6 +23,7 @@ static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_inc_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_add_hl_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -52,6 +55,12 @@ opcode_fn opcode_table[256] = {
     [0x1B] = op_dec_r16,     // DEC DE
     [0x2B] = op_dec_r16,     // DEC HL
     [0x3B] = op_dec_r16,     // DEC SP
+    // Type: add hl, r16
+    [0x09] = op_add_hl_r16,  // ADD HL, BC
+    [0x19] = op_add_hl_r16,  // ADD HL, DE
+    [0x29] = op_add_hl_r16,  // ADD HL, HL
+    [0x39] = op_add_hl_r16,  // ADD HL, SP
+
     // ... (initialize other opcodes as needed)
 };
 
@@ -154,6 +163,36 @@ static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
         reg_name, cpu->pc - 1, opcode);
 
     return 8; // INC r16 takes 8 cycles
+}
+
+static int op_add_hl_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    (void)bus;
+
+    uint8_t register_code = (opcode >> 4) & 0x03;// Extract the register code from the opcode
+
+    uint16_t *reg_ptr = get_r16(cpu, register_code);
+    const char *reg_name = get_r16_name(register_code);
+
+    uint16_t old_hl = cpu->hl.reg;
+    uint16_t val = *reg_ptr;
+
+    // H: overflow from bit 11
+    bool half_carry = ((old_hl & 0x0FFF) + (val & 0x0FFF)) > 0x0FFF;
+
+    // C: overflow from bit 15
+    bool carry = ((uint32_t)old_hl + val) > 0xFFFF;
+
+    cpu->hl.reg = old_hl + val;
+
+    // N cleared, H and C set according to result, Z unaffected
+    cpu->af.lo &= FLAG_Z;           // preserve Z, clear N, H, C
+    if (half_carry) cpu->af.lo |= FLAG_H;
+    if (carry)      cpu->af.lo |= FLAG_C;
+
+    LOG_DEBUG("ADD HL,%s HL=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        reg_name, cpu->hl.reg, cpu->pc - 1, opcode);
+
+    return 8; // ADD HL,r16 takes 8 cycles
 }
 
 /*-------------------------------------------------------
