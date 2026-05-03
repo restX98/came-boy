@@ -42,13 +42,13 @@ void test_op_nop(void) {
     TEST_ASSERT_EQUAL(0, mock_cpu.pc); // PC should not change
 }
 
-// ---- op_ld_r16_d16 ----
-void test_op_ld_bc_d16(void) {
+// ---- op_ld_r16_imm16 ----
+void test_op_ld_bc_imm16(void) {
     // Use mock memory to simulate the ROM contents for the opcode and its immediate value
     mock_memory[0] = 0x34; // Low byte of immediate value
     mock_memory[1] = 0x12; // High byte of immediate value
 
-    uint8_t opcode = 0x01; // LD BC, d16
+    uint8_t opcode = 0x01; // LD BC, imm16
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
@@ -57,12 +57,12 @@ void test_op_ld_bc_d16(void) {
     TEST_ASSERT_EQUAL(0x1234, mock_cpu.bc.reg); // BC should be loaded with 0x1234
 }
 
-void test_op_ld_de_d16(void) {
+void test_op_ld_de_imm16(void) {
     // Use mock memory to simulate the ROM contents for the opcode and its immediate value
     mock_memory[0] = 0x34; // Low byte of immediate value
     mock_memory[1] = 0x12; // High byte of immediate value
 
-    uint8_t opcode = 0x11; // LD DE, d16
+    uint8_t opcode = 0x11; // LD DE, imm16
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
@@ -71,12 +71,12 @@ void test_op_ld_de_d16(void) {
     TEST_ASSERT_EQUAL(0x1234, mock_cpu.de.reg); // DE should be loaded with 0x1234
 }
 
-void test_op_ld_hl_d16(void) {
+void test_op_ld_hl_imm16(void) {
     // Use mock memory to simulate the ROM contents for the opcode and its immediate value
     mock_memory[0] = 0x34; // Low byte of immediate value
     mock_memory[1] = 0x12; // High byte of immediate value
 
-    uint8_t opcode = 0x21; // LD HL, d16
+    uint8_t opcode = 0x21; // LD HL, imm16
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
@@ -85,12 +85,12 @@ void test_op_ld_hl_d16(void) {
     TEST_ASSERT_EQUAL(0x1234, mock_cpu.hl.reg); // HL should be loaded with 0x1234
 }
 
-void test_op_ld_sp_d16(void) {
+void test_op_ld_sp_imm16(void) {
     // Use mock memory to simulate the ROM contents for the opcode and its immediate value
     mock_memory[0] = 0x34; // Low byte of immediate value
     mock_memory[1] = 0x12; // High byte of immediate value
 
-    uint8_t opcode = 0x31; // LD SP, d16
+    uint8_t opcode = 0x31; // LD SP, imm16
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
@@ -743,14 +743,115 @@ void test_op_dec_r8_sets_n_flag(void) {
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
 }
 
+// ---- op_ld_r8_imm8 ----
+void test_op_ld_b_imm8(void) {
+    mock_memory[0] = 0x12; // Immediate value
+
+    uint8_t opcode = 0x06; // LD B, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0x12, mock_cpu.bc.hi);
+}
+
+void test_op_ld_c_imm8(void) {
+    mock_memory[0] = 0x12; // Immediate value
+
+    uint8_t opcode = 0x0E; // LD C, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0x12, mock_cpu.bc.lo);
+}
+
+void test_op_ld_d_imm8(void) {
+    mock_memory[0] = 0x12; // Immediate value
+
+    uint8_t opcode = 0x16; // LD D, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0x12, mock_cpu.de.hi);
+}
+
+void test_op_ld_e_imm8(void) {
+    mock_memory[0] = 0x12; // Immediate value
+
+    uint8_t opcode = 0x1E; // LD E, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0x12, mock_cpu.de.lo);
+}
+
+void test_op_ld_h_imm8(void) {
+    mock_memory[0] = 0x12; // Immediate value
+
+    uint8_t opcode = 0x26; // LD H, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0x12, mock_cpu.hl.hi);
+}
+
+void test_op_ld_l_imm8(void) {
+    // Use mock memory to simulate the ROM contents for the opcode and its immediate value
+    mock_memory[0] = 0x12; // Immediate value
+
+    uint8_t opcode = 0x2E; // LD L, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0x12, mock_cpu.hl.lo);
+}
+
+void test_op_ld_hl_mem_imm8(void) {
+    // Use mock memory to simulate the ROM contents for the opcode and its immediate value
+    mock_cpu.hl.reg = 0x05;
+    mock_memory[0] = 0x12; // Immediate value
+
+    uint8_t opcode = 0x36; // LD [HL], imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0x12, mock_memory[mock_cpu.hl.reg]);
+}
+
+void test_op_ld_a_imm8(void) {
+    // Use mock memory to simulate the ROM contents for the opcode and its immediate value
+    mock_memory[0] = 0x12; // Immediate value
+
+    uint8_t opcode = 0x3E; // LD A, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0x12, mock_cpu.af.hi);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
     RUN_TEST(test_op_nop);
-    RUN_TEST(test_op_ld_bc_d16);
-    RUN_TEST(test_op_ld_de_d16);
-    RUN_TEST(test_op_ld_hl_d16);
-    RUN_TEST(test_op_ld_sp_d16);
+    RUN_TEST(test_op_ld_bc_imm16);
+    RUN_TEST(test_op_ld_de_imm16);
+    RUN_TEST(test_op_ld_hl_imm16);
+    RUN_TEST(test_op_ld_sp_imm16);
     RUN_TEST(test_op_ld_bc_mem_a);
     RUN_TEST(test_op_ld_de_mem_a);
     RUN_TEST(test_op_ld_hli_mem_a);
@@ -800,6 +901,14 @@ int main(void) {
     RUN_TEST(test_op_dec_r8_does_not_set_h_flag_when_no_nibble_overflow);
     RUN_TEST(test_op_dec_r8_wraps_and_sets_h);
     RUN_TEST(test_op_dec_r8_sets_n_flag);
+    RUN_TEST(test_op_ld_b_imm8);
+    RUN_TEST(test_op_ld_c_imm8);
+    RUN_TEST(test_op_ld_d_imm8);
+    RUN_TEST(test_op_ld_e_imm8);
+    RUN_TEST(test_op_ld_h_imm8);
+    RUN_TEST(test_op_ld_l_imm8);
+    RUN_TEST(test_op_ld_hl_mem_imm8);
+    RUN_TEST(test_op_ld_a_imm8);
 
     return UNITY_END();
 }

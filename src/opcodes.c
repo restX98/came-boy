@@ -7,6 +7,7 @@
 /*-------------------------------------------------------
  * Private helpers declaration
  *-------------------------------------------------------*/
+static uint8_t read_imm8(cpu_t *cpu, bus_t *bus);
 static uint16_t read_imm16(cpu_t *cpu, bus_t *bus);
 static uint8_t read_r8(cpu_t *cpu, bus_t *bus, uint8_t register_code);
 static void write_r8(cpu_t *cpu, bus_t *bus, uint8_t register_code, uint8_t value);
@@ -30,15 +31,16 @@ static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_add_hl_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_inc_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_dec_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_ld_r8_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
     [0x00] = op_nop, // NOP
     // Type: LD r16, imm16
-    [0x01] = op_ld_r16_imm16, // LD BC,d16
-    [0x11] = op_ld_r16_imm16, // LD DE,d16
-    [0x21] = op_ld_r16_imm16, // LD HL,d16
-    [0x31] = op_ld_r16_imm16, // LD SP,d16
+    [0x01] = op_ld_r16_imm16, // LD BC,imm8
+    [0x11] = op_ld_r16_imm16, // LD DE,imm8
+    [0x21] = op_ld_r16_imm16, // LD HL,imm8
+    [0x31] = op_ld_r16_imm16, // LD SP,imm8
     // Type: LD [r16mem], a
     [0x02] = op_ld_r16mem_a,  // LD [BC],A
     [0x12] = op_ld_r16mem_a,  // LD [DE],A
@@ -62,10 +64,10 @@ opcode_fn opcode_table[256] = {
     [0x2B] = op_dec_r16,      // DEC HL
     [0x3B] = op_dec_r16,      // DEC SP
     // Type: ADD hl, r16
-    [0x09] = op_add_hl_r16,   // ADD HL, BC
-    [0x19] = op_add_hl_r16,   // ADD HL, DE
-    [0x29] = op_add_hl_r16,   // ADD HL, HL
-    [0x39] = op_add_hl_r16,   // ADD HL, SP
+    [0x09] = op_add_hl_r16,   // ADD HL,BC
+    [0x19] = op_add_hl_r16,   // ADD HL,DE
+    [0x29] = op_add_hl_r16,   // ADD HL,HL
+    [0x39] = op_add_hl_r16,   // ADD HL,SP
     // Type: INC r8
     [0x04] = op_inc_r8,       // INC B
     [0x0C] = op_inc_r8,       // INC C
@@ -84,6 +86,16 @@ opcode_fn opcode_table[256] = {
     [0x2D] = op_dec_r8,       // DEC L
     [0x35] = op_dec_r8,       // DEC [HL]
     [0x3D] = op_dec_r8,       // DEC A
+    // Type: LD r8, imm8
+    [0x06] = op_ld_r8_imm8,   // LD B,imm8
+    [0x0E] = op_ld_r8_imm8,   // LD C,imm8
+    [0x16] = op_ld_r8_imm8,   // LD D,imm8
+    [0x1E] = op_ld_r8_imm8,   // LD E,imm8
+    [0x26] = op_ld_r8_imm8,   // LD H,imm8
+    [0x2E] = op_ld_r8_imm8,   // LD L,imm8
+    [0x36] = op_ld_r8_imm8,   // LD [HL],imm8
+    [0x3E] = op_ld_r8_imm8,   // LD A,imm8
+
     // ... (initialize other opcodes as needed)
 };
 
@@ -109,7 +121,7 @@ static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     LOG_DEBUG("LD %s,imm16 value=0x%04X at PC=0x%04X (opcode=0x%02X)",
         get_r16_name(register_code), immediate_value, cpu->pc - 1, opcode);
 
-    return 12; // LD r16,d16 takes 12 cycles
+    return 12; // LD r16,imm16 takes 12 cycles
 }
 
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
@@ -247,9 +259,28 @@ static int op_dec_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return (register_code == 0b110) ? 12 : 4; // DEC r8 takes 4 cycles for normal r8 register and 12 for [HL]
 }
 
+static int op_ld_r8_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint8_t immediate_value = read_imm8(cpu, bus);
+
+    uint8_t register_code = (opcode >> 3) & 0b111; // Extract the register code from the opcode
+
+    write_r8(cpu, bus, register_code, immediate_value);
+
+    LOG_DEBUG("LD %s,imm8 value=0x%02X at PC=0x%04X (opcode=0x%02X)",
+        get_r8_name(register_code), immediate_value, cpu->pc - 1, opcode);
+
+    return (register_code == 0b110) ? 12 : 4; // LD r8,imm8 takes 4 cycles for normal r8 register and 12 for [HL]
+}
+
 /*-------------------------------------------------------
  * Private helpers definition
  *-------------------------------------------------------*/
+
+static uint8_t read_imm8(cpu_t *cpu, bus_t *bus) {
+    uint8_t immediate_value = bus_read(bus, cpu->pc);
+    cpu->pc += 1;
+    return immediate_value;
+}
 
 static uint16_t read_imm16(cpu_t *cpu, bus_t *bus) {
     uint8_t lo = bus_read(bus, cpu->pc);
