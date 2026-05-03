@@ -1,6 +1,7 @@
 #ifndef CPU_H
 #define CPU_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "bus.h"
@@ -30,5 +31,17 @@ typedef struct {
 void cpu_init(cpu_t *cpu);
 
 int cpu_step(cpu_t *cpu, bus_t *bus);
+
+static inline void flag_set(cpu_t *cpu, uint8_t flag) {
+    cpu->af.lo |= flag;
+}
+
+static inline void flag_clear(cpu_t *cpu, uint8_t flag) {
+    cpu->af.lo &= ~flag;
+}
+
+static inline bool flag_get(cpu_t *cpu, uint8_t flag) {
+    return cpu->af.lo & flag;
+}
 
 #endif // CPU_H
