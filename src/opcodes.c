@@ -37,6 +37,7 @@ static int op_rlca(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_rrca(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_rla(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_rra(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -105,6 +106,8 @@ opcode_fn opcode_table[256] = {
     [0x0F] = op_rrca,         // RRCA
     [0x17] = op_rla,          // RLA
     [0x1F] = op_rra,          // RRA
+    // Type: DAA (Decimal Adjust Accumulator)
+    [0x27] = op_daa,
 
     // ... (initialize other opcodes as needed)
 };
@@ -360,6 +363,39 @@ static int op_rra(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
         old_a, cpu->af.hi, cpu->pc - 1, opcode);
 
     return 4; // RRA takes 4 cycles
+}
+
+static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    (void)bus;
+
+    bool subtraction_flag = flag_get(cpu, FLAG_N);
+    bool half_carry_flag = flag_get(cpu, FLAG_H);
+    bool carry_flag = flag_get(cpu, FLAG_C);
+
+    uint8_t adjustment = 0;
+
+    if (subtraction_flag) {
+        if (half_carry_flag) adjustment += 0x06;
+        if (carry_flag) adjustment += 0x60;
+        cpu->af.hi -= adjustment;
+    } else {
+        if (half_carry_flag || (cpu->af.hi & 0xF) > 0x9) {
+            adjustment += 0x06;
+        }
+        if (carry_flag || cpu->af.hi > 0x99) {
+            flag_set(cpu, FLAG_C);
+            adjustment += 0x60;
+        }
+        cpu->af.hi += adjustment;
+    }
+
+    flag_clear(cpu, FLAG_H);
+    if (cpu->af.hi == 0) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+
+    LOG_DEBUG("DAA A=0x%02X at PC=0x%04X (opcode=0x%02X)",
+        cpu->af.hi, cpu->pc - 1, opcode);
+
+    return 4; // DAA takes 4 cycles
 }
 
 /*-------------------------------------------------------
