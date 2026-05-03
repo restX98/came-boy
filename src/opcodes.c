@@ -5,6 +5,7 @@
 static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -19,7 +20,11 @@ opcode_fn opcode_table[256] = {
     [0x12] = op_ld_r16mem_a, // LD [DE],A
     [0x22] = op_ld_r16mem_a, // LD [HL+],A
     [0x32] = op_ld_r16mem_a, // LD [HL-],A
-
+    // Type: LD a, [r16mem]
+    [0x0A] = op_ld_a_r16mem, // LD A,[BC]
+    [0x1A] = op_ld_a_r16mem, // LD A,[DE]
+    [0x2A] = op_ld_a_r16mem, // LD A,[HL+]
+    [0x3A] = op_ld_a_r16mem, // LD A,[HL-]
 
     // ... (initialize other opcodes as needed)
 };
@@ -91,7 +96,40 @@ static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     }
 
     LOG_DEBUG("LD [%s],A %s=0x%04X A=%u at PC=0x%04X (opcode=0x%02X)",
-        reg_name, reg_name, cpu->bc.reg, cpu->af.hi, cpu->af.hi, cpu->pc - 1, opcode);
+        reg_name, reg_name, cpu->bc.reg, cpu->af.hi, cpu->pc - 1, opcode);
 
     return 8; // LD [r16mem],a takes 8 cycles
+}
+
+static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    const char *reg_name = NULL;
+    uint16_t addr = 0;
+    uint8_t register_code = (opcode >> 4) & 0x03; // Extract the register code from the opcode
+    switch (register_code) {
+        case 0x00:
+            addr = cpu->bc.reg;
+            cpu->af.hi = bus_read(bus, addr);
+            reg_name = "BC";
+            break;
+        case 0x01:
+            addr = cpu->de.reg;
+            cpu->af.hi = bus_read(bus, addr);
+            reg_name = "DE";
+            break;
+        case 0x02:
+            addr = cpu->hl.reg++;
+            cpu->af.hi = bus_read(bus, addr);
+            reg_name = "HL+";
+            break;
+        case 0x03:
+            addr = cpu->hl.reg--;
+            cpu->af.hi = bus_read(bus, addr);
+            reg_name = "HL-";
+            break;
+    }
+
+    LOG_DEBUG("LD A,[%s] %s=0x%04X [%s]=%u at PC=0x%04X (opcode=0x%02X)",
+        reg_name, reg_name, cpu->bc.reg, reg_name, cpu->af.hi, cpu->pc - 1, opcode);
+
+    return 8; // LD a,[r16mem] takes 8 cycles
 }
