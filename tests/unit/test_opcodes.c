@@ -844,6 +844,62 @@ void test_op_ld_a_imm8(void) {
     TEST_ASSERT_EQUAL(0x12, mock_cpu.af.hi);
 }
 
+// ---- op_rlca ----
+void test_op_rlca(void) {
+    mock_cpu.af.hi = 0b01100101;
+
+    uint8_t opcode = 0x07; // RLCA
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0b11001010, mock_cpu.af.hi);
+}
+
+void test_op_rlca_clears_z_n_h_flags(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.af.hi = 0b01100101;
+
+    uint8_t opcode = 0x07; // RLCA
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+void test_op_rlca_sets_carry_flag_when_msb_is_1(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.af.hi = 0b10100101;
+
+    uint8_t opcode = 0x07; // RLCA
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(0b01001011, mock_cpu.af.hi);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_rlca_clears_carry_flag_when_msb_is_0(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.af.hi = 0b01100101;
+
+    uint8_t opcode = 0x07; // RLCA
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(0b11001010, mock_cpu.af.hi);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -909,6 +965,10 @@ int main(void) {
     RUN_TEST(test_op_ld_l_imm8);
     RUN_TEST(test_op_ld_hl_mem_imm8);
     RUN_TEST(test_op_ld_a_imm8);
+    RUN_TEST(test_op_rlca);
+    RUN_TEST(test_op_rlca_clears_z_n_h_flags);
+    RUN_TEST(test_op_rlca_sets_carry_flag_when_msb_is_1);
+    RUN_TEST(test_op_rlca_clears_carry_flag_when_msb_is_0);
 
     return UNITY_END();
 }
