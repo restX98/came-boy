@@ -929,9 +929,6 @@ void test_op_rrca_clears_z_n_h_flags(void) {
 }
 
 void test_op_rrca_sets_carry_flag_when_lsb_is_1(void) {
-    flag_set(&mock_cpu, FLAG_Z);
-    flag_set(&mock_cpu, FLAG_N);
-    flag_set(&mock_cpu, FLAG_H);
     mock_cpu.af.hi = 0b10100101;
 
     uint8_t opcode = 0x0F; // RRCA
@@ -943,9 +940,6 @@ void test_op_rrca_sets_carry_flag_when_lsb_is_1(void) {
 }
 
 void test_op_rrca_clears_carry_flag_when_lsb_is_0(void) {
-    flag_set(&mock_cpu, FLAG_Z);
-    flag_set(&mock_cpu, FLAG_N);
-    flag_set(&mock_cpu, FLAG_H);
     mock_cpu.af.hi = 0b11001010;
 
     uint8_t opcode = 0x0F; // RRCA
@@ -953,6 +947,59 @@ void test_op_rrca_clears_carry_flag_when_lsb_is_0(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL(0b01100101, mock_cpu.af.hi);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+// ---- op_rla ----
+void test_op_rla_inserts_carry_and_updates_msb_to_flag(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.af.hi = 0b11001010;
+
+    uint8_t opcode = 0x17; // RLA
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL(0b10010101, mock_cpu.af.hi);
+}
+
+void test_op_rla_clears_z_n_h_flags(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.af.hi = 0b11001010;
+
+    uint8_t opcode = 0x17; // RLA
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+void test_op_rla_sets_carry_flag_when_msb_is_1(void) {
+    flag_clear(&mock_cpu, FLAG_C);
+    mock_cpu.af.hi = 0b10100100;
+
+    uint8_t opcode = 0x17; // RLA
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(0b01001000, mock_cpu.af.hi);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_rla_clears_carry_flag_when_msb_is_0(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.af.hi = 0b01010010;
+
+    uint8_t opcode = 0x17; // RLA
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(0b10100101, mock_cpu.af.hi);
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
@@ -1029,6 +1076,10 @@ int main(void) {
     RUN_TEST(test_op_rrca_clears_z_n_h_flags);
     RUN_TEST(test_op_rrca_sets_carry_flag_when_lsb_is_1);
     RUN_TEST(test_op_rrca_clears_carry_flag_when_lsb_is_0);
+    RUN_TEST(test_op_rla_inserts_carry_and_updates_msb_to_flag);
+    RUN_TEST(test_op_rla_clears_z_n_h_flags);
+    RUN_TEST(test_op_rla_sets_carry_flag_when_msb_is_1);
+    RUN_TEST(test_op_rla_clears_carry_flag_when_msb_is_0);
 
     return UNITY_END();
 }
