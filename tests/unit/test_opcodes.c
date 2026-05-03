@@ -1070,9 +1070,9 @@ void test_op_daa_no_adjustment_needed(void) {
     TEST_ASSERT_EQUAL(4, cycles);
     TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
     TEST_ASSERT_EQUAL_UINT8(0x08, mock_cpu.af.hi);
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_Z);
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_H);
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
 void test_op_daa_adjusts_lower_nibble_after_addition(void) {
@@ -1084,7 +1084,7 @@ void test_op_daa_adjusts_lower_nibble_after_addition(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT8(0x12, mock_cpu.af.hi); // 0x0C + 0x06 = 0x12
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
 void test_op_daa_adjusts_upper_nibble_after_addition(void) {
@@ -1096,8 +1096,8 @@ void test_op_daa_adjusts_upper_nibble_after_addition(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.af.hi); // 0xA0 + 0x60 = 0x100, wraps to 0x00
-    TEST_ASSERT_EQUAL_UINT8(FLAG_C, mock_cpu.af.lo & FLAG_C);
-    TEST_ASSERT_EQUAL_UINT8(FLAG_Z, mock_cpu.af.lo & FLAG_Z);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
 }
 
 void test_op_daa_adjusts_both_nibbles_after_addition(void) {
@@ -1109,7 +1109,7 @@ void test_op_daa_adjusts_both_nibbles_after_addition(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT8(0x12, mock_cpu.af.hi); // 0xAC + 0x66 = 0x112, wraps to 0x12
-    TEST_ASSERT_EQUAL_UINT8(FLAG_C, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
 }
 
 void test_op_daa_uses_carry_flag_to_adjust_upper_nibble(void) {
@@ -1122,7 +1122,7 @@ void test_op_daa_uses_carry_flag_to_adjust_upper_nibble(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT8(0x65, mock_cpu.af.hi); // 0x05 + 0x60 = 0x65
-    TEST_ASSERT_EQUAL_UINT8(FLAG_C, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
 }
 
 void test_op_daa_uses_half_carry_flag_to_adjust_lower_nibble(void) {
@@ -1149,7 +1149,7 @@ void test_op_daa_adjusts_lower_nibble_after_subtraction(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT8(0x13, mock_cpu.af.hi); // 0x19 - 0x06 = 0x13
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
 void test_op_daa_adjusts_upper_nibble_after_subtraction(void) {
@@ -1174,7 +1174,7 @@ void test_op_daa_sets_z_flag_when_result_is_zero(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.af.hi);
-    TEST_ASSERT_EQUAL_UINT8(FLAG_Z, mock_cpu.af.lo & FLAG_Z);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
 }
 
 void test_op_daa_clears_z_flag_when_result_is_nonzero(void) {
@@ -1185,7 +1185,7 @@ void test_op_daa_clears_z_flag_when_result_is_nonzero(void) {
 
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_Z);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
 }
 
 // H flag
@@ -1197,7 +1197,52 @@ void test_op_daa_always_clears_h_flag(void) {
 
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_H);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+// ---- op_cpl ----
+void test_op_cpl(void) {
+    mock_cpu.af.hi = 0b11001010;
+
+    uint8_t opcode = 0x2F; // CPL
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0b00110101, mock_cpu.af.hi);
+}
+
+
+void test_op_cpl_sets_n_h_flags(void) {
+    mock_cpu.af.hi = 0x42;
+
+    uint8_t opcode = 0x2F; // CPL
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+}
+
+void test_op_cpl_all_zeros_becomes_all_ones(void) {
+    mock_cpu.af.hi = 0x00;
+
+    uint8_t opcode = 0x2F; // CPL
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0xFF, mock_cpu.af.hi);
+}
+
+void test_op_cpl_all_ones_becomes_all_zeros(void) {
+    mock_cpu.af.hi = 0xFF;
+
+    uint8_t opcode = 0x2F; // CPL
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.af.hi);
 }
 
 int main(void) {
@@ -1292,6 +1337,10 @@ int main(void) {
     RUN_TEST(test_op_daa_sets_z_flag_when_result_is_zero);
     RUN_TEST(test_op_daa_clears_z_flag_when_result_is_nonzero);
     RUN_TEST(test_op_daa_always_clears_h_flag);
+    RUN_TEST(test_op_cpl);
+    RUN_TEST(test_op_cpl_sets_n_h_flags);
+    RUN_TEST(test_op_cpl_all_zeros_becomes_all_ones);
+    RUN_TEST(test_op_cpl_all_ones_becomes_all_zeros);
 
     return UNITY_END();
 }

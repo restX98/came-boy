@@ -38,6 +38,7 @@ static int op_rrca(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_rla(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_rra(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_cpl(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -108,6 +109,8 @@ opcode_fn opcode_table[256] = {
     [0x1F] = op_rra,          // RRA
     // Type: DAA (Decimal Adjust Accumulator)
     [0x27] = op_daa,
+    // Type: CPL (ComPLement)
+    [0x2F] = op_cpl,
 
     // ... (initialize other opcodes as needed)
 };
@@ -396,6 +399,20 @@ static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
         cpu->af.hi, cpu->pc - 1, opcode);
 
     return 4; // DAA takes 4 cycles
+}
+
+static int op_cpl(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    (void)bus;
+
+    cpu->af.hi = ~cpu->af.hi;
+
+    flag_set(cpu, FLAG_N);
+    flag_set(cpu, FLAG_H);
+
+    LOG_DEBUG("CPL A=0x%02X at PC=0x%04X (opcode=0x%02X)",
+        cpu->af.hi, cpu->pc - 1, opcode);
+
+    return 4; // CPL takes 4 cycles
 }
 
 /*-------------------------------------------------------
