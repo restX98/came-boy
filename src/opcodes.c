@@ -17,7 +17,7 @@ static const char *get_r16mem_name(uint8_t register_code);
  * Opcode declaration
  *-------------------------------------------------------*/
 static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
-static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode);
@@ -29,10 +29,10 @@ opcode_fn opcode_table[256] = {
     // Block 0
     [0x00] = op_nop, // NOP
     // Type: LD r16, imm16
-    [0x01] = op_ld_r16_d16,  // LD BC,d16
-    [0x11] = op_ld_r16_d16,  // LD DE,d16
-    [0x21] = op_ld_r16_d16,  // LD HL,d16
-    [0x31] = op_ld_r16_d16,  // LD SP,d16
+    [0x01] = op_ld_r16_imm16,  // LD BC,d16
+    [0x11] = op_ld_r16_imm16,  // LD DE,d16
+    [0x21] = op_ld_r16_imm16,  // LD HL,d16
+    [0x31] = op_ld_r16_imm16,  // LD SP,d16
     // Type: LD [r16mem], a
     [0x02] = op_ld_r16mem_a, // LD [BC],A
     [0x12] = op_ld_r16mem_a, // LD [DE],A
@@ -77,7 +77,7 @@ static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return 4; // NOP takes 4 cycles
 }
 
-static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t immediate_value = read_imm16(cpu, bus);
 
     uint8_t register_code = (opcode >> 4) & 0x03;// Extract the register code from the opcode
@@ -87,7 +87,7 @@ static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     *reg_ptr = immediate_value;
 
-    LOG_DEBUG("LD %s,d16 value=0x%04X at PC=0x%04X (opcode=0x%02X)",
+    LOG_DEBUG("LD %s,imm16 value=0x%04X at PC=0x%04X (opcode=0x%02X)",
         reg_name, immediate_value, cpu->pc - 1, opcode);
 
     return 12; // LD r16,d16 takes 12 cycles
