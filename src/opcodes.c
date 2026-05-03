@@ -3,20 +3,17 @@
 #include "logger.h"
 
 /*-------------------------------------------------------
- * Private helpers
+ * Private helpers declaration
  *-------------------------------------------------------*/
-
-static uint16_t read_imm16(cpu_t *cpu, bus_t *bus) {
-    uint8_t lo = bus_read(bus, cpu->pc);
-    uint8_t hi = bus_read(bus, cpu->pc + 1);
-    cpu->pc += 2;
-    return (hi << 8) | lo;
-}
+static uint16_t read_imm16(cpu_t *cpu, bus_t *bus);
+static uint16_t *get_r16(cpu_t *cpu, uint8_t register_code);
+static const char *get_r16_name(uint8_t register_code);
+static uint16_t get_r16mem(cpu_t *cpu, uint8_t register_code);
+static const char *get_r16mem_name(uint8_t register_code);
 
 /*-------------------------------------------------------
- * Opcode implementations
+ * Opcode declaration
  *-------------------------------------------------------*/
-
 static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode);
@@ -58,6 +55,9 @@ opcode_fn opcode_table[256] = {
     // ... (initialize other opcodes as needed)
 };
 
+/*-------------------------------------------------------
+ * Opcode definitions
+ *-------------------------------------------------------*/
 
 static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus; // Unused parameter
@@ -71,26 +71,12 @@ static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t immediate_value = read_imm16(cpu, bus);
 
-    const char *reg_name = NULL;
     uint8_t register_code = (opcode >> 4) & 0x03;// Extract the register code from the opcode
-    switch (register_code) {
-        case 0b00: // BC:
-            cpu->bc.reg = immediate_value;
-            reg_name = "BC";
-            break;
-        case 0b01: // DE:
-            cpu->de.reg = immediate_value;
-            reg_name = "DE";
-            break;
-        case 0b10: // HL:
-            cpu->hl.reg = immediate_value;
-            reg_name = "HL";
-            break;
-        case 0b11: // SP:
-            cpu->sp = immediate_value;
-            reg_name = "SP";
-            break;
-    }
+
+    uint16_t *reg_ptr = get_r16(cpu, register_code);
+    const char *reg_name = get_r16_name(register_code);
+
+    *reg_ptr = immediate_value;
 
     LOG_DEBUG("LD %s,d16 value=0x%04X at PC=0x%04X (opcode=0x%02X)",
         reg_name, immediate_value, cpu->pc - 1, opcode);
@@ -99,26 +85,12 @@ static int op_ld_r16_d16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 }
 
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
-    const char *reg_name = NULL;
     uint8_t register_code = (opcode >> 4) & 0x03; // Extract the register code from the opcode
-    switch (register_code) {
-        case 0b00:
-            bus_write(bus, cpu->bc.reg, cpu->af.hi);
-            reg_name = "BC";
-            break;
-        case 0b01:
-            bus_write(bus, cpu->de.reg, cpu->af.hi);
-            reg_name = "DE";
-            break;
-        case 0b10:
-            bus_write(bus, cpu->hl.reg++, cpu->af.hi);
-            reg_name = "HL+";
-            break;
-        case 0b11:
-            bus_write(bus, cpu->hl.reg--, cpu->af.hi);
-            reg_name = "HL-";
-            break;
-    }
+
+    uint16_t reg_value = get_r16mem(cpu, register_code);
+    const char *reg_name = get_r16mem_name(register_code);
+
+    bus_write(bus, reg_value, cpu->af.hi);
 
     LOG_DEBUG("LD [%s],A %s=0x%04X A=%u at PC=0x%04X (opcode=0x%02X)",
         reg_name, reg_name, cpu->bc.reg, cpu->af.hi, cpu->pc - 1, opcode);
@@ -127,31 +99,12 @@ static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 }
 
 static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
-    const char *reg_name = NULL;
-    uint16_t addr = 0;
     uint8_t register_code = (opcode >> 4) & 0x03; // Extract the register code from the opcode
-    switch (register_code) {
-        case 0x00:
-            addr = cpu->bc.reg;
-            cpu->af.hi = bus_read(bus, addr);
-            reg_name = "BC";
-            break;
-        case 0x01:
-            addr = cpu->de.reg;
-            cpu->af.hi = bus_read(bus, addr);
-            reg_name = "DE";
-            break;
-        case 0x02:
-            addr = cpu->hl.reg++;
-            cpu->af.hi = bus_read(bus, addr);
-            reg_name = "HL+";
-            break;
-        case 0x03:
-            addr = cpu->hl.reg--;
-            cpu->af.hi = bus_read(bus, addr);
-            reg_name = "HL-";
-            break;
-    }
+
+    uint16_t reg_value = get_r16mem(cpu, register_code);
+    const char *reg_name = get_r16mem_name(register_code);
+
+    cpu->af.hi = bus_read(bus, reg_value);
 
     LOG_DEBUG("LD A,[%s] %s=0x%04X [%s]=%u at PC=0x%04X (opcode=0x%02X)",
         reg_name, reg_name, cpu->bc.reg, reg_name, cpu->af.hi, cpu->pc - 1, opcode);
@@ -174,26 +127,12 @@ static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 static int op_inc_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
 
-    const char *reg_name = NULL;
     uint8_t register_code = (opcode >> 4) & 0x03;// Extract the register code from the opcode
-    switch (register_code) {
-        case 0b00: // BC:
-            cpu->bc.reg++;
-            reg_name = "BC";
-            break;
-        case 0b01: // DE:
-            cpu->de.reg++;
-            reg_name = "DE";
-            break;
-        case 0b10: // HL:
-            cpu->hl.reg++;
-            reg_name = "HL";
-            break;
-        case 0b11: // SP:
-            cpu->sp++;
-            reg_name = "SP";
-            break;
-    }
+
+    uint16_t *reg_ptr = get_r16(cpu, register_code);
+    const char *reg_name = get_r16_name(register_code);
+
+    *reg_ptr += 1;
 
     LOG_DEBUG("INC %s at PC=0x%04X (opcode=0x%02X)",
         reg_name, cpu->pc - 1, opcode);
@@ -204,26 +143,12 @@ static int op_inc_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
 
-    const char *reg_name = NULL;
     uint8_t register_code = (opcode >> 4) & 0x03;// Extract the register code from the opcode
-    switch (register_code) {
-        case 0b00: // BC:
-            cpu->bc.reg--;
-            reg_name = "BC";
-            break;
-        case 0b01: // DE:
-            cpu->de.reg--;
-            reg_name = "DE";
-            break;
-        case 0b10: // HL:
-            cpu->hl.reg--;
-            reg_name = "HL";
-            break;
-        case 0b11: // SP:
-            cpu->sp--;
-            reg_name = "SP";
-            break;
-    }
+
+    uint16_t *reg_ptr = get_r16(cpu, register_code);
+    const char *reg_name = get_r16_name(register_code);
+
+    *reg_ptr -= 1;
 
     LOG_DEBUG("INC %s at PC=0x%04X (opcode=0x%02X)",
         reg_name, cpu->pc - 1, opcode);
@@ -231,3 +156,53 @@ static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return 8; // INC r16 takes 8 cycles
 }
 
+/*-------------------------------------------------------
+ * Private helpers definition
+ *-------------------------------------------------------*/
+
+static uint16_t read_imm16(cpu_t *cpu, bus_t *bus) {
+    uint8_t lo = bus_read(bus, cpu->pc);
+    uint8_t hi = bus_read(bus, cpu->pc + 1);
+    cpu->pc += 2;
+    return (hi << 8) | lo;
+}
+
+static uint16_t *get_r16(cpu_t *cpu, uint8_t register_code) {
+    switch (register_code) {
+        case 0b00: return &cpu->bc.reg;
+        case 0b01: return &cpu->de.reg;
+        case 0b10: return &cpu->hl.reg;
+        case 0b11: return &cpu->sp;
+        default:   return NULL;
+    }
+}
+
+static const char *get_r16_name(uint8_t register_code) {
+    switch (register_code) {
+        case 0b00: return "BC";
+        case 0b01: return "DE";
+        case 0b10: return "HL";
+        case 0b11: return "SP";
+        default:   return "??";
+    }
+}
+
+static uint16_t get_r16mem(cpu_t *cpu, uint8_t register_code) {
+    switch (register_code) {
+        case 0b00: return cpu->bc.reg;
+        case 0b01: return cpu->de.reg;
+        case 0b10: return cpu->hl.reg++;
+        case 0b11: return cpu->hl.reg--;
+        default:   return -1;
+    }
+}
+
+static const char *get_r16mem_name(uint8_t register_code) {
+    switch (register_code) {
+        case 0b00: return "BC";
+        case 0b01: return "DE";
+        case 0b10: return "HL+";
+        case 0b11: return "HL-";
+        default:   return "??";
+    }
+}
