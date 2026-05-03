@@ -401,15 +401,16 @@ void test_op_add_hl_r16_reset_nhc_flags_if_no_overflow(void) {
     // 0001000000001000
     mock_cpu.bc.reg = 0x0005;
     mock_cpu.hl.reg = 0x0003;
+    flag_set(&mock_cpu, FLAG_N); // N set beforehand
 
     uint8_t opcode = 0x09; // ADD HL, BC
 
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT16(0x0008, mock_cpu.hl.reg);
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_N);
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_H);
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
 void test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11(void) {
@@ -424,8 +425,8 @@ void test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT16(0x1000, mock_cpu.hl.reg);
-    TEST_ASSERT_EQUAL_UINT8(FLAG_H, mock_cpu.af.lo & FLAG_H);
-    TEST_ASSERT_EQUAL_UINT8(0, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
 void test_op_add_hl_r16_set_carry_if_overflow_from_bit_15(void) {
@@ -440,8 +441,151 @@ void test_op_add_hl_r16_set_carry_if_overflow_from_bit_15(void) {
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT16(0x0000, mock_cpu.hl.reg);
-    TEST_ASSERT_EQUAL_UINT8(FLAG_H, mock_cpu.af.lo & FLAG_H);
-    TEST_ASSERT_EQUAL_UINT8(FLAG_C, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+}
+
+// ---- op_inc_r8 ----
+void test_op_inc_b(void) {
+    mock_cpu.bc.hi = 0x2;
+
+    uint8_t opcode = 0x04; // INC B
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.bc.hi);
+}
+
+void test_op_inc_c(void) {
+    mock_cpu.bc.lo = 0x2;
+
+    uint8_t opcode = 0x0C; // INC C
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.bc.lo);
+}
+
+void test_op_inc_d(void) {
+    mock_cpu.de.hi = 0x2;
+
+    uint8_t opcode = 0x14; // INC D
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.de.hi);
+}
+
+void test_op_inc_e(void) {
+    mock_cpu.de.lo = 0x2;
+
+    uint8_t opcode = 0x1C; // INC E
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.de.lo);
+}
+
+
+void test_op_inc_h(void) {
+    mock_cpu.hl.hi = 0x2;
+
+    uint8_t opcode = 0x24; // INC H
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.hl.hi);
+}
+
+void test_op_inc_l(void) {
+    mock_cpu.hl.lo = 0x2;
+
+    uint8_t opcode = 0x2C; // INC L
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.hl.lo);
+}
+
+void test_op_inc_hl_mem(void) {
+    mock_cpu.hl.reg = 0x0;
+    mock_memory[mock_cpu.hl.reg] = 0x2;
+
+    uint8_t opcode = 0x34; // INC [HL]
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0x3, mock_memory[mock_cpu.hl.reg]);
+}
+
+void test_op_inc_a(void) {
+    mock_cpu.af.hi = 0x2;
+
+    uint8_t opcode = 0x3C; // INC A
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.af.hi);
+}
+
+void test_op_inc_r8_sets_z_flag_on_overflow(void) {
+    mock_cpu.bc.hi = 0xFF;
+
+    uint8_t opcode = 0x04; // INC B
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.bc.hi);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_inc_r8_sets_h_flag_on_nibble_overflow(void) {
+    mock_cpu.bc.hi = 0x0F; // 00001111 -> 00010000
+
+    uint8_t opcode = 0x04; // INC B
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x10, mock_cpu.bc.hi);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+}
+
+void test_op_inc_r8_does_not_set_h_flag_when_no_nibble_overflow(void) {
+    mock_cpu.bc.hi = 0x10; // 00010000 -> 00010001
+
+    uint8_t opcode = 0x04; // INC B
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x11, mock_cpu.bc.hi);
+    TEST_ASSERT_EQUAL_UINT8(false, flag_get(&mock_cpu, FLAG_H));
+}
+
+void test_op_inc_r8_clears_n_flag(void) {
+    flag_set(&mock_cpu, FLAG_N); // N set beforehand
+    mock_cpu.bc.hi = 0x01;
+
+    uint8_t opcode = 0x04; // INC B
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
 }
 
 int main(void) {
@@ -476,6 +620,18 @@ int main(void) {
     RUN_TEST(test_op_add_hl_r16_reset_nhc_flags_if_no_overflow);
     RUN_TEST(test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11);
     RUN_TEST(test_op_add_hl_r16_set_carry_if_overflow_from_bit_15);
+    RUN_TEST(test_op_inc_b);
+    RUN_TEST(test_op_inc_c);
+    RUN_TEST(test_op_inc_d);
+    RUN_TEST(test_op_inc_e);
+    RUN_TEST(test_op_inc_h);
+    RUN_TEST(test_op_inc_l);
+    RUN_TEST(test_op_inc_hl_mem);
+    RUN_TEST(test_op_inc_a);
+    RUN_TEST(test_op_inc_r8_sets_z_flag_on_overflow);
+    RUN_TEST(test_op_inc_r8_sets_h_flag_on_nibble_overflow);
+    RUN_TEST(test_op_inc_r8_does_not_set_h_flag_when_no_nibble_overflow);
+    RUN_TEST(test_op_inc_r8_clears_n_flag);
 
     return UNITY_END();
 }
