@@ -1261,6 +1261,39 @@ void test_op_scf(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
 }
 
+// ---- op_ccf ----
+void test_op_ccf_clears_c_flag_when_set(void) {
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    flag_set(&mock_cpu, FLAG_C);
+
+    uint8_t opcode = 0x3F; // CCF
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+void test_op_ccf_sets_c_flag_when_clear(void) {
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    flag_clear(&mock_cpu, FLAG_C);
+
+    uint8_t opcode = 0x3F; // CCF
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -1358,6 +1391,8 @@ int main(void) {
     RUN_TEST(test_op_cpl_all_zeros_becomes_all_ones);
     RUN_TEST(test_op_cpl_all_ones_becomes_all_zeros);
     RUN_TEST(test_op_scf);
+    RUN_TEST(test_op_ccf_clears_c_flag_when_set);
+    RUN_TEST(test_op_ccf_sets_c_flag_when_clear);
 
     return UNITY_END();
 }

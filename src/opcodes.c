@@ -40,6 +40,7 @@ static int op_rra(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_cpl(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_scf(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_ccf(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -114,6 +115,8 @@ opcode_fn opcode_table[256] = {
     [0x2F] = op_cpl,
     // Type: SCF (Set Carry Flag)
     [0x37] = op_scf,
+    // Type: CCF (Complement Carry Flag)
+    [0x3F] = op_ccf,
 
     // ... (initialize other opcodes as needed)
 };
@@ -428,6 +431,19 @@ static int op_scf(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     LOG_DEBUG("SCF at PC=0x%04X (opcode=0x%02X)", cpu->pc - 1, opcode);
 
     return 4; // SCF takes 4 cycles
+}
+
+static int op_ccf(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    (void)bus;
+
+    flag_clear(cpu, FLAG_N);
+    flag_clear(cpu, FLAG_H);
+
+    if (flag_get(cpu, FLAG_C)) flag_clear(cpu, FLAG_C); else flag_set(cpu, FLAG_C);
+
+    LOG_DEBUG("CFF at PC=0x%04X (opcode=0x%02X)", cpu->pc - 1, opcode);
+
+    return 4; // CCF takes 4 cycles
 }
 
 /*-------------------------------------------------------
