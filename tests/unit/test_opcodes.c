@@ -7,7 +7,7 @@
 
 static cpu_t mock_cpu = { 0 };
 static bus_t mock_bus = { 0 };
-static uint8_t mock_memory[0x4000] = { 0 }; // 16 KiB, covers all the addresses accessed by the opcodes being tested
+static uint8_t mock_memory[0x10] = { 0 };
 
 void setUp(void) {
     suppress_logs();
@@ -25,6 +25,11 @@ void tearDown(void) {
 uint8_t bus_read(bus_t *bus, uint16_t addr) {
     (void)bus; // Unused parameter
     return mock_memory[addr];
+}
+
+void bus_write(bus_t *bus, uint16_t addr, uint8_t value) {
+    (void)bus; (void)addr; (void)value;
+    mock_memory[addr] = value;
 }
 
 // ---- op_nop ----
@@ -94,6 +99,64 @@ void test_op_ld_sp_d16(void) {
     TEST_ASSERT_EQUAL(0x1234, mock_cpu.sp); // SP should be loaded with 0x1234
 }
 
+// ---- op_ld_r16mem_a ----
+void test_op_ld_bc_mem_a(void) {
+    mock_cpu.bc.reg = 0x00;
+    mock_cpu.af.hi = 0x42;
+
+    uint8_t opcode = 0x02; // LD [BC], A
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x00, mock_cpu.bc.reg);
+    TEST_ASSERT_EQUAL(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(mock_cpu.af.hi, mock_memory[mock_cpu.bc.reg]);
+}
+
+void test_op_ld_de_mem_a(void) {
+    mock_cpu.de.reg = 0x00;
+    mock_cpu.af.hi = 0x42;
+
+    uint8_t opcode = 0x12; // LD [DE], A
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x00, mock_cpu.de.reg);
+    TEST_ASSERT_EQUAL(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(mock_cpu.af.hi, mock_memory[mock_cpu.de.reg]);
+}
+
+void test_op_ld_hli_mem_a(void) {
+    mock_cpu.hl.reg = 0x00;
+    mock_cpu.af.hi = 0x42;
+
+    uint8_t opcode = 0x22; // LD [HL+], A
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x01, mock_cpu.hl.reg);
+    TEST_ASSERT_EQUAL(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(mock_cpu.af.hi, mock_memory[mock_cpu.hl.reg - 1]);
+}
+
+void test_op_ld_hld_mem_a(void) {
+    mock_cpu.hl.reg = 0x01;
+    mock_cpu.af.hi = 0x42;
+
+    uint8_t opcode = 0x32; // LD [HL-], A
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x00, mock_cpu.hl.reg);
+    TEST_ASSERT_EQUAL(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(mock_cpu.af.hi, mock_memory[mock_cpu.hl.reg + 1]);
+}
+
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -102,6 +165,10 @@ int main(void) {
     RUN_TEST(test_op_ld_de_d16);
     RUN_TEST(test_op_ld_hl_d16);
     RUN_TEST(test_op_ld_sp_d16);
+    RUN_TEST(test_op_ld_bc_mem_a);
+    RUN_TEST(test_op_ld_de_mem_a);
+    RUN_TEST(test_op_ld_hli_mem_a);
+    RUN_TEST(test_op_ld_hld_mem_a);
 
     return UNITY_END();
 }
