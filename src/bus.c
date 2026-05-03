@@ -18,17 +18,17 @@ static uint8_t read_hram(bus_t *bus, uint16_t addr);
 static uint8_t read_interrupt_reg(bus_t *bus, uint16_t addr);
 
 static const mem_region_t memory_map[] = {
-    {"ROM Bank 0", 0x0000, 0x3FFF, read_rom0},                        // 16 KiB ROM bank 00 (fixed)
-    {"ROM Bank 1", 0x4000, 0x7FFF, read_rom1},                        // 16 KiB ROM bank 01~NN (switchable, if supported)
-    {"VRAM", 0x8000, 0x9FFF, read_vram},                              // 8 KiB Video RAM (VRAM)
-    {"External RAM", 0xA000, 0xBFFF, read_external_ram},              // 8 KiB External RAM (if supported)
-    {"WRAM", 0xC000, 0xDFFF, read_wram},                              // 8 KiB Work RAM (WRAM)
-    {"Echo RAM", 0xE000, 0xFDFF, read_echo_ram},                      // Echo RAM (mirrors 0xC000~0xDDFF)
-    {"OAM", 0xFE00, 0xFE9F, read_oam},                                // Object Attribute Memory (OAM)
-    {"Not Usable", 0xFEA0, 0xFEFF, read_not_usable},                  // Not usable
-    {"I/O Registers", 0xFF00, 0xFF7F, read_io_reg},                   // I/O Registers
-    {"HRAM", 0xFF80, 0xFFFE, read_hram},                              // High RAM (HRAM) - 127 bytes
-    {"Interrupt Enable Register", 0xFFFF, 0xFFFF, read_interrupt_reg} // Interrupt Enable Register (IE)
+    {"ROM Bank 0", 0x0000, 0x3FFF, read_rom0, NULL},                        // 16 KiB ROM bank 00 (fixed)
+    {"ROM Bank 1", 0x4000, 0x7FFF, read_rom1, NULL},                        // 16 KiB ROM bank 01~NN (switchable, if supported)
+    {"VRAM", 0x8000, 0x9FFF, read_vram, NULL},                              // 8 KiB Video RAM (VRAM)
+    {"External RAM", 0xA000, 0xBFFF, read_external_ram, NULL},              // 8 KiB External RAM (if supported)
+    {"WRAM", 0xC000, 0xDFFF, read_wram, NULL},                              // 8 KiB Work RAM (WRAM)
+    {"Echo RAM", 0xE000, 0xFDFF, read_echo_ram, NULL},                      // Echo RAM (mirrors 0xC000~0xDDFF)
+    {"OAM", 0xFE00, 0xFE9F, read_oam, NULL},                                // Object Attribute Memory (OAM)
+    {"Not Usable", 0xFEA0, 0xFEFF, read_not_usable, NULL},                  // Not usable
+    {"I/O Registers", 0xFF00, 0xFF7F, read_io_reg, NULL},                   // I/O Registers
+    {"HRAM", 0xFF80, 0xFFFE, read_hram, NULL},                              // High RAM (HRAM) - 127 bytes
+    {"Interrupt Enable Register", 0xFFFF, 0xFFFF, read_interrupt_reg, NULL} // Interrupt Enable Register (IE)
 };
 
 int bus_init(bus_t *bus, cartridge_t *cartridge) {
@@ -79,6 +79,21 @@ uint8_t bus_read(bus_t *bus, uint16_t addr) {
     assert(0 && "Address not mapped in bus_read");
 }
 
+void bus_write(bus_t *bus, uint16_t addr, uint8_t value) {
+    LOG_DEBUG("Writing %d to address: 0x%04X", value, addr);
+
+    for (size_t i = 0; i < sizeof(memory_map) / sizeof(mem_region_t); i++) {
+        mem_region_t region = memory_map[i];
+        if (addr >= region.start && addr <= region.end) {
+            region.read_fn(bus, addr);
+            return;
+        }
+    }
+
+    LOG_WARN("bus_write: address 0x%04X not mapped - this should never happen", addr);
+    assert(0 && "Address not mapped in bus_write");
+}
+
 static uint8_t read_rom0(bus_t *bus, uint16_t addr) {
     uint8_t value = bus->cartridge->rom[addr];
     LOG_DEBUG("ROM bank 0 read: [0x%04X] = 0x%02X", addr, value);
@@ -95,8 +110,9 @@ static uint8_t read_rom1(bus_t *bus, uint16_t addr) {
 }
 
 static uint8_t read_vram(bus_t *bus, uint16_t addr) {
-    uint8_t value = bus->vram.mem[addr - 0x8000];
-    LOG_DEBUG("VRAM read: [0x%04X] = 0x%02X", addr, value);
+    uint16_t vram_address = addr - 0x8000;
+    uint8_t value = bus->vram.mem[vram_address];
+    LOG_DEBUG("VRAM read: [0x%04X] = 0x%02X", vram_address, value);
 
     return value;
 }
@@ -109,8 +125,9 @@ static uint8_t read_external_ram(bus_t *bus, uint16_t addr) {
 }
 
 static uint8_t read_wram(bus_t *bus, uint16_t addr) {
-    uint8_t value = bus->wram.mem[addr - 0xC000];
-    LOG_DEBUG("WRAM read: [0x%04X] = 0x%02X", addr, value);
+    uint16_t wram_address = addr - 0xC000;
+    uint8_t value = bus->wram.mem[wram_address];
+    LOG_DEBUG("WRAM read: [0x%04X] = 0x%02X", wram_address, value);
 
     return value;
 }
@@ -146,8 +163,9 @@ static uint8_t read_io_reg(bus_t *bus, uint16_t addr) {
 }
 
 static uint8_t read_hram(bus_t *bus, uint16_t addr) {
-    uint8_t value = bus->hram.mem[addr - 0xFF80];
-    LOG_DEBUG("HRAM read: [0x%04X] = 0x%02X", addr, value);
+    uint16_t hram_address = addr - 0xFF80;
+    uint8_t value = bus->hram.mem[hram_address];
+    LOG_DEBUG("HRAM read: [0x%04X] = 0x%02X", hram_address, value);
 
     return value;
 }
