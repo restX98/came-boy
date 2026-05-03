@@ -29,6 +29,7 @@ static int op_inc_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_add_hl_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_inc_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_dec_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -74,6 +75,15 @@ opcode_fn opcode_table[256] = {
     [0x2C] = op_inc_r8,       // INC L
     [0x34] = op_inc_r8,       // INC [HL]
     [0x3C] = op_inc_r8,       // INC A
+    // Type: DEC r8
+    [0x05] = op_dec_r8,       // DEC B
+    [0x0D] = op_dec_r8,       // DEC C
+    [0x15] = op_dec_r8,       // DEC D
+    [0x1D] = op_dec_r8,       // DEC E
+    [0x25] = op_dec_r8,       // DEC H
+    [0x2D] = op_dec_r8,       // DEC L
+    [0x35] = op_dec_r8,       // DEC [HL]
+    [0x3D] = op_dec_r8,       // DEC A
     // ... (initialize other opcodes as needed)
 };
 
@@ -214,6 +224,27 @@ static int op_inc_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
         get_r8_name(register_code), old_val, new_val, cpu->pc - 1, opcode);
 
     return (register_code == 0b110) ? 12 : 4; // INC r8 takes 4 cycles for normal r8 register and 12 for [HL]
+}
+
+static int op_dec_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint8_t register_code = (opcode >> 3) & 0b111; // Extract the register code from the opcode
+
+    uint8_t old_val = read_r8(cpu, bus, register_code);
+    uint8_t new_val = old_val - 1;
+
+    bool half_borrow = (old_val & 0x0F) == 0x00;
+    bool zero = new_val == 0;
+
+    write_r8(cpu, bus, register_code, new_val);
+
+    flag_set(cpu, FLAG_N);
+    if (zero) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+
+    LOG_DEBUG("DEC %s 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        get_r8_name(register_code), old_val, new_val, cpu->pc - 1, opcode);
+
+    return (register_code == 0b110) ? 12 : 4; // DEC r8 takes 4 cycles for normal r8 register and 12 for [HL]
 }
 
 /*-------------------------------------------------------
