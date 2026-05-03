@@ -294,6 +294,54 @@ void test_op_inc_sp(void) {
     TEST_ASSERT_EQUAL_UINT16(0x11, mock_cpu.sp);
 }
 
+// ---- op_dec_r16 ----
+void test_op_dec_bc(void) {
+    mock_cpu.bc.reg = 0x10;
+
+    uint8_t opcode = 0x0B; // INC BC
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x0F, mock_cpu.bc.reg);
+}
+
+void test_op_dec_de(void) {
+    mock_cpu.de.reg = 0x10;
+
+    uint8_t opcode = 0x1B; // INC DE
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x0F, mock_cpu.de.reg);
+}
+
+void test_op_dec_hl(void) {
+    mock_cpu.hl.reg = 0x10;
+
+    uint8_t opcode = 0x2B; // INC HL
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x0F, mock_cpu.hl.reg);
+}
+
+void test_op_dec_sp(void) {
+    mock_cpu.sp = 0x10;
+
+    uint8_t opcode = 0x3B; // INC SP
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0x0F, mock_cpu.sp);
+}
 
 int main(void) {
     UNITY_BEGIN();
@@ -316,5 +364,10 @@ int main(void) {
     RUN_TEST(test_op_inc_de);
     RUN_TEST(test_op_inc_hl);
     RUN_TEST(test_op_inc_sp);
+    RUN_TEST(test_op_dec_bc);
+    RUN_TEST(test_op_dec_de);
+    RUN_TEST(test_op_dec_hl);
+    RUN_TEST(test_op_dec_sp);
+
     return UNITY_END();
 }
