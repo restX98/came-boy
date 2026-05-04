@@ -1432,9 +1432,7 @@ void test_op_jr_nc_imm8_negative_offset_condition_false(void) {
 struct reg_entry_t {
     r8_operand_t code;
     uint8_t *reg;
-};
-
-struct reg_entry_t regs[] = {
+} regs[] = {
     {OP_REG_B, &mock_cpu.bc.hi},
     {OP_REG_C, &mock_cpu.bc.lo},
     {OP_REG_D, &mock_cpu.de.hi},
@@ -1506,6 +1504,102 @@ void test_op_ld_r8_r8_matrix(void) {
             TEST_ASSERT_EQUAL_UINT8(0x99, *regs[dst].reg);
         }
     }
+}
+
+// ---- op_add_a_r8 ----
+void test_op_add_a_r8(void) {
+    mock_cpu.af.hi = 0x10;
+    mock_cpu.bc.hi = 0x22; // B
+
+    uint8_t opcode = 0x80; // ADD A,B
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0x32, mock_cpu.af.hi);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_add_a_r8_sets_zero_flag(void) {
+    mock_cpu.af.hi = 0x80;
+    mock_cpu.bc.hi = 0x80; // B
+
+    uint8_t opcode = 0x80; // ADD A,B
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.af.hi);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_add_a_r8_sets_half_carry_and_carry(void) {
+    mock_cpu.af.hi = 0xFF;
+    mock_cpu.bc.hi = 0x01; // B
+
+    uint8_t opcode = 0x80; // ADD A,B
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.af.hi);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_add_a_hl_mem(void) {
+    mock_cpu.af.hi = 0x10;
+    mock_cpu.hl.reg = 0x20;
+
+    mock_memory[0x20] = 0x22;
+
+    uint8_t opcode = 0x86; // ADD A,[HL]
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0x32, mock_cpu.af.hi);
+}
+
+void test_op_add_a_r8_all_registers(void) {
+    struct {
+        uint8_t opcode;
+        uint8_t *reg;
+    } cases[] = {
+        {0x80, &mock_cpu.bc.hi}, // B
+        {0x81, &mock_cpu.bc.lo}, // C
+        {0x82, &mock_cpu.de.hi}, // D
+        {0x83, &mock_cpu.de.lo}, // E
+        {0x84, &mock_cpu.hl.hi}, // H
+        {0x85, &mock_cpu.hl.lo}, // L
+    };
+
+    for (int i = 0; i < 6; i++) {
+        mock_cpu.af.hi = 0x10;
+        *cases[i].reg = 0x05;
+
+        opcode_table[cases[i].opcode](&mock_cpu, &mock_bus, cases[i].opcode);
+
+        TEST_ASSERT_EQUAL_UINT8(0x15, mock_cpu.af.hi);
+    }
+}
+
+void test_op_add_a_a(void) {
+    mock_cpu.af.hi = 0x10;
+
+    uint8_t opcode = 0x87; // ADD A,A
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x20, mock_cpu.af.hi);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
 int main(void) {
@@ -1619,6 +1713,12 @@ int main(void) {
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);
+    RUN_TEST(test_op_add_a_r8);
+    RUN_TEST(test_op_add_a_r8_sets_zero_flag);
+    RUN_TEST(test_op_add_a_r8_sets_half_carry_and_carry);
+    RUN_TEST(test_op_add_a_hl_mem);
+    RUN_TEST(test_op_add_a_r8_all_registers);
+    RUN_TEST(test_op_add_a_a);
 
     return UNITY_END();
 }
