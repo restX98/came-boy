@@ -7,7 +7,7 @@
 
 static cpu_t mock_cpu = { 0 };
 static bus_t mock_bus = { 0 };
-static uint8_t mock_memory[0xFF] = { 0 };
+static uint8_t mock_memory[0xFFFF] = { 0 };
 
 void setUp(void) {
     suppress_logs();
@@ -1428,6 +1428,86 @@ void test_op_jr_nc_imm8_negative_offset_condition_false(void) {
     TEST_ASSERT_EQUAL_UINT16(0x0011, mock_cpu.pc);
 }
 
+// ---- op_ld_r8_r8 ----
+struct reg_entry_t {
+    r8_operand_t code;
+    uint8_t *reg;
+};
+
+struct reg_entry_t regs[] = {
+    {OP_REG_B, &mock_cpu.bc.hi},
+    {OP_REG_C, &mock_cpu.bc.lo},
+    {OP_REG_D, &mock_cpu.de.hi},
+    {OP_REG_E, &mock_cpu.de.lo},
+    {OP_REG_H, &mock_cpu.hl.hi},
+    {OP_REG_L, &mock_cpu.hl.lo},
+    {OP_REG_A + 1, &mock_cpu.af.hi},
+};
+
+void test_op_ld_hl_mem_r8(void) {
+    mock_memory[0x10] = 0xAA;
+
+    uint8_t opcodes[7] = { 0x46, 0x4E, 0x56, 0x5E, 0x66, 0x6E, 0x7E };
+    for (int i = 0; i < 7; i++) {
+        mock_cpu.hl.reg = 0x10;
+
+        uint8_t opcode = opcodes[i]; // LD r8,[HL]
+
+        int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+        TEST_ASSERT_EQUAL(8, cycles);
+        TEST_ASSERT_EQUAL_UINT8(0xAA, *regs[i].reg);
+    }
+}
+
+void test_op_ld_r8_hl_mem(void) {
+    uint8_t opcodes[7] = { 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x77 };
+
+    for (int i = 0; i < 7; i++) {
+        memset(mock_memory, 0, sizeof(mock_memory));
+        mock_cpu.hl.reg = 0x20;
+        *regs[i].reg = 0x55;
+
+        uint8_t opcode = opcodes[i]; // LD [HL],r8
+
+        int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+        // HL may have changed if r = H or L
+        uint16_t expected_addr = mock_cpu.hl.reg;
+
+        TEST_ASSERT_EQUAL(8, cycles);
+        TEST_ASSERT_EQUAL_UINT8(0x55, mock_memory[expected_addr]);
+    }
+}
+
+void test_op_ld_r8_r8_matrix(void) {
+    uint8_t opcodes[7][7] = {
+        {0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x47},
+        {0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4F},
+        {0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x57},
+        {0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5F},
+        {0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x67},
+        {0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6F},
+        {0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7F},
+    };
+
+    for (int dst = 0; dst < 7; dst++) {
+        for (int src = 0; src < 6; src++) {
+            if (dst == src) continue;
+
+            *regs[src].reg = 0x99;
+            *regs[dst].reg = 0x00;
+
+            uint8_t opcode = opcodes[dst][src];
+
+            int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+            TEST_ASSERT_EQUAL(4, cycles);
+            TEST_ASSERT_EQUAL_UINT8(0x99, *regs[dst].reg);
+        }
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -1536,6 +1616,9 @@ int main(void) {
     RUN_TEST(test_op_jr_z_imm8_positive_offset);
     RUN_TEST(test_op_jr_c_imm8_negative_offset);
     RUN_TEST(test_op_jr_nc_imm8_negative_offset_condition_false);
+    RUN_TEST(test_op_ld_hl_mem_r8);
+    RUN_TEST(test_op_ld_r8_hl_mem);
+    RUN_TEST(test_op_ld_r8_r8_matrix);
 
     return UNITY_END();
 }

@@ -26,6 +26,7 @@ static const char *get_condition_name(cond_operand_t cond);
  *-------------------------------------------------------*/
 static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_stop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_halt(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode);
@@ -46,6 +47,7 @@ static int op_scf(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ccf(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_jr_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_jr_cond_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_ld_r8_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -130,6 +132,72 @@ opcode_fn opcode_table[256] = {
     [0x30] = op_jr_cond_imm8, // JR NC,imm8
     [0x38] = op_jr_cond_imm8, // JR C,imm8
 
+    // Block 1: 8-bit register-to-register loads
+    // Type: LD r8, r8
+    [0x40] = op_ld_r8_r8,     // LD B,B -> NOP
+    [0x41] = op_ld_r8_r8,     // LD B,C
+    [0x42] = op_ld_r8_r8,     // LD B,D
+    [0x43] = op_ld_r8_r8,     // LD B,E
+    [0x44] = op_ld_r8_r8,     // LD B,H
+    [0x45] = op_ld_r8_r8,     // LD B,L
+    [0x46] = op_ld_r8_r8,     // LD B,[HL]
+    [0x47] = op_ld_r8_r8,     // LD B,A
+    [0x48] = op_ld_r8_r8,     // LD C,B
+    [0x49] = op_ld_r8_r8,     // LD C,C -> NOP
+    [0x4A] = op_ld_r8_r8,     // LD C,D
+    [0x4B] = op_ld_r8_r8,     // LD C,E
+    [0x4C] = op_ld_r8_r8,     // LD C,H
+    [0x4D] = op_ld_r8_r8,     // LD C,L
+    [0x4E] = op_ld_r8_r8,     // LD C,[HL]
+    [0x4F] = op_ld_r8_r8,     // LD C,A
+    [0x50] = op_ld_r8_r8,     // LD D,B
+    [0x51] = op_ld_r8_r8,     // LD D,C
+    [0x52] = op_ld_r8_r8,     // LD D,D -> NOP
+    [0x53] = op_ld_r8_r8,     // LD D,E
+    [0x54] = op_ld_r8_r8,     // LD D,H
+    [0x55] = op_ld_r8_r8,     // LD D,L
+    [0x56] = op_ld_r8_r8,     // LD D,[HL]
+    [0x57] = op_ld_r8_r8,     // LD D,A
+    [0x58] = op_ld_r8_r8,     // LD E,B
+    [0x59] = op_ld_r8_r8,     // LD E,C
+    [0x5A] = op_ld_r8_r8,     // LD E,D
+    [0x5B] = op_ld_r8_r8,     // LD E,E -> NOP
+    [0x5C] = op_ld_r8_r8,     // LD E,H
+    [0x5D] = op_ld_r8_r8,     // LD E,L
+    [0x5E] = op_ld_r8_r8,     // LD E,[HL]
+    [0x5F] = op_ld_r8_r8,     // LD E,A
+    [0x60] = op_ld_r8_r8,     // LD H,B
+    [0x61] = op_ld_r8_r8,     // LD H,C
+    [0x62] = op_ld_r8_r8,     // LD H,D
+    [0x63] = op_ld_r8_r8,     // LD H,E
+    [0x64] = op_ld_r8_r8,     // LD H,H -> NOP
+    [0x65] = op_ld_r8_r8,     // LD H,L
+    [0x66] = op_ld_r8_r8,     // LD H,[HL]
+    [0x67] = op_ld_r8_r8,     // LD H,A
+    [0x68] = op_ld_r8_r8,     // LD L,B
+    [0x69] = op_ld_r8_r8,     // LD L,C
+    [0x6A] = op_ld_r8_r8,     // LD L,D
+    [0x6B] = op_ld_r8_r8,     // LD L,E
+    [0x6C] = op_ld_r8_r8,     // LD L,H
+    [0x6D] = op_ld_r8_r8,     // LD L,L -> NOP
+    [0x6E] = op_ld_r8_r8,     // LD L,[HL]
+    [0x6F] = op_ld_r8_r8,     // LD L,A
+    [0x70] = op_ld_r8_r8,     // LD [HL],B
+    [0x71] = op_ld_r8_r8,     // LD [HL],C
+    [0x72] = op_ld_r8_r8,     // LD [HL],D
+    [0x73] = op_ld_r8_r8,     // LD [HL],E
+    [0x74] = op_ld_r8_r8,     // LD [HL],H
+    [0x75] = op_ld_r8_r8,     // LD [HL],L
+    [0x76] = op_halt,         // LD [HL],[HL] -> HALT
+    [0x77] = op_ld_r8_r8,     // LD [HL],A
+    [0x78] = op_ld_r8_r8,     // LD A,B
+    [0x79] = op_ld_r8_r8,     // LD A,C
+    [0x7A] = op_ld_r8_r8,     // LD A,D
+    [0x7B] = op_ld_r8_r8,     // LD A,E
+    [0x7C] = op_ld_r8_r8,     // LD A,H
+    [0x7D] = op_ld_r8_r8,     // LD A,L
+    [0x7E] = op_ld_r8_r8,     // LD A,[HL]
+    [0x7F] = op_ld_r8_r8,     // LD A,A -> NOP
     // ... (initialize other opcodes as needed)
 };
 
@@ -155,6 +223,17 @@ static int op_stop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     LOG_DEBUG("STOP at PC=0x%04X", cpu->pc - 1);
 
     return 4; // STOP takes 4 cycles
+}
+
+static int op_halt(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    (void)opcode;
+    (void)bus;
+
+    // TODO: Understand how HALT actually works
+
+    LOG_DEBUG("HALT at PC=0x%04X", cpu->pc - 1);
+
+    return 4; // HALT takes 4 cycles
 }
 
 static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
@@ -294,7 +373,7 @@ static int op_inc_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     LOG_DEBUG("INC %s 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
         get_r8_name(register_code), old_val, new_val, instr_pc, opcode);
 
-    return (register_code == 0b110) ? 12 : 4; // INC r8 takes 4 cycles for normal r8 register and 12 for [HL]
+    return (register_code == OP_MEM_HL) ? 12 : 4; // INC r8 takes 4 cycles for normal r8 register and 12 for [HL]
 }
 
 static int op_dec_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
@@ -524,6 +603,20 @@ static int op_jr_cond_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
         get_condition_name(cond_op), offset, (uint8_t)offset, instr_pc, opcode);
 
     return condition ? 12 : 8;
+}
+
+static int op_ld_r8_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    r8_operand_t dest_reg_code = (opcode >> 3) & 0b111;
+    r8_operand_t source_reg_code = opcode & 0b111;
+
+    write_r8(cpu, bus, dest_reg_code, read_r8(cpu, bus, source_reg_code));
+
+    LOG_DEBUG("LD %s,%s at PC=0x%04X (opcode=0x%02X)",
+        get_r8_name(dest_reg_code), get_r8_name(source_reg_code), instr_pc, opcode);
+
+    return (dest_reg_code == OP_MEM_HL || source_reg_code == OP_MEM_HL) ? 8 : 4;
 }
 
 /*-------------------------------------------------------
