@@ -7,7 +7,7 @@
 
 static cpu_t mock_cpu = { 0 };
 static bus_t mock_bus = { 0 };
-static uint8_t mock_memory[0x10] = { 0 };
+static uint8_t mock_memory[0xFF] = { 0 };
 
 void setUp(void) {
     suppress_logs();
@@ -1294,6 +1294,69 @@ void test_op_ccf_sets_c_flag_when_clear(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
 }
 
+// ---- op_jr_imm8 ----
+void test_op_jr_imm8(void) {
+    mock_cpu.pc = 0x0;
+    mock_cpu.bc.reg = 0x1234;
+    mock_cpu.de.reg = 0x5678;
+    mock_cpu.hl.reg = 0x9ABC;
+    mock_cpu.sp = 0xFFFE;
+    flag_set(&mock_cpu, FLAG_Z);
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    flag_set(&mock_cpu, FLAG_C);
+    mock_memory[0] = 0x00; // offset 0
+
+    uint8_t opcode = 0x18; // JR imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL_UINT16(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(FLAG_Z, mock_cpu.af.lo & FLAG_Z);
+    TEST_ASSERT_EQUAL_UINT8(FLAG_N, mock_cpu.af.lo & FLAG_N);
+    TEST_ASSERT_EQUAL_UINT8(FLAG_H, mock_cpu.af.lo & FLAG_H);
+    TEST_ASSERT_EQUAL_UINT8(FLAG_C, mock_cpu.af.lo & FLAG_C);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.bc.reg);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.de.reg);
+    TEST_ASSERT_EQUAL_UINT16(0x9ABC, mock_cpu.hl.reg);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp);
+}
+
+void test_op_jr_imm8_zero_offset(void) {
+    mock_memory[0] = 0x00; // offset 0
+
+    uint8_t opcode = 0x18; // JR imm8
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    // PC = 1 (after reading offset byte) + 0 = 1
+    TEST_ASSERT_EQUAL_UINT16(0x0001, mock_cpu.pc);
+}
+
+void test_op_jr_imm8_positive_offset_jumps_forward(void) {
+    mock_memory[0] = 0x05; // offset +5
+
+    uint8_t opcode = 0x18; // JR imm8
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    // PC = 1 (after reading offset byte) + 5 = 6
+    TEST_ASSERT_EQUAL_UINT16(0x0006, mock_cpu.pc);
+}
+
+void test_op_jr_imm8_negative_offset_jumps_backward(void) {
+    mock_cpu.pc = 0x10;
+    mock_memory[0x10] = 0xFE; // offset -2 as int8_t
+
+    uint8_t opcode = 0x18; // JR imm8
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    // PC = 0x11 (after reading offset byte) + (-2) = 0x0F
+    TEST_ASSERT_EQUAL_UINT16(0x000F, mock_cpu.pc);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -1393,6 +1456,10 @@ int main(void) {
     RUN_TEST(test_op_scf);
     RUN_TEST(test_op_ccf_clears_c_flag_when_set);
     RUN_TEST(test_op_ccf_sets_c_flag_when_clear);
+    RUN_TEST(test_op_jr_imm8);
+    RUN_TEST(test_op_jr_imm8_zero_offset);
+    RUN_TEST(test_op_jr_imm8_positive_offset_jumps_forward);
+    RUN_TEST(test_op_jr_imm8_negative_offset_jumps_backward);
 
     return UNITY_END();
 }

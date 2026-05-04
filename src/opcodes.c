@@ -41,6 +41,7 @@ static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_cpl(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_scf(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ccf(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_jr_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -117,6 +118,8 @@ opcode_fn opcode_table[256] = {
     [0x37] = op_scf,
     // Type: CCF (Complement Carry Flag)
     [0x3F] = op_ccf,
+    // Type: JR imm8
+    [0x18] = op_jr_imm8,
 
     // ... (initialize other opcodes as needed)
 };
@@ -134,6 +137,8 @@ static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 }
 
 static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
     uint16_t immediate_value = read_imm16(cpu, bus);
 
     r16_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
@@ -141,12 +146,14 @@ static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     write_r16(cpu, register_code, immediate_value);
 
     LOG_DEBUG("LD %s,imm16 value=0x%04X at PC=0x%04X (opcode=0x%02X)",
-        get_r16_name(register_code), immediate_value, cpu->pc - 1, opcode);
+        get_r16_name(register_code), immediate_value, instr_pc, opcode);
 
     return 12; // LD r16,imm16 takes 12 cycles
 }
 
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
     r16mem_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
 
     uint16_t reg_value = read_r16mem(cpu, register_code);
@@ -155,12 +162,14 @@ static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     bus_write(bus, reg_value, cpu->af.hi);
 
     LOG_DEBUG("LD [%s],A %s=0x%04X A=%u at PC=0x%04X (opcode=0x%02X)",
-        reg_name, reg_name, cpu->bc.reg, cpu->af.hi, cpu->pc - 1, opcode);
+        reg_name, reg_name, cpu->bc.reg, cpu->af.hi, instr_pc, opcode);
 
     return 8; // LD [r16mem],a takes 8 cycles
 }
 
 static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
     r16mem_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
 
     uint16_t reg_value = read_r16mem(cpu, register_code);
@@ -169,51 +178,56 @@ static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     cpu->af.hi = bus_read(bus, reg_value);
 
     LOG_DEBUG("LD A,[%s] %s=0x%04X [%s]=%u at PC=0x%04X (opcode=0x%02X)",
-        reg_name, reg_name, cpu->bc.reg, reg_name, cpu->af.hi, cpu->pc - 1, opcode);
+        reg_name, reg_name, cpu->bc.reg, reg_name, cpu->af.hi, instr_pc, opcode);
 
     return 8; // LD a,[r16mem] takes 8 cycles
 }
 
 static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
     uint16_t address = read_imm16(cpu, bus);
 
     bus_write(bus, address, cpu->sp & 0xFF);
     bus_write(bus, address + 1, cpu->sp >> 8);
 
     LOG_DEBUG("LD [0x%04X],SP SP=0x%04X at PC=0x%04X (opcode=0x%02X)",
-        address, cpu->sp, cpu->pc - 1, opcode);
+        address, cpu->sp, instr_pc, opcode);
 
     return 20; // LD [imm16],sp takes 20 cycles
 }
 
 static int op_inc_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     r16_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
 
     write_r16(cpu, register_code, read_r16(cpu, register_code) + 1);
 
     LOG_DEBUG("INC %s at PC=0x%04X (opcode=0x%02X)",
-        get_r16_name(register_code), cpu->pc - 1, opcode);
+        get_r16_name(register_code), instr_pc, opcode);
 
     return 8; // INC r16 takes 8 cycles
 }
 
 static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     r16_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
 
     write_r16(cpu, register_code, read_r16(cpu, register_code) - 1);
 
     LOG_DEBUG("INC %s at PC=0x%04X (opcode=0x%02X)",
-        get_r16_name(register_code), cpu->pc - 1, opcode);
+        get_r16_name(register_code), instr_pc, opcode);
 
     return 8; // INC r16 takes 8 cycles
 }
 
 static int op_add_hl_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     r16_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
 
@@ -234,12 +248,14 @@ static int op_add_hl_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("ADD HL,%s HL=0x%04X at PC=0x%04X (opcode=0x%02X)",
-        get_r16_name(register_code), cpu->hl.reg, cpu->pc - 1, opcode);
+        get_r16_name(register_code), cpu->hl.reg, instr_pc, opcode);
 
     return 8; // ADD HL,r16 takes 8 cycles
 }
 
 static int op_inc_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
     r8_operand_t register_code = (opcode >> 3) & 0b111; // Extract the register code from the opcode
 
     uint8_t old_val = read_r8(cpu, bus, register_code);
@@ -255,12 +271,14 @@ static int op_inc_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
 
     LOG_DEBUG("INC %s 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        get_r8_name(register_code), old_val, new_val, cpu->pc - 1, opcode);
+        get_r8_name(register_code), old_val, new_val, instr_pc, opcode);
 
     return (register_code == 0b110) ? 12 : 4; // INC r8 takes 4 cycles for normal r8 register and 12 for [HL]
 }
 
 static int op_dec_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
     r8_operand_t register_code = (opcode >> 3) & 0b111; // Extract the register code from the opcode
 
     uint8_t old_val = read_r8(cpu, bus, register_code);
@@ -276,12 +294,14 @@ static int op_dec_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
 
     LOG_DEBUG("DEC %s 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        get_r8_name(register_code), old_val, new_val, cpu->pc - 1, opcode);
+        get_r8_name(register_code), old_val, new_val, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 12 : 4; // DEC r8 takes 4 cycles for normal r8 register and 12 for [HL]
 }
 
 static int op_ld_r8_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
     uint8_t immediate_value = read_imm8(cpu, bus);
 
     r8_operand_t register_code = (opcode >> 3) & 0b111; // Extract the register code from the opcode
@@ -289,13 +309,14 @@ static int op_ld_r8_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     write_r8(cpu, bus, register_code, immediate_value);
 
     LOG_DEBUG("LD %s,imm8 value=0x%02X at PC=0x%04X (opcode=0x%02X)",
-        get_r8_name(register_code), immediate_value, cpu->pc - 1, opcode);
+        get_r8_name(register_code), immediate_value, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 12 : 4; // LD r8,imm8 takes 4 cycles for normal r8 register and 12 for [HL]
 }
 
 static int op_rlca(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     uint8_t old_a = cpu->af.hi;
 
@@ -309,13 +330,14 @@ static int op_rlca(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (carry) flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("RLCA 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        old_a, cpu->af.hi, cpu->pc - 1, opcode);
+        old_a, cpu->af.hi, instr_pc, opcode);
 
     return 4; // RLCA takes 4 cycles
 }
 
 static int op_rrca(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     uint8_t old_a = cpu->af.hi;
 
@@ -329,13 +351,14 @@ static int op_rrca(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (carry) flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("RRCA 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        old_a, cpu->af.hi, cpu->pc - 1, opcode);
+        old_a, cpu->af.hi, instr_pc, opcode);
 
     return 4; // RRCA takes 4 cycles
 }
 
 static int op_rla(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     uint8_t old_a = cpu->af.hi;
 
@@ -349,13 +372,14 @@ static int op_rla(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (carry) flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("RLA 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        old_a, cpu->af.hi, cpu->pc - 1, opcode);
+        old_a, cpu->af.hi, instr_pc, opcode);
 
     return 4; // RLA takes 4 cycles
 }
 
 static int op_rra(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     uint8_t old_a = cpu->af.hi;
 
@@ -369,13 +393,14 @@ static int op_rra(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (carry) flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("RRA 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        old_a, cpu->af.hi, cpu->pc - 1, opcode);
+        old_a, cpu->af.hi, instr_pc, opcode);
 
     return 4; // RRA takes 4 cycles
 }
 
 static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     bool subtraction_flag = flag_get(cpu, FLAG_N);
     bool half_carry_flag = flag_get(cpu, FLAG_H);
@@ -402,13 +427,14 @@ static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (cpu->af.hi == 0) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
 
     LOG_DEBUG("DAA A=0x%02X at PC=0x%04X (opcode=0x%02X)",
-        cpu->af.hi, cpu->pc - 1, opcode);
+        cpu->af.hi, instr_pc, opcode);
 
     return 4; // DAA takes 4 cycles
 }
 
 static int op_cpl(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     cpu->af.hi = ~cpu->af.hi;
 
@@ -416,35 +442,51 @@ static int op_cpl(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     flag_set(cpu, FLAG_H);
 
     LOG_DEBUG("CPL A=0x%02X at PC=0x%04X (opcode=0x%02X)",
-        cpu->af.hi, cpu->pc - 1, opcode);
+        cpu->af.hi, instr_pc, opcode);
 
     return 4; // CPL takes 4 cycles
 }
 
 static int op_scf(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     flag_clear(cpu, FLAG_N);
     flag_clear(cpu, FLAG_H);
     flag_set(cpu, FLAG_C);
 
-    LOG_DEBUG("SCF at PC=0x%04X (opcode=0x%02X)", cpu->pc - 1, opcode);
+    LOG_DEBUG("SCF at PC=0x%04X (opcode=0x%02X)", instr_pc, opcode);
 
     return 4; // SCF takes 4 cycles
 }
 
 static int op_ccf(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)bus;
+    uint16_t instr_pc = cpu->pc - 1;
 
     flag_clear(cpu, FLAG_N);
     flag_clear(cpu, FLAG_H);
 
     if (flag_get(cpu, FLAG_C)) flag_clear(cpu, FLAG_C); else flag_set(cpu, FLAG_C);
 
-    LOG_DEBUG("CFF at PC=0x%04X (opcode=0x%02X)", cpu->pc - 1, opcode);
+    LOG_DEBUG("CFF at PC=0x%04X (opcode=0x%02X)", instr_pc, opcode);
 
     return 4; // CCF takes 4 cycles
 }
+
+static int op_jr_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    int8_t offset = (int8_t)read_imm8(cpu, bus);
+
+    cpu->pc += offset;
+
+    LOG_DEBUG("JR imm8 value=0x%02X at PC=0x%04X (opcode=0x%02X)",
+        offset, instr_pc, opcode);
+
+    return 12; // JR imm8 takes 12 cycles
+}
+
 
 /*-------------------------------------------------------
  * Private helpers definition
