@@ -25,6 +25,7 @@ static const char *get_condition_name(cond_operand_t cond);
  * Opcode declaration
  *-------------------------------------------------------*/
 static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_stop(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode);
@@ -48,7 +49,8 @@ static int op_jr_cond_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
-    [0x00] = op_nop, // NOP
+    [0x00] = op_nop,          // NOP
+    [0x10] = op_stop,         // STOP
     // Type: LD r16, imm16
     [0x01] = op_ld_r16_imm16, // LD BC,imm8
     [0x11] = op_ld_r16_imm16, // LD DE,imm8
@@ -141,6 +143,18 @@ static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     LOG_DEBUG("NOP at PC=0x%04X", cpu->pc - 1);
 
     return 4; // NOP takes 4 cycles
+}
+
+static int op_stop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    (void)opcode;
+
+    // TODO: Understand how STOP actually works
+
+    read_imm8(cpu, bus);
+
+    LOG_DEBUG("STOP at PC=0x%04X", cpu->pc - 1);
+
+    return 4; // STOP takes 4 cycles
 }
 
 static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
