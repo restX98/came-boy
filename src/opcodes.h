@@ -31,6 +31,13 @@ typedef enum {
     OP_REG_HLD_MEM,
 } r16mem_operand_t;
 
+typedef enum {
+    OP_NZ = 0,
+    OP_Z,
+    OP_NC,
+    OP_C,
+} cond_operand_t;
+
 typedef int (*opcode_fn)(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 extern opcode_fn opcode_table[256];

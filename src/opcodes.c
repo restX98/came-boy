@@ -18,6 +18,8 @@ static void write_r16(cpu_t *cpu, r16_operand_t r16_op, uint16_t value);
 static const char *get_r16_name(r16_operand_t r16_op);
 static uint16_t read_r16mem(cpu_t *cpu, r16mem_operand_t r16mem_op);
 static const char *get_r16mem_name(r16mem_operand_t r16mem_op);
+static bool check_condition(cpu_t *cpu, cond_operand_t cond);
+static const char *get_condition_name(cond_operand_t cond);
 
 /*-------------------------------------------------------
  * Opcode declaration
@@ -42,6 +44,7 @@ static int op_cpl(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_scf(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ccf(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_jr_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_jr_cond_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -118,8 +121,12 @@ opcode_fn opcode_table[256] = {
     [0x37] = op_scf,
     // Type: CCF (Complement Carry Flag)
     [0x3F] = op_ccf,
-    // Type: JR imm8
-    [0x18] = op_jr_imm8,
+    // Type: JR (Jump Register)
+    [0x18] = op_jr_imm8,      // JR imm8
+    [0x20] = op_jr_cond_imm8, // JR NZ,imm8
+    [0x28] = op_jr_cond_imm8, // JR Z,imm8
+    [0x30] = op_jr_cond_imm8, // JR NC,imm8
+    [0x38] = op_jr_cond_imm8, // JR C,imm8
 
     // ... (initialize other opcodes as needed)
 };
@@ -481,12 +488,29 @@ static int op_jr_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     cpu->pc += offset;
 
-    LOG_DEBUG("JR imm8 value=0x%02X at PC=0x%04X (opcode=0x%02X)",
+    LOG_DEBUG("JR imm8 offset=%d at PC=0x%04X (opcode=0x%02X)",
         offset, instr_pc, opcode);
 
     return 12; // JR imm8 takes 12 cycles
 }
 
+static int op_jr_cond_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    cond_operand_t cond_op = (opcode >> 3) & 0b11; // Extract condition code from opcode
+    bool condition = check_condition(cpu, cond_op);
+
+    int8_t offset = (int8_t)read_imm8(cpu, bus);
+
+    if (condition) {
+        cpu->pc += offset;
+    }
+
+    LOG_DEBUG("JR %s offset=%d (0x%02X) at PC=0x%04X (opcode=0x%02X)",
+        get_condition_name(cond_op), offset, (uint8_t)offset, instr_pc, opcode);
+
+    return condition ? 12 : 8;
+}
 
 /*-------------------------------------------------------
  * Private helpers definition
@@ -585,4 +609,22 @@ static const char *get_r16mem_name(r16mem_operand_t r16mem_op) {
     };
     if (r16mem_op > OP_REG_HLD_MEM) return "??";
     return names[r16mem_op];
+}
+
+static bool check_condition(cpu_t *cpu, cond_operand_t cond) {
+    switch (cond) {
+        case OP_NZ: return !flag_get(cpu, FLAG_Z);
+        case OP_Z: return  flag_get(cpu, FLAG_Z);
+        case OP_NC: return !flag_get(cpu, FLAG_C);
+        case OP_C: return  flag_get(cpu, FLAG_C);
+        default: assert(0 && "Invalid condition operand");
+    }
+}
+
+static const char *get_condition_name(cond_operand_t cond) {
+    static const char *names[] = {
+        "NZ","Z","NC","C"
+    };
+    if (cond > OP_C) return "??";
+    return names[cond];
 }

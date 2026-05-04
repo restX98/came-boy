@@ -1357,6 +1357,77 @@ void test_op_jr_imm8_negative_offset_jumps_backward(void) {
     TEST_ASSERT_EQUAL_UINT16(0x000F, mock_cpu.pc);
 }
 
+// ---- op_jr_imm8 ----
+void test_op_jr_nz_imm8_condition_true(void) {
+    mock_cpu.pc = 0x0000;
+    flag_clear(&mock_cpu, FLAG_Z); // NZ = true
+
+    mock_memory[0] = 0x00; // offset 0
+
+    uint8_t opcode = 0x20; // JR NZ, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL_UINT16(1, mock_cpu.pc); // 1 + 0
+}
+
+void test_op_jr_nz_imm8_condition_false(void) {
+    mock_cpu.pc = 0x0000;
+    flag_set(&mock_cpu, FLAG_Z); // NZ = false
+
+    mock_memory[0] = 0x05; // offset (ignored)
+
+    uint8_t opcode = 0x20; // JR NZ, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(1, mock_cpu.pc); // only consumed imm8
+}
+
+void test_op_jr_z_imm8_positive_offset(void) {
+    mock_cpu.pc = 0x0000;
+    flag_set(&mock_cpu, FLAG_Z); // Z = true
+
+    mock_memory[0] = 0x05; // +5
+
+    uint8_t opcode = 0x28; // JR Z, imm8
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    // PC = 1 + 5 = 6
+    TEST_ASSERT_EQUAL_UINT16(0x0006, mock_cpu.pc);
+}
+
+void test_op_jr_c_imm8_negative_offset(void) {
+    mock_cpu.pc = 0x0010;
+    flag_set(&mock_cpu, FLAG_C); // C = true
+
+    mock_memory[0x10] = 0xFE; // -2
+
+    uint8_t opcode = 0x38; // JR C, imm8
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    // PC = 0x11 + (-2) = 0x0F
+    TEST_ASSERT_EQUAL_UINT16(0x000F, mock_cpu.pc);
+}
+
+void test_op_jr_nc_imm8_negative_offset_condition_false(void) {
+    mock_cpu.pc = 0x0010;
+    flag_set(&mock_cpu, FLAG_C); // NC = false
+
+    mock_memory[0x10] = 0xFE; // -2 (ignored)
+
+    uint8_t opcode = 0x30; // JR NC, imm8
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    // PC = 0x11 (no jump)
+    TEST_ASSERT_EQUAL_UINT16(0x0011, mock_cpu.pc);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -1460,6 +1531,11 @@ int main(void) {
     RUN_TEST(test_op_jr_imm8_zero_offset);
     RUN_TEST(test_op_jr_imm8_positive_offset_jumps_forward);
     RUN_TEST(test_op_jr_imm8_negative_offset_jumps_backward);
+    RUN_TEST(test_op_jr_nz_imm8_condition_true);
+    RUN_TEST(test_op_jr_nz_imm8_condition_false);
+    RUN_TEST(test_op_jr_z_imm8_positive_offset);
+    RUN_TEST(test_op_jr_c_imm8_negative_offset);
+    RUN_TEST(test_op_jr_nc_imm8_negative_offset_condition_false);
 
     return UNITY_END();
 }
