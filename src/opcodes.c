@@ -50,6 +50,7 @@ static int op_jr_cond_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_ld_r8_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_add_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_adc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_sub_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -220,6 +221,15 @@ opcode_fn opcode_table[256] = {
     [0x8D] = op_adc_a_r8,     // ADC a,L
     [0x8E] = op_adc_a_r8,     // ADC a,[HL]
     [0x8F] = op_adc_a_r8,     // ADC a,A
+    //Type: SUB a, r8
+    [0x90] = op_sub_a_r8,     // SUB A,B
+    [0x91] = op_sub_a_r8,     // SUB A,C
+    [0x92] = op_sub_a_r8,     // SUB A,D
+    [0x93] = op_sub_a_r8,     // SUB A,E
+    [0x94] = op_sub_a_r8,     // SUB A,H
+    [0x95] = op_sub_a_r8,     // SUB A,L
+    [0x96] = op_sub_a_r8,     // SUB A,[HL]
+    [0x97] = op_sub_a_r8,     // SUB A,A
 
     // ... (initialize other opcodes as needed)
 };
@@ -711,6 +721,40 @@ static int op_adc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
         reg_name, old_a, reg_value, carry_in, sum, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // ADC A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
+}
+
+static int op_sub_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    r8_operand_t register_code = opcode & 0b111; // Extract the register code from the opcode
+
+    uint8_t reg_value = read_r8(cpu, bus, register_code);
+    uint8_t old_a = cpu->af.hi;
+
+    uint8_t diff = old_a - reg_value;
+
+    // Z: diff is zero
+    bool zero = diff == 0;
+
+    // H: borrow from bit 4
+    bool half_borrow = (reg_value & 0x0F) > (old_a & 0x0F);
+
+    // C: borrow
+    bool borrow = reg_value > old_a;
+
+    cpu->af.hi = diff;
+
+    // N set, Z, H and C set according to result
+    flag_set(cpu, FLAG_N);
+    if (zero)        flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (borrow)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+
+    const char *reg_name = get_r8_name(register_code);
+    LOG_DEBUG("SUB A,%s: 0x%02X - 0x%02X = 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        reg_name, old_a, reg_value, diff, instr_pc, opcode);
+
+    return (register_code == OP_MEM_HL) ? 8 : 4; // SUB A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
 
 
