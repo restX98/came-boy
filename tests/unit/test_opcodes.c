@@ -73,6 +73,32 @@ alu8_result_t alu_sub8(uint8_t a, uint8_t value, uint8_t carry) {
     return alu_sub8_stats.calls[alu_sub8_stats.call_count - 1].return_value;
 }
 
+// Mock alu_inc8
+typedef struct {
+    uint8_t value;
+    alu8_result_t return_value;
+} alu_inc8_call_t;
+
+typedef struct {
+    size_t call_count;
+    alu_inc8_call_t calls[10];
+} alu_inc8_stats_t;
+
+static alu_inc8_stats_t alu_inc8_stats;
+
+alu8_result_t alu_inc8(uint8_t value) {
+    if (alu_inc8_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for alu_inc8");
+    }
+
+    alu_inc8_call_t *call = &alu_inc8_stats.calls[alu_inc8_stats.call_count];
+    call->value = value;
+
+    alu_inc8_stats.call_count++;
+
+    return alu_inc8_stats.calls[alu_inc8_stats.call_count - 1].return_value;
+}
+
 // Mock alu_dec8
 typedef struct {
     uint8_t value;
@@ -103,6 +129,7 @@ void setUp(void) {
     suppress_logs();
     alu_add8_stats = (alu_add8_stats_t){ 0 };
     alu_sub8_stats = (alu_sub8_stats_t){ 0 };
+    alu_inc8_stats = (alu_inc8_stats_t){ 0 };
     alu_dec8_stats = (alu_dec8_stats_t){ 0 };
 }
 
@@ -539,82 +566,53 @@ void test_op_add_hl_r16_set_carry_if_overflow_from_bit_15(void) {
 }
 
 // ---- op_inc_r8 ----
-void test_op_inc_b(void) {
-    mock_cpu.bc.hi = 0x2;
+void test_op_inc_r8_all_registers(void) {
+    struct {
+        uint8_t opcode;
+        uint8_t *reg;
+    } cases[] = {
+        {0x04, &mock_cpu.bc.hi}, // B
+        {0x0C, &mock_cpu.bc.lo}, // C
+        {0x14, &mock_cpu.de.hi}, // D
+        {0x1C, &mock_cpu.de.lo}, // E
+        {0x24, &mock_cpu.hl.hi}, // H
+        {0x2C, &mock_cpu.hl.lo}, // L
+        {0x3C, &mock_cpu.af.hi}, // A
+    };
 
-    uint8_t opcode = 0x04; // INC B
+    for (int i = 0; i < 7; i++) {
+        *cases[i].reg = 0x2;
 
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+        alu_inc8_stats.calls[i].return_value = (alu8_result_t){
+            .value = 0x03,
+            .status = {
+                .zero = false,
+                .half_carry = false,
+            }
+        };
 
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.bc.hi);
-}
+        int cycles = opcode_table[cases[i].opcode](&mock_cpu, &mock_bus, cases[i].opcode);
 
-void test_op_inc_c(void) {
-    mock_cpu.bc.lo = 0x2;
+        TEST_ASSERT_EQUAL(4, cycles);
+        TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+        TEST_ASSERT_EQUAL_UINT8(0x03, *cases[i].reg);
 
-    uint8_t opcode = 0x0C; // INC C
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.bc.lo);
-}
-
-void test_op_inc_d(void) {
-    mock_cpu.de.hi = 0x2;
-
-    uint8_t opcode = 0x14; // INC D
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.de.hi);
-}
-
-void test_op_inc_e(void) {
-    mock_cpu.de.lo = 0x2;
-
-    uint8_t opcode = 0x1C; // INC E
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.de.lo);
-}
-
-
-void test_op_inc_h(void) {
-    mock_cpu.hl.hi = 0x2;
-
-    uint8_t opcode = 0x24; // INC H
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.hl.hi);
-}
-
-void test_op_inc_l(void) {
-    mock_cpu.hl.lo = 0x2;
-
-    uint8_t opcode = 0x2C; // INC L
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.hl.lo);
+        TEST_ASSERT_EQUAL_INT(i + 1, alu_inc8_stats.call_count);
+        TEST_ASSERT_EQUAL_UINT8(0x2, alu_inc8_stats.calls[i].value);
+    }
 }
 
 void test_op_inc_hl_mem(void) {
     mock_cpu.hl.reg = 0x0;
     mock_memory[mock_cpu.hl.reg] = 0x2;
+
+    alu_inc8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0x03,
+        .status = {
+            .zero = false,
+            .half_carry = false,
+        }
+    };
 
     uint8_t opcode = 0x34; // INC [HL]
 
@@ -623,22 +621,20 @@ void test_op_inc_hl_mem(void) {
     TEST_ASSERT_EQUAL(12, cycles);
     TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
     TEST_ASSERT_EQUAL_UINT8(0x3, mock_memory[mock_cpu.hl.reg]);
-}
 
-void test_op_inc_a(void) {
-    mock_cpu.af.hi = 0x2;
-
-    uint8_t opcode = 0x3C; // INC A
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x3, mock_cpu.af.hi);
+    TEST_ASSERT_EQUAL_UINT8(0x2, alu_inc8_stats.calls[0].value);
 }
 
 void test_op_inc_r8_sets_z_flag_on_overflow(void) {
     mock_cpu.bc.hi = 0xFF;
+
+    alu_inc8_stats.calls[0].return_value = (alu8_result_t){
+       .value = 0x00,
+       .status = {
+           .zero = true,
+           .half_carry = true,
+       }
+    };
 
     uint8_t opcode = 0x04; // INC B
 
@@ -646,10 +642,20 @@ void test_op_inc_r8_sets_z_flag_on_overflow(void) {
 
     TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.bc.hi);
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+
+    TEST_ASSERT_EQUAL_UINT8(0xFF, alu_inc8_stats.calls[0].value);
 }
 
 void test_op_inc_r8_sets_h_flag_on_nibble_overflow(void) {
     mock_cpu.bc.hi = 0x0F; // 00001111 -> 00010000
+
+    alu_inc8_stats.calls[0].return_value = (alu8_result_t){
+       .value = 0x10,
+       .status = {
+           .zero = false,
+           .half_carry = true,
+       }
+    };
 
     uint8_t opcode = 0x04; // INC B
 
@@ -657,10 +663,20 @@ void test_op_inc_r8_sets_h_flag_on_nibble_overflow(void) {
 
     TEST_ASSERT_EQUAL_UINT8(0x10, mock_cpu.bc.hi);
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+
+    TEST_ASSERT_EQUAL_UINT8(0x0F, alu_inc8_stats.calls[0].value);
 }
 
 void test_op_inc_r8_does_not_set_h_flag_when_no_nibble_overflow(void) {
     mock_cpu.bc.hi = 0x10; // 00010000 -> 00010001
+
+    alu_inc8_stats.calls[0].return_value = (alu8_result_t){
+       .value = 0x11,
+       .status = {
+           .zero = false,
+           .half_carry = false,
+       }
+    };
 
     uint8_t opcode = 0x04; // INC B
 
@@ -668,17 +684,29 @@ void test_op_inc_r8_does_not_set_h_flag_when_no_nibble_overflow(void) {
 
     TEST_ASSERT_EQUAL_UINT8(0x11, mock_cpu.bc.hi);
     TEST_ASSERT_EQUAL_UINT8(false, flag_get(&mock_cpu, FLAG_H));
+
+    TEST_ASSERT_EQUAL_UINT8(0x10, alu_inc8_stats.calls[0].value);
 }
 
 void test_op_inc_r8_clears_n_flag(void) {
     flag_set(&mock_cpu, FLAG_N); // N set beforehand
     mock_cpu.bc.hi = 0x01;
 
+    alu_inc8_stats.calls[0].return_value = (alu8_result_t){
+       .value = 0x02,
+       .status = {
+           .zero = false,
+           .half_carry = false,
+       }
+    };
+
     uint8_t opcode = 0x04; // INC B
 
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+
+    TEST_ASSERT_EQUAL_UINT8(0x01, alu_inc8_stats.calls[0].value);
 }
 
 // ---- op_dec_r8 ----
@@ -3004,14 +3032,7 @@ int main(void) {
     RUN_TEST(test_op_add_hl_r16_reset_nhc_flags_if_no_overflow);
     RUN_TEST(test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11);
     RUN_TEST(test_op_add_hl_r16_set_carry_if_overflow_from_bit_15);
-    RUN_TEST(test_op_inc_b);
-    RUN_TEST(test_op_inc_c);
-    RUN_TEST(test_op_inc_d);
-    RUN_TEST(test_op_inc_e);
-    RUN_TEST(test_op_inc_h);
-    RUN_TEST(test_op_inc_l);
     RUN_TEST(test_op_inc_hl_mem);
-    RUN_TEST(test_op_inc_a);
     RUN_TEST(test_op_inc_r8_sets_z_flag_on_overflow);
     RUN_TEST(test_op_inc_r8_sets_h_flag_on_nibble_overflow);
     RUN_TEST(test_op_inc_r8_does_not_set_h_flag_when_no_nibble_overflow);
