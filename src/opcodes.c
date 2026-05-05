@@ -53,6 +53,7 @@ static int op_adc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_sub_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_sbc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_and_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_xor_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -250,6 +251,16 @@ opcode_fn opcode_table[256] = {
     [0xA5] = op_and_a_r8,     // AND a,L
     [0xA6] = op_and_a_r8,     // AND a,[HL]
     [0xA7] = op_and_a_r8,     // AND a,A
+    //Type: XOR a, r8
+    [0xA8] = op_xor_a_r8,     // XOR a,B
+    [0xA9] = op_xor_a_r8,     // XOR a,C
+    [0xAA] = op_xor_a_r8,     // XOR a,D
+    [0xAB] = op_xor_a_r8,     // XOR a,E
+    [0xAC] = op_xor_a_r8,     // XOR a,H
+    [0xAD] = op_xor_a_r8,     // XOR a,L
+    [0xAE] = op_xor_a_r8,     // XOR a,[HL]
+    [0xAF] = op_xor_a_r8,     // XOR a,A
+
     // ... (initialize other opcodes as needed)
 };
 
@@ -835,6 +846,29 @@ static int op_and_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // AND A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
+
+static int op_xor_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    r8_operand_t register_code = opcode & 0b111; // Extract the register code from the opcode
+
+    uint8_t reg_value = read_r8(cpu, bus, register_code);
+    uint8_t a = cpu->af.hi;
+
+    uint8_t result = a ^ reg_value;
+    cpu->af.hi = result;
+
+    if (result == 0) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    flag_clear(cpu, FLAG_N);
+    flag_clear(cpu, FLAG_H);
+    flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("XOR A,%s: 0x%02X ^ 0x%02X = 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        get_r8_name(register_code), a, reg_value, result, instr_pc, opcode);
+
+    return (register_code == OP_MEM_HL) ? 8 : 4; // XOR A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
+}
+
 
 /*-------------------------------------------------------
  * Private helpers definition
