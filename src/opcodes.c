@@ -465,20 +465,18 @@ static int op_dec_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     r8_operand_t register_code = (opcode >> 3) & 0b111; // Extract the register code from the opcode
 
-    uint8_t old_val = read_r8(cpu, bus, register_code);
-    uint8_t new_val = old_val - 1;
+    uint8_t reg_value = read_r8(cpu, bus, register_code);
 
-    bool half_borrow = (old_val & 0x0F) == 0x00;
-    bool zero = new_val == 0;
+    alu8_result_t result = alu_dec8(reg_value);
 
-    write_r8(cpu, bus, register_code, new_val);
+    write_r8(cpu, bus, register_code, result.value);
 
     flag_set(cpu, FLAG_N);
-    if (zero) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
-    if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
 
     LOG_DEBUG("DEC %s 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        get_r8_name(register_code), old_val, new_val, instr_pc, opcode);
+        get_r8_name(register_code), reg_value, result.value, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 12 : 4; // DEC r8 takes 4 cycles for normal r8 register and 12 for [HL]
 }

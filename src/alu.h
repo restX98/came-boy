@@ -16,11 +16,11 @@ typedef struct {
 alu8_result_t alu_add8(uint8_t a, uint8_t value, uint8_t carry);
 alu8_result_t alu_sub8(uint8_t a, uint8_t value, uint8_t carry);
 
-// alu8_result_t alu_inc(uint8_t value);
-// alu8_result_t alu_dec(uint8_t value);
+alu8_result_t alu_inc8(uint8_t value);
+alu8_result_t alu_dec8(uint8_t value);
 
-// uint8_t alu_and(uint8_t a, uint8_t v);
-// uint8_t alu_or(uint8_t a, uint8_t v);
-// uint8_t alu_xor(uint8_t a, uint8_t v);
+// uint8_t alu_and8(uint8_t a, uint8_t v);
+// uint8_t alu_or8(uint8_t a, uint8_t v);
+// uint8_t alu_xor8(uint8_t a, uint8_t v);
 
 #endif // ALU_H

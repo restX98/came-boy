@@ -73,10 +73,37 @@ alu8_result_t alu_sub8(uint8_t a, uint8_t value, uint8_t carry) {
     return alu_sub8_stats.calls[alu_sub8_stats.call_count - 1].return_value;
 }
 
+// Mock alu_dec8
+typedef struct {
+    uint8_t value;
+    alu8_result_t return_value;
+} alu_dec8_call_t;
+
+typedef struct {
+    size_t call_count;
+    alu_dec8_call_t calls[10];
+} alu_dec8_stats_t;
+
+static alu_dec8_stats_t alu_dec8_stats;
+
+alu8_result_t alu_dec8(uint8_t value) {
+    if (alu_dec8_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for alu_dec8");
+    }
+
+    alu_dec8_call_t *call = &alu_dec8_stats.calls[alu_dec8_stats.call_count];
+    call->value = value;
+
+    alu_dec8_stats.call_count++;
+
+    return alu_dec8_stats.calls[alu_dec8_stats.call_count - 1].return_value;
+}
+
 void setUp(void) {
     suppress_logs();
     alu_add8_stats = (alu_add8_stats_t){ 0 };
     alu_sub8_stats = (alu_sub8_stats_t){ 0 };
+    alu_dec8_stats = (alu_dec8_stats_t){ 0 };
 }
 
 void tearDown(void) {
@@ -655,82 +682,53 @@ void test_op_inc_r8_clears_n_flag(void) {
 }
 
 // ---- op_dec_r8 ----
-void test_op_dec_b(void) {
-    mock_cpu.bc.hi = 0x2;
+void test_op_dec_r8_all_registers(void) {
+    struct {
+        uint8_t opcode;
+        uint8_t *reg;
+    } cases[] = {
+        {0x05, &mock_cpu.bc.hi}, // B
+        {0x0D, &mock_cpu.bc.lo}, // C
+        {0x15, &mock_cpu.de.hi}, // D
+        {0x1D, &mock_cpu.de.lo}, // E
+        {0x25, &mock_cpu.hl.hi}, // H
+        {0x2D, &mock_cpu.hl.lo}, // L
+        {0x3D, &mock_cpu.af.hi}, // A
+    };
 
-    uint8_t opcode = 0x05; // DEC B
+    for (int i = 0; i < 7; i++) {
+        *cases[i].reg = 0x2;
 
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+        alu_dec8_stats.calls[i].return_value = (alu8_result_t){
+            .value = 0x01,
+            .status = {
+                .zero = false,
+                .half_carry = false,
+            }
+        };
 
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x1, mock_cpu.bc.hi);
-}
+        int cycles = opcode_table[cases[i].opcode](&mock_cpu, &mock_bus, cases[i].opcode);
 
-void test_op_dec_c(void) {
-    mock_cpu.bc.lo = 0x2;
+        TEST_ASSERT_EQUAL(4, cycles);
+        TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+        TEST_ASSERT_EQUAL_UINT8(0x1, *cases[i].reg);
 
-    uint8_t opcode = 0x0D; // DEC C
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x1, mock_cpu.bc.lo);
-}
-
-void test_op_dec_d(void) {
-    mock_cpu.de.hi = 0x2;
-
-    uint8_t opcode = 0x15; // DEC D
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x1, mock_cpu.de.hi);
-}
-
-void test_op_dec_e(void) {
-    mock_cpu.de.lo = 0x2;
-
-    uint8_t opcode = 0x1D; // DEC E
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x1, mock_cpu.de.lo);
-}
-
-
-void test_op_dec_h(void) {
-    mock_cpu.hl.hi = 0x2;
-
-    uint8_t opcode = 0x25; // DEC H
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x1, mock_cpu.hl.hi);
-}
-
-void test_op_dec_l(void) {
-    mock_cpu.hl.lo = 0x2;
-
-    uint8_t opcode = 0x2D; // DEC L
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x1, mock_cpu.hl.lo);
+        TEST_ASSERT_EQUAL_INT(i + 1, alu_dec8_stats.call_count);
+        TEST_ASSERT_EQUAL_UINT8(0x2, alu_dec8_stats.calls[i].value);
+    }
 }
 
 void test_op_dec_hl_mem(void) {
     mock_cpu.hl.reg = 0x0;
     mock_memory[mock_cpu.hl.reg] = 0x2;
+
+    alu_dec8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0x01,
+        .status = {
+            .zero = false,
+            .half_carry = false,
+        }
+    };
 
     uint8_t opcode = 0x35; // DEC [HL]
 
@@ -739,22 +737,20 @@ void test_op_dec_hl_mem(void) {
     TEST_ASSERT_EQUAL(12, cycles);
     TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
     TEST_ASSERT_EQUAL_UINT8(0x1, mock_memory[mock_cpu.hl.reg]);
-}
 
-void test_op_dec_a(void) {
-    mock_cpu.af.hi = 0x2;
-
-    uint8_t opcode = 0x3D; // DEC A
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT8(0x1, mock_cpu.af.hi);
+    TEST_ASSERT_EQUAL_UINT8(0x2, alu_dec8_stats.calls[0].value);
 }
 
 void test_op_dec_r8_sets_z_flag_on_overflow(void) {
     mock_cpu.bc.hi = 0x01;
+
+    alu_dec8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0x00,
+        .status = {
+            .zero = true,
+            .half_carry = false,
+        }
+    };
 
     uint8_t opcode = 0x05; // DEC B
 
@@ -762,10 +758,20 @@ void test_op_dec_r8_sets_z_flag_on_overflow(void) {
 
     TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.bc.hi);
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+
+    TEST_ASSERT_EQUAL_UINT8(0x1, alu_dec8_stats.calls[0].value);
 }
 
 void test_op_dec_r8_sets_h_flag_on_nibble_overflow(void) {
     mock_cpu.bc.hi = 0x10; // 00010000 -> 00001111
+
+    alu_dec8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0x0F,
+        .status = {
+            .zero = false,
+            .half_carry = true,
+        }
+    };
 
     uint8_t opcode = 0x05; // DEC B
 
@@ -773,10 +779,20 @@ void test_op_dec_r8_sets_h_flag_on_nibble_overflow(void) {
 
     TEST_ASSERT_EQUAL_UINT8(0x0F, mock_cpu.bc.hi);
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+
+    TEST_ASSERT_EQUAL_UINT8(0x10, alu_dec8_stats.calls[0].value);
 }
 
 void test_op_dec_r8_does_not_set_h_flag_when_no_nibble_overflow(void) {
     mock_cpu.bc.hi = 0x08; // 00001000 -> 00000111
+
+    alu_dec8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0x07,
+        .status = {
+            .zero = false,
+            .half_carry = false,
+        }
+    };
 
     uint8_t opcode = 0x05; // DEC B
 
@@ -784,10 +800,21 @@ void test_op_dec_r8_does_not_set_h_flag_when_no_nibble_overflow(void) {
 
     TEST_ASSERT_EQUAL_UINT8(0x07, mock_cpu.bc.hi);
     TEST_ASSERT_EQUAL_UINT8(false, flag_get(&mock_cpu, FLAG_H));
+
+    TEST_ASSERT_EQUAL_UINT8(0x08, alu_dec8_stats.calls[0].value);
 }
 
 void test_op_dec_r8_wraps_and_sets_h(void) {
     mock_cpu.bc.hi = 0x00;
+
+    alu_dec8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0xFF,
+        .status = {
+            .zero = false,
+            .half_carry = true,
+        }
+    };
+
 
     uint8_t opcode = 0x05;
 
@@ -796,6 +823,8 @@ void test_op_dec_r8_wraps_and_sets_h(void) {
     TEST_ASSERT_EQUAL_UINT8(0xFF, mock_cpu.bc.hi);
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, alu_dec8_stats.calls[0].value);
 }
 
 void test_op_dec_r8_sets_n_flag(void) {
@@ -2987,14 +3016,8 @@ int main(void) {
     RUN_TEST(test_op_inc_r8_sets_h_flag_on_nibble_overflow);
     RUN_TEST(test_op_inc_r8_does_not_set_h_flag_when_no_nibble_overflow);
     RUN_TEST(test_op_inc_r8_clears_n_flag);
-    RUN_TEST(test_op_dec_b);
-    RUN_TEST(test_op_dec_c);
-    RUN_TEST(test_op_dec_d);
-    RUN_TEST(test_op_dec_e);
-    RUN_TEST(test_op_dec_h);
-    RUN_TEST(test_op_dec_l);
+    RUN_TEST(test_op_dec_r8_all_registers);
     RUN_TEST(test_op_dec_hl_mem);
-    RUN_TEST(test_op_dec_a);
     RUN_TEST(test_op_dec_r8_sets_z_flag_on_overflow);
     RUN_TEST(test_op_dec_r8_sets_h_flag_on_nibble_overflow);
     RUN_TEST(test_op_dec_r8_does_not_set_h_flag_when_no_nibble_overflow);

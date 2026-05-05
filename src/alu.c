@@ -32,3 +32,29 @@ alu8_result_t alu_sub8(uint8_t a, uint8_t value, uint8_t carry) {
         }
     };
 }
+
+alu8_result_t alu_inc8(uint8_t value) {
+    uint8_t r = value + 1;
+
+    return (alu8_result_t) {
+        .value = (uint8_t)r,
+            .status = {
+                .zero = (r == 0),
+                .half_carry = (value & 0xF) == 0x0F,
+                .carry = false
+        }
+    };
+}
+
+alu8_result_t alu_dec8(uint8_t value) {
+    uint8_t r = value - 1;
+
+    return (alu8_result_t) {
+        .value = (uint8_t)r,
+            .status = {
+                .zero = (r == 0),
+                .half_carry = (value & 0xF) == 0x00,
+                .carry = false
+        }
+    };
+}
