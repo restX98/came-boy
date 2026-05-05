@@ -756,29 +756,19 @@ static int op_sub_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     r8_operand_t register_code = opcode & 0b111; // Extract the register code from the opcode
 
     uint8_t reg_value = read_r8(cpu, bus, register_code);
-    uint8_t old_a = cpu->af.hi;
+    uint8_t a = cpu->af.hi;
 
-    uint8_t diff = old_a - reg_value;
-
-    // Z: diff is zero
-    bool zero = diff == 0;
-
-    // H: borrow from bit 4
-    bool half_borrow = (reg_value & 0x0F) > (old_a & 0x0F);
-
-    // C: borrow
-    bool borrow = reg_value > old_a;
-
-    cpu->af.hi = diff;
+    alu_result_t result = alu_sub(a, reg_value, 0);
+    cpu->af.hi = result.value;
 
     // N set, Z, H and C set according to result
     flag_set(cpu, FLAG_N);
-    if (zero)        flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
-    if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
-    if (borrow)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+    if (result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("SUB A,%s: 0x%02X - 0x%02X = 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        get_r8_name(register_code), old_a, reg_value, diff, instr_pc, opcode);
+        get_r8_name(register_code), a, reg_value, result.value, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // SUB A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
@@ -788,38 +778,21 @@ static int op_sbc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     r8_operand_t register_code = opcode & 0b111; // Extract the register code from the opcode
 
-    uint8_t carry_in = flag_get(cpu, FLAG_C) ? 1 : 0;
     uint8_t reg_value = read_r8(cpu, bus, register_code);
-    uint8_t old_a = cpu->af.hi;
+    uint8_t a = cpu->af.hi;
+    uint8_t carry_in = flag_get(cpu, FLAG_C) ? 1 : 0;
 
-    uint8_t diff = old_a - reg_value - carry_in;
-
-    // Z: diff is zero
-    bool zero = diff == 0;
-
-    // H: borrow from bit 4
-    bool half_borrow = (reg_value & 0x0F) + carry_in > (old_a & 0x0F);
-    // carry_in must not be added to reg_value before masking, as doing so
-    // can hide a half-borrow due to overflow in the lower nibble.
-    // Example:
-    // A     = 0001 1111                         |  A           = 0001 1111
-    // reg   = 0000 1111                         |  reg + carry = 0001 0000
-    // carry = 0000 0001                         |  diff        = 0000 1111 -> half borrow undetected
-    // diff  = 0000 1111 -> half borrow detected |
-
-    // C: borrow
-    bool borrow = (uint16_t)old_a < (uint16_t)reg_value + carry_in;
-
-    cpu->af.hi = diff;
+    alu_result_t result = alu_sub(a, reg_value, carry_in);
+    cpu->af.hi = result.value;
 
     // N set, Z, H and C set according to result
     flag_set(cpu, FLAG_N);
-    if (zero)        flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
-    if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
-    if (borrow)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+    if (result.status.zero)        flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("SBC A,%s: 0x%02X - 0x%02X - %d = 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        get_r8_name(register_code), old_a, reg_value, carry_in, diff, instr_pc, opcode);
+        get_r8_name(register_code), a, reg_value, carry_in, result.value, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // SBC A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
