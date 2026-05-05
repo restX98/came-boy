@@ -2280,6 +2280,134 @@ void test_op_or_a_a(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
+// ---- op_cp_a_r8 ----
+void test_op_cp_a_r8(void) {
+    mock_cpu.af.hi = 0x30;
+    mock_cpu.bc.hi = 0x10; // B
+
+    uint8_t opcode = 0xB8; // CP A,B
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+
+    // A unchanged
+    TEST_ASSERT_EQUAL_UINT8(0x30, mock_cpu.af.hi);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_cp_a_r8_sets_zero(void) {
+    mock_cpu.af.hi = 0x42;
+    mock_cpu.bc.hi = 0x42; // B
+
+    uint8_t opcode = 0xB8;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x42, mock_cpu.af.hi);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_cp_a_r8_sets_carry(void) {
+    mock_cpu.af.hi = 0x10;
+    mock_cpu.bc.hi = 0x20; // B
+
+    uint8_t opcode = 0xB8;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x10, mock_cpu.af.hi);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_cp_a_r8_sets_half_borrow(void) {
+    mock_cpu.af.hi = 0x10;
+    mock_cpu.bc.hi = 0x01; // B
+
+    uint8_t opcode = 0xB8;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x10, mock_cpu.af.hi);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H)); // 0x0 - 1 borrow
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_cp_a_r8_all_registers(void) {
+    struct {
+        uint8_t opcode;
+        uint8_t *reg;
+    } cases[] = {
+        {0xB8, &mock_cpu.bc.hi}, // B
+        {0xB9, &mock_cpu.bc.lo}, // C
+        {0xBA, &mock_cpu.de.hi}, // D
+        {0xBB, &mock_cpu.de.lo}, // E
+        {0xBC, &mock_cpu.hl.hi}, // H
+        {0xBD, &mock_cpu.hl.lo}, // L
+    };
+
+    for (int i = 0; i < 6; i++) {
+        mock_cpu.af.hi = 0x20;
+        *cases[i].reg = 0x05;
+
+        opcode_table[cases[i].opcode](&mock_cpu, &mock_bus, cases[i].opcode);
+
+        TEST_ASSERT_EQUAL_UINT8(0x20, mock_cpu.af.hi); // A unchanged
+
+        TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+        TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+    }
+}
+
+void test_op_cp_a_r8_hl_mem(void) {
+    mock_cpu.af.hi = 0x30;
+    mock_cpu.hl.reg = 0x2000;
+    mock_memory[0x2000] = 0x10;
+
+    uint8_t opcode = 0xBE; // CP A,[HL]
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+
+    // A must NOT change
+    TEST_ASSERT_EQUAL_UINT8(0x30, mock_cpu.af.hi);
+
+    // 0x30 - 0x10 = 0x20
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_cp_a_a(void) {
+    mock_cpu.af.hi = 0x20;
+
+    uint8_t opcode = 0xBF;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x20, mock_cpu.af.hi); // A unchanged
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -2436,6 +2564,13 @@ int main(void) {
     RUN_TEST(test_op_or_a_r8_all_registers);
     RUN_TEST(test_op_or_a_r8_hl_mem);
     RUN_TEST(test_op_or_a_a);
+    RUN_TEST(test_op_cp_a_r8);
+    RUN_TEST(test_op_cp_a_r8_sets_zero);
+    RUN_TEST(test_op_cp_a_r8_sets_carry);
+    RUN_TEST(test_op_cp_a_r8_sets_half_borrow);
+    RUN_TEST(test_op_cp_a_r8_all_registers);
+    RUN_TEST(test_op_cp_a_r8_hl_mem);
+    RUN_TEST(test_op_cp_a_a);
 
     return UNITY_END();
 }
