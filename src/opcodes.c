@@ -871,22 +871,13 @@ static int op_cp_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t reg_value = read_r8(cpu, bus, register_code);
     uint8_t a = cpu->af.hi;
 
-    uint8_t diff = a - reg_value;
-
-    // Z: diff is zero
-    bool zero = diff == 0;
-
-    // H: borrow from bit 4
-    bool half_borrow = (a & 0x0F) < (reg_value & 0x0F);
-
-    // C: borrow
-    bool borrow = a < reg_value;
+    alu_result_t result = alu_sub(a, reg_value, 0);
 
     // N set, Z, H and C set according to result
     flag_set(cpu, FLAG_N);
-    if (zero)        flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
-    if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
-    if (borrow)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+    if (result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("CP A,%s: 0x%02X - 0x%02X at PC=0x%04X (opcode=0x%02X)",
         get_r8_name(register_code), a, reg_value, instr_pc, opcode);

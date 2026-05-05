@@ -2031,6 +2031,7 @@ void test_op_sub_a_r8(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 
+    TEST_ASSERT_EQUAL_INT(1, alu_sub_stats.call_count);
     TEST_ASSERT_EQUAL_UINT8(0x30, alu_sub_stats.calls[0].a);
     TEST_ASSERT_EQUAL_UINT8(0x10, alu_sub_stats.calls[0].value);
     TEST_ASSERT_EQUAL_UINT8(0, alu_sub_stats.calls[0].carry);
@@ -2208,6 +2209,7 @@ void test_op_sbc_a_r8_no_carry(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 
+    TEST_ASSERT_EQUAL_INT(1, alu_sub_stats.call_count);
     TEST_ASSERT_EQUAL_UINT8(0x30, alu_sub_stats.calls[0].a);
     TEST_ASSERT_EQUAL_UINT8(0x10, alu_sub_stats.calls[0].value);
     TEST_ASSERT_EQUAL_UINT8(0, alu_sub_stats.calls[0].carry);
@@ -2731,6 +2733,15 @@ void test_op_cp_a_r8(void) {
     mock_cpu.af.hi = 0x30;
     mock_cpu.bc.hi = 0x10; // B
 
+    alu_sub_stats.calls[0].return_value = (alu_result_t){
+        .value = 0x20,
+        .status = {
+            .zero = false,
+            .half_carry = false,
+            .carry = false,
+        }
+    };
+
     uint8_t opcode = 0xB8; // CP A,B
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
@@ -2750,6 +2761,15 @@ void test_op_cp_a_r8_sets_zero(void) {
     mock_cpu.af.hi = 0x42;
     mock_cpu.bc.hi = 0x42; // B
 
+    alu_sub_stats.calls[0].return_value = (alu_result_t){
+        .value = 0x00,
+        .status = {
+            .zero = true,
+            .half_carry = false,
+            .carry = false,
+        }
+    };
+
     uint8_t opcode = 0xB8;
 
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
@@ -2760,11 +2780,24 @@ void test_op_cp_a_r8_sets_zero(void) {
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+
+    TEST_ASSERT_EQUAL_UINT8(0x42, alu_sub_stats.calls[0].a);
+    TEST_ASSERT_EQUAL_UINT8(0x42, alu_sub_stats.calls[0].value);
+    TEST_ASSERT_EQUAL_UINT8(0, alu_sub_stats.calls[0].carry);
 }
 
 void test_op_cp_a_r8_sets_carry(void) {
     mock_cpu.af.hi = 0x10;
     mock_cpu.bc.hi = 0x20; // B
+
+    alu_sub_stats.calls[0].return_value = (alu_result_t){
+        .value = 0xF0,
+        .status = {
+            .zero = false,
+            .half_carry = false,
+            .carry = true,
+        }
+    };
 
     uint8_t opcode = 0xB8;
 
@@ -2776,11 +2809,24 @@ void test_op_cp_a_r8_sets_carry(void) {
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+
+    TEST_ASSERT_EQUAL_UINT8(0x10, alu_sub_stats.calls[0].a);
+    TEST_ASSERT_EQUAL_UINT8(0x20, alu_sub_stats.calls[0].value);
+    TEST_ASSERT_EQUAL_UINT8(0, alu_sub_stats.calls[0].carry);
 }
 
 void test_op_cp_a_r8_sets_half_borrow(void) {
     mock_cpu.af.hi = 0x10;
     mock_cpu.bc.hi = 0x01; // B
+
+    alu_sub_stats.calls[0].return_value = (alu_result_t){
+        .value = 0x0F,
+        .status = {
+            .zero = false,
+            .half_carry = true,
+            .carry = false,
+        }
+    };
 
     uint8_t opcode = 0xB8;
 
@@ -2792,6 +2838,10 @@ void test_op_cp_a_r8_sets_half_borrow(void) {
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H)); // 0x0 - 1 borrow
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+
+    TEST_ASSERT_EQUAL_UINT8(0x10, alu_sub_stats.calls[0].a);
+    TEST_ASSERT_EQUAL_UINT8(0x01, alu_sub_stats.calls[0].value);
+    TEST_ASSERT_EQUAL_UINT8(0, alu_sub_stats.calls[0].carry);
 }
 
 void test_op_cp_a_r8_all_registers(void) {
@@ -2811,12 +2861,25 @@ void test_op_cp_a_r8_all_registers(void) {
         mock_cpu.af.hi = 0x20;
         *cases[i].reg = 0x05;
 
+        alu_sub_stats.calls[i].return_value = (alu_result_t){
+            .value = 0x1B,
+            .status = {
+                .zero = false,
+                .half_carry = true,
+                .carry = false,
+            }
+        };
+
         opcode_table[cases[i].opcode](&mock_cpu, &mock_bus, cases[i].opcode);
 
         TEST_ASSERT_EQUAL_UINT8(0x20, mock_cpu.af.hi); // A unchanged
 
         TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
         TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+
+        TEST_ASSERT_EQUAL_UINT8(0x20, alu_sub_stats.calls[i].a);
+        TEST_ASSERT_EQUAL_UINT8(0x05, alu_sub_stats.calls[i].value);
+        TEST_ASSERT_EQUAL_UINT8(0, alu_sub_stats.calls[i].carry);
     }
 }
 
@@ -2824,6 +2887,15 @@ void test_op_cp_a_r8_hl_mem(void) {
     mock_cpu.af.hi = 0x30;
     mock_cpu.hl.reg = 0x2000;
     mock_memory[0x2000] = 0x10;
+
+    alu_sub_stats.calls[0].return_value = (alu_result_t){
+        .value = 0x20,
+        .status = {
+            .zero = false,
+            .half_carry = false,
+            .carry = false,
+        }
+    };
 
     uint8_t opcode = 0xBE; // CP A,[HL]
 
@@ -2839,10 +2911,23 @@ void test_op_cp_a_r8_hl_mem(void) {
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+
+    TEST_ASSERT_EQUAL_UINT8(0x30, alu_sub_stats.calls[0].a);
+    TEST_ASSERT_EQUAL_UINT8(0x10, alu_sub_stats.calls[0].value);
+    TEST_ASSERT_EQUAL_UINT8(0, alu_sub_stats.calls[0].carry);
 }
 
 void test_op_cp_a_a(void) {
     mock_cpu.af.hi = 0x20;
+
+    alu_sub_stats.calls[0].return_value = (alu_result_t){
+        .value = 0x00,
+        .status = {
+            .zero = true,
+            .half_carry = false,
+            .carry = false,
+        }
+    };
 
     uint8_t opcode = 0xBF;
 
@@ -2852,6 +2937,10 @@ void test_op_cp_a_a(void) {
 
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+
+    TEST_ASSERT_EQUAL_UINT8(0x20, alu_sub_stats.calls[0].a);
+    TEST_ASSERT_EQUAL_UINT8(0x20, alu_sub_stats.calls[0].value);
+    TEST_ASSERT_EQUAL_UINT8(0, alu_sub_stats.calls[0].carry);
 }
 
 int main(void) {
