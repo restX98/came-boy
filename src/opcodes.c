@@ -403,10 +403,10 @@ static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     write_r16(cpu, register_code, read_r16(cpu, register_code) - 1);
 
-    LOG_DEBUG("INC %s at PC=0x%04X (opcode=0x%02X)",
+    LOG_DEBUG("DEC %s at PC=0x%04X (opcode=0x%02X)",
         get_r16_name(register_code), instr_pc, opcode);
 
-    return 8; // INC r16 takes 8 cycles
+    return 8; // DEC r16 takes 8 cycles
 }
 
 static int op_add_hl_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
@@ -711,7 +711,7 @@ static int op_add_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t reg_value = read_r8(cpu, bus, register_code);
     uint8_t a = cpu->af.hi;
 
-    alu_result_t alu_result = alu_add(a, reg_value, 0);
+    alu8_result_t alu_result = alu_add8(a, reg_value, 0);
     cpu->af.hi = alu_result.value;
 
     // N cleared, Z, H and C set according to result
@@ -735,7 +735,7 @@ static int op_adc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t a = cpu->af.hi;
     uint8_t carry_in = flag_get(cpu, FLAG_C) ? 1 : 0;
 
-    alu_result_t alu_result = alu_add(a, reg_value, carry_in);
+    alu8_result_t alu_result = alu_add8(a, reg_value, carry_in);
     cpu->af.hi = alu_result.value;
 
     // N cleared, Z, H and C set according to result
@@ -758,7 +758,7 @@ static int op_sub_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t reg_value = read_r8(cpu, bus, register_code);
     uint8_t a = cpu->af.hi;
 
-    alu_result_t result = alu_sub(a, reg_value, 0);
+    alu8_result_t result = alu_sub8(a, reg_value, 0);
     cpu->af.hi = result.value;
 
     // N set, Z, H and C set according to result
@@ -782,7 +782,7 @@ static int op_sbc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t a = cpu->af.hi;
     uint8_t carry_in = flag_get(cpu, FLAG_C) ? 1 : 0;
 
-    alu_result_t result = alu_sub(a, reg_value, carry_in);
+    alu8_result_t result = alu_sub8(a, reg_value, carry_in);
     cpu->af.hi = result.value;
 
     // N set, Z, H and C set according to result
@@ -871,7 +871,7 @@ static int op_cp_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t reg_value = read_r8(cpu, bus, register_code);
     uint8_t a = cpu->af.hi;
 
-    alu_result_t result = alu_sub(a, reg_value, 0);
+    alu8_result_t result = alu_sub8(a, reg_value, 0);
 
     // N set, Z, H and C set according to result
     flag_set(cpu, FLAG_N);
