@@ -52,6 +52,7 @@ static int op_add_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_adc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_sub_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_sbc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_and_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -240,7 +241,15 @@ opcode_fn opcode_table[256] = {
     [0x9D] = op_sbc_a_r8,     // SBC a,L
     [0x9E] = op_sbc_a_r8,     // SBC a,[HL]
     [0x9F] = op_sbc_a_r8,     // SBC a,A
-
+    // Type: AND A, r8
+    [0xA0] = op_and_a_r8,     // AND a,B
+    [0xA1] = op_and_a_r8,     // AND a,C
+    [0xA2] = op_and_a_r8,     // AND a,D
+    [0xA3] = op_and_a_r8,     // AND a,E
+    [0xA4] = op_and_a_r8,     // AND a,H
+    [0xA5] = op_and_a_r8,     // AND a,L
+    [0xA6] = op_and_a_r8,     // AND a,[HL]
+    [0xA7] = op_and_a_r8,     // AND a,A
     // ... (initialize other opcodes as needed)
 };
 
@@ -690,9 +699,8 @@ static int op_add_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
     if (carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
-    const char *reg_name = get_r8_name(register_code);
     LOG_DEBUG("ADD A,%s: 0x%02X + 0x%02X = 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        reg_name, old_a, reg_value, sum, instr_pc, opcode);
+        get_r8_name(register_code), old_a, reg_value, sum, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // ADD A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
@@ -726,9 +734,8 @@ static int op_adc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
     if (carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
-    const char *reg_name = get_r8_name(register_code);
     LOG_DEBUG("ADC A,%s: 0x%02X + 0x%02X + %d = 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        reg_name, old_a, reg_value, carry_in, sum, instr_pc, opcode);
+        get_r8_name(register_code), old_a, reg_value, carry_in, sum, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // ADC A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
@@ -760,9 +767,8 @@ static int op_sub_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
     if (borrow)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
-    const char *reg_name = get_r8_name(register_code);
     LOG_DEBUG("SUB A,%s: 0x%02X - 0x%02X = 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        reg_name, old_a, reg_value, diff, instr_pc, opcode);
+        get_r8_name(register_code), old_a, reg_value, diff, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // SUB A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
@@ -802,13 +808,33 @@ static int op_sbc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     if (half_borrow) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
     if (borrow)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
-    const char *reg_name = get_r8_name(register_code);
     LOG_DEBUG("SBC A,%s: 0x%02X - 0x%02X - %d = 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        reg_name, old_a, reg_value, carry_in, diff, instr_pc, opcode);
+        get_r8_name(register_code), old_a, reg_value, carry_in, diff, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // SBC A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
 
+static int op_and_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    r8_operand_t register_code = opcode & 0b111; // Extract the register code from the opcode
+
+    uint8_t reg_value = read_r8(cpu, bus, register_code);
+    uint8_t a = cpu->af.hi;
+
+    uint8_t result = a & reg_value;
+    cpu->af.hi = result;
+
+    if (result == 0) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    flag_clear(cpu, FLAG_N);
+    flag_set(cpu, FLAG_H);
+    flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("AND A,%s: 0x%02X & 0x%02X = 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        get_r8_name(register_code), a, reg_value, result, instr_pc, opcode);
+
+    return (register_code == OP_MEM_HL) ? 8 : 4; // AND A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
+}
 
 /*-------------------------------------------------------
  * Private helpers definition
