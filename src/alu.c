@@ -58,3 +58,36 @@ alu8_result_t alu_dec8(uint8_t value) {
         }
     };
 }
+
+alu8_result_t alu_and8(uint8_t a, uint8_t value) {
+    uint8_t r = a & value;
+
+    return (alu8_result_t) {
+        .value = r,
+            .status = {
+                .zero = (r == 0),
+        }
+    };
+}
+
+alu8_result_t alu_or8(uint8_t a, uint8_t value) {
+    uint8_t r = a | value;
+
+    return (alu8_result_t) {
+        .value = r,
+            .status = {
+                .zero = (r == 0),
+        }
+    };
+}
+
+alu8_result_t alu_xor8(uint8_t a, uint8_t value) {
+    uint8_t r = a ^ value;
+
+    return (alu8_result_t) {
+        .value = r,
+            .status = {
+                .zero = (r == 0),
+        }
+    };
+}

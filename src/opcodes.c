@@ -801,10 +801,10 @@ static int op_and_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t reg_value = read_r8(cpu, bus, register_code);
     uint8_t a = cpu->af.hi;
 
-    uint8_t result = a & reg_value;
-    cpu->af.hi = result;
+    alu8_result_t result = alu_and8(a, reg_value);
+    cpu->af.hi = result.value;
 
-    if (result == 0) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.zero) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
     flag_clear(cpu, FLAG_N);
     flag_set(cpu, FLAG_H);
     flag_clear(cpu, FLAG_C);
@@ -823,10 +823,10 @@ static int op_xor_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t reg_value = read_r8(cpu, bus, register_code);
     uint8_t a = cpu->af.hi;
 
-    uint8_t result = a ^ reg_value;
-    cpu->af.hi = result;
+    alu8_result_t result = alu_xor8(a, reg_value);
+    cpu->af.hi = result.value;
 
-    if (result == 0) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.zero) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
     flag_clear(cpu, FLAG_N);
     flag_clear(cpu, FLAG_H);
     flag_clear(cpu, FLAG_C);
@@ -845,10 +845,10 @@ static int op_or_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t reg_value = read_r8(cpu, bus, register_code);
     uint8_t a = cpu->af.hi;
 
-    uint8_t result = a | reg_value;
-    cpu->af.hi = result;
+    alu8_result_t result = alu_or8(a, reg_value);
+    cpu->af.hi = result.value;
 
-    if (result == 0) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.zero) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
     flag_clear(cpu, FLAG_N);
     flag_clear(cpu, FLAG_H);
     flag_clear(cpu, FLAG_C);
