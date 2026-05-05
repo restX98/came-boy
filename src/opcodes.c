@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdbool.h>
 
+#include "alu.h"
 #include "logger.h"
 
 /*-------------------------------------------------------
@@ -272,14 +273,14 @@ opcode_fn opcode_table[256] = {
     [0xB6] = op_or_a_r8,      // OR a,[HL]
     [0xB7] = op_or_a_r8,      // OR a,A
     //Type: CP a, r8 (ComPare)
-    [0xB8] = op_cp_a_r8,     // CP a,B
-    [0xB9] = op_cp_a_r8,     // CP a,C
-    [0xBA] = op_cp_a_r8,     // CP a,D
-    [0xBB] = op_cp_a_r8,     // CP a,E
-    [0xBC] = op_cp_a_r8,     // CP a,H
-    [0xBD] = op_cp_a_r8,     // CP a,L
-    [0xBE] = op_cp_a_r8,     // CP a,[HL]
-    [0xBF] = op_cp_a_r8,     // CP a,A
+    [0xB8] = op_cp_a_r8,      // CP a,B
+    [0xB9] = op_cp_a_r8,      // CP a,C
+    [0xBA] = op_cp_a_r8,      // CP a,D
+    [0xBB] = op_cp_a_r8,      // CP a,E
+    [0xBC] = op_cp_a_r8,      // CP a,H
+    [0xBD] = op_cp_a_r8,      // CP a,L
+    [0xBE] = op_cp_a_r8,      // CP a,[HL]
+    [0xBF] = op_cp_a_r8,      // CP a,A
 
     // ... (initialize other opcodes as needed)
 };
@@ -708,30 +709,19 @@ static int op_add_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     r8_operand_t register_code = opcode & 0b111; // Extract the register code from the opcode
 
     uint8_t reg_value = read_r8(cpu, bus, register_code);
-    uint8_t old_a = cpu->af.hi;
+    uint8_t a = cpu->af.hi;
 
-    uint16_t full_sum = old_a + reg_value;
-    uint8_t sum = (uint8_t)full_sum;
-
-    // Z: sum is zero
-    bool zero = sum == 0;
-
-    // H: overflow from bit 3
-    bool half_carry = ((old_a & 0x0F) + (reg_value & 0x0F)) > 0x0F;
-
-    // C: overflow from bit 7
-    bool carry = full_sum > 0xFF;
-
-    cpu->af.hi = sum;
+    alu_result_t alu_result = alu_add(a, reg_value, 0);
+    cpu->af.hi = alu_result.value;
 
     // N cleared, Z, H and C set according to result
     flag_clear(cpu, FLAG_N);
-    if (zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
-    if (half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
-    if (carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+    if (alu_result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (alu_result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (alu_result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("ADD A,%s: 0x%02X + 0x%02X = 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        get_r8_name(register_code), old_a, reg_value, sum, instr_pc, opcode);
+        get_r8_name(register_code), a, reg_value, alu_result.value, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // ADD A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
@@ -742,31 +732,20 @@ static int op_adc_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     r8_operand_t register_code = opcode & 0b111; // Extract the register code from the opcode
 
     uint8_t reg_value = read_r8(cpu, bus, register_code);
-    uint8_t old_a = cpu->af.hi;
-
+    uint8_t a = cpu->af.hi;
     uint8_t carry_in = flag_get(cpu, FLAG_C) ? 1 : 0;
-    uint16_t full_sum = old_a + reg_value + carry_in;
-    uint8_t sum = (uint8_t)full_sum;
 
-    // Z: sum is zero
-    bool zero = sum == 0;
-
-    // H: overflow from bit 3
-    bool half_carry = ((old_a & 0x0F) + (reg_value & 0x0F) + carry_in) > 0x0F;
-
-    // C: overflow from bit 7
-    bool carry = full_sum > 0xFF;
-
-    cpu->af.hi = sum;
+    alu_result_t alu_result = alu_add(a, reg_value, carry_in);
+    cpu->af.hi = alu_result.value;
 
     // N cleared, Z, H and C set according to result
     flag_clear(cpu, FLAG_N);
-    if (zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
-    if (half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
-    if (carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+    if (alu_result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (alu_result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (alu_result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("ADC A,%s: 0x%02X + 0x%02X + %d = 0x%02X at PC=0x%04X (opcode=0x%02X)",
-        get_r8_name(register_code), old_a, reg_value, carry_in, sum, instr_pc, opcode);
+        get_r8_name(register_code), a, reg_value, carry_in, alu_result.value, instr_pc, opcode);
 
     return (register_code == OP_MEM_HL) ? 8 : 4; // ADC A,r8 takes 4 cycles for normal r8 register and 8 for [HL]
 }
