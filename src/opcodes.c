@@ -416,20 +416,15 @@ static int op_add_hl_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     r16_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
 
     uint16_t reg_value = read_r16(cpu, register_code);
-    uint16_t old_hl = cpu->hl.reg;
+    uint16_t hl = cpu->hl.reg;
 
-    // H: overflow from bit 11
-    bool half_carry = ((old_hl & 0x0FFF) + (reg_value & 0x0FFF)) > 0x0FFF;
-
-    // C: overflow from bit 15
-    bool carry = ((uint32_t)old_hl + reg_value) > 0xFFFF;
-
-    cpu->hl.reg = old_hl + reg_value;
+    alu16_result_t result = alu_add16(hl, reg_value);
+    cpu->hl.reg = result.value;
 
     // N cleared, H and C set according to result, Z unaffected
     flag_clear(cpu, FLAG_N);
-    if (half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
-    if (carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
 
     LOG_DEBUG("ADD HL,%s HL=0x%04X at PC=0x%04X (opcode=0x%02X)",
         get_r16_name(register_code), cpu->hl.reg, instr_pc, opcode);

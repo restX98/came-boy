@@ -209,6 +209,34 @@ alu8_result_t alu_xor8(uint8_t a, uint8_t value) {
     return alu_xor8_stats.calls[alu_xor8_stats.call_count - 1].return_value;
 }
 
+// Mock alu_add16
+typedef struct {
+    uint16_t hl;
+    uint16_t value;
+    alu16_result_t return_value;
+} alu_add16_call_t;
+
+typedef struct {
+    size_t call_count;
+    alu_add16_call_t calls[10];
+} alu_add16_stats_t;
+
+static alu_add16_stats_t alu_add16_stats;
+
+alu16_result_t alu_add16(uint16_t hl, uint16_t value) {
+    if (alu_add16_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for alu_add16");
+    }
+
+    alu_add16_call_t *call = &alu_add16_stats.calls[alu_add16_stats.call_count];
+    call->hl = hl;
+    call->value = value;
+
+    alu_add16_stats.call_count++;
+
+    return alu_add16_stats.calls[alu_add16_stats.call_count - 1].return_value;
+}
+
 void setUp(void) {
     suppress_logs();
     alu_add8_stats = (alu_add8_stats_t){ 0 };
@@ -218,6 +246,7 @@ void setUp(void) {
     alu_and8_stats = (alu_and8_stats_t){ 0 };
     alu_or8_stats = (alu_or8_stats_t){ 0 };
     alu_xor8_stats = (alu_xor8_stats_t){ 0 };
+    alu_add16_stats = (alu_add16_stats_t){ 0 };
 }
 
 void tearDown(void) {
@@ -551,34 +580,52 @@ void test_op_dec_sp(void) {
 }
 
 // ---- op_add_hl_r16 ----
-void test_op_add_hl_bc(void) {
-    mock_cpu.bc.reg = 0x06;
-    mock_cpu.hl.reg = 0x03;
 
-    uint8_t opcode = 0x09; // ADD HL, BC
+void test_op_add_hl_r16_all_registers(void) {
+    struct {
+        uint8_t opcode;
+        uint16_t *reg;
+    } cases[] = {
+        {0x09, &mock_cpu.bc.reg}, // BC
+        {0x19, &mock_cpu.de.reg}, // DE
+        {0x39, &mock_cpu.sp}, // SP
+    };
 
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+    for (int i = 0; i < 3; i++) {
+        mock_cpu.hl.reg = 0x0003;
+        *cases[i].reg = 0x0006;
 
-    TEST_ASSERT_EQUAL(8, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT16(0x09, mock_cpu.hl.reg);
-}
+        alu_add16_stats.calls[i].return_value = (alu16_result_t){
+            .value = 0x0009,
+            .status = {
+                .half_carry = false,
+                .carry = false,
+            }
+        };
+        uint8_t opcode = cases[i].opcode;
 
-void test_op_add_hl_de(void) {
-    mock_cpu.de.reg = 0x06;
-    mock_cpu.hl.reg = 0x03;
+        int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    uint8_t opcode = 0x19; // ADD HL, DE
+        TEST_ASSERT_EQUAL(8, cycles);
+        TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
+        TEST_ASSERT_EQUAL_UINT16(0x0009, mock_cpu.hl.reg);
 
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(8, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT16(0x09, mock_cpu.hl.reg);
+        TEST_ASSERT_EQUAL_INT(i + 1, alu_add16_stats.call_count);
+        TEST_ASSERT_EQUAL_UINT16(0x0003, alu_add16_stats.calls[i].hl);
+        TEST_ASSERT_EQUAL_UINT16(0x0006, alu_add16_stats.calls[i].value);
+    }
 }
 
 void test_op_add_hl_hl(void) {
-    mock_cpu.hl.reg = 0x03;
+    mock_cpu.hl.reg = 0x0003;
+
+    alu_add16_stats.calls[0].return_value = (alu16_result_t){
+            .value = 0x0006,
+            .status = {
+                .half_carry = false,
+                .carry = false,
+            }
+    };
 
     uint8_t opcode = 0x29; // ADD HL, HL
 
@@ -586,29 +633,28 @@ void test_op_add_hl_hl(void) {
 
     TEST_ASSERT_EQUAL(8, cycles);
     TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT16(0x06, mock_cpu.hl.reg);
-}
+    TEST_ASSERT_EQUAL_UINT16(0x0006, mock_cpu.hl.reg);
 
-void test_op_add_hl_sp(void) {
-    mock_cpu.sp = 0x06;
-    mock_cpu.hl.reg = 0x03;
-
-    uint8_t opcode = 0x39; // ADD HL, SP
-
-    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
-
-    TEST_ASSERT_EQUAL(8, cycles);
-    TEST_ASSERT_EQUAL_UINT16(0, mock_cpu.pc);
-    TEST_ASSERT_EQUAL_UINT16(0x09, mock_cpu.hl.reg);
+    TEST_ASSERT_EQUAL_INT(1, alu_add16_stats.call_count);
+    TEST_ASSERT_EQUAL_UINT16(0x0003, alu_add16_stats.calls[0].hl);
+    TEST_ASSERT_EQUAL_UINT16(0x0003, alu_add16_stats.calls[0].value);
 }
 
 void test_op_add_hl_r16_reset_nhc_flags_if_no_overflow(void) {
     // 0000000000000101+
     // 0000000000000011=
     // 0001000000001000
-    mock_cpu.bc.reg = 0x0005;
-    mock_cpu.hl.reg = 0x0003;
+    mock_cpu.hl.reg = 0x0005;
+    mock_cpu.bc.reg = 0x0003;
     flag_set(&mock_cpu, FLAG_N); // N set beforehand
+
+    alu_add16_stats.calls[0].return_value = (alu16_result_t){
+            .value = 0x0008,
+            .status = {
+                .half_carry = false,
+                .carry = false,
+            }
+    };
 
     uint8_t opcode = 0x09; // ADD HL, BC
 
@@ -618,14 +664,25 @@ void test_op_add_hl_r16_reset_nhc_flags_if_no_overflow(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+
+    TEST_ASSERT_EQUAL_UINT16(0x0005, alu_add16_stats.calls[0].hl);
+    TEST_ASSERT_EQUAL_UINT16(0x0003, alu_add16_stats.calls[0].value);
 }
 
 void test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11(void) {
     // 0000111111111111+
     // 0000000000000001=
     // 0001000000000000
-    mock_cpu.bc.reg = 0x0FFF;
-    mock_cpu.hl.reg = 0x0001;
+    mock_cpu.hl.reg = 0x0FFF;
+    mock_cpu.bc.reg = 0x0001;
+
+    alu_add16_stats.calls[0].return_value = (alu16_result_t){
+            .value = 0x1000,
+            .status = {
+                .half_carry = true,
+                .carry = false,
+            }
+    };
 
     uint8_t opcode = 0x09; // ADD HL, BC
 
@@ -634,14 +691,25 @@ void test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11(void) {
     TEST_ASSERT_EQUAL_UINT16(0x1000, mock_cpu.hl.reg);
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+
+    TEST_ASSERT_EQUAL_UINT16(0x0FFF, alu_add16_stats.calls[0].hl);
+    TEST_ASSERT_EQUAL_UINT16(0x0001, alu_add16_stats.calls[0].value);
 }
 
 void test_op_add_hl_r16_set_carry_if_overflow_from_bit_15(void) {
     // 1111111111111111+
     // 0000000000000001=
     // 0000000000000000
-    mock_cpu.bc.reg = 0xFFFF;
-    mock_cpu.hl.reg = 0x0001;
+    mock_cpu.hl.reg = 0xFFFF;
+    mock_cpu.bc.reg = 0x0001;
+
+    alu_add16_stats.calls[0].return_value = (alu16_result_t){
+            .value = 0x0000,
+            .status = {
+                .half_carry = true,
+                .carry = true,
+            }
+    };
 
     uint8_t opcode = 0x09; // ADD HL, BC
 
@@ -650,6 +718,9 @@ void test_op_add_hl_r16_set_carry_if_overflow_from_bit_15(void) {
     TEST_ASSERT_EQUAL_UINT16(0x0000, mock_cpu.hl.reg);
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+
+    TEST_ASSERT_EQUAL_UINT16(0xFFFF, alu_add16_stats.calls[0].hl);
+    TEST_ASSERT_EQUAL_UINT16(0x0001, alu_add16_stats.calls[0].value);
 }
 
 // ---- op_inc_r8 ----
@@ -3274,10 +3345,8 @@ int main(void) {
     RUN_TEST(test_op_dec_de);
     RUN_TEST(test_op_dec_hl);
     RUN_TEST(test_op_dec_sp);
-    RUN_TEST(test_op_add_hl_bc);
-    RUN_TEST(test_op_add_hl_de);
+    RUN_TEST(test_op_add_hl_r16_all_registers);
     RUN_TEST(test_op_add_hl_hl);
-    RUN_TEST(test_op_add_hl_sp);
     RUN_TEST(test_op_add_hl_r16_reset_nhc_flags_if_no_overflow);
     RUN_TEST(test_op_add_hl_r16_set_half_carry_if_overflow_from_bit_11);
     RUN_TEST(test_op_add_hl_r16_set_carry_if_overflow_from_bit_15);
