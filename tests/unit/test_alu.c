@@ -337,6 +337,80 @@ void test_alu_xor8_alternating_bits(void) {
     TEST_ASSERT_FALSE(r.status.zero);
 }
 
+// ---- alu_add16 ----
+
+void test_alu_add16_basic_addition(void) {
+    alu16_result_t r = alu_add16(0x0003, 0x0005);
+    TEST_ASSERT_EQUAL_UINT16(0x0008, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_zero_plus_zero(void) {
+    alu16_result_t r = alu_add16(0x0000, 0x0000);
+    TEST_ASSERT_EQUAL_UINT16(0x0000, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_wraps_on_overflow_and_sets_carry(void) {
+    alu16_result_t r = alu_add16(0xFFFF, 0x0001);
+    TEST_ASSERT_EQUAL_UINT16(0x0000, r.value);
+    TEST_ASSERT_TRUE(r.status.carry);
+}
+
+void test_alu_add16_no_carry_below_max(void) {
+    alu16_result_t r = alu_add16(0xFFFE, 0x0001);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFF, r.value);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_max_values_sets_carry(void) {
+    alu16_result_t r = alu_add16(0xFFFF, 0xFFFF);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, r.value);
+    TEST_ASSERT_TRUE(r.status.carry);
+    TEST_ASSERT_TRUE(r.status.half_carry);
+}
+
+void test_alu_add16_sets_half_carry_on_bit11_overflow(void) {
+    // 0x0FFF + 0x0001 = 0x1000: overflow from bit 11
+    alu16_result_t r = alu_add16(0x0FFF, 0x0001);
+    TEST_ASSERT_EQUAL_UINT16(0x1000, r.value);
+    TEST_ASSERT_TRUE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_no_half_carry_just_below_bit11_overflow(void) {
+    // 0x0FFE + 0x0001 = 0x0FFF: no overflow from bit 11
+    alu16_result_t r = alu_add16(0x0FFE, 0x0001);
+    TEST_ASSERT_EQUAL_UINT16(0x0FFF, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_half_carry_ignores_upper_nibble(void) {
+    // Lower 12 bits: 0x0FFF + 0x0001 overflow, upper bits should not affect it
+    alu16_result_t r = alu_add16(0x1FFF, 0x0001);
+    TEST_ASSERT_EQUAL_UINT16(0x2000, r.value);
+    TEST_ASSERT_TRUE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_carry_without_half_carry(void) {
+    // 0xF000 + 0x1000 = 0x10000: carry set, lower 12 bits don't overflow
+    alu16_result_t r = alu_add16(0xF000, 0x1000);
+    TEST_ASSERT_EQUAL_UINT16(0x0000, r.value);
+    TEST_ASSERT_TRUE(r.status.carry);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+}
+
+void test_alu_add16_add_with_itself(void) {
+    alu16_result_t r = alu_add16(0x0800, 0x0800);
+    TEST_ASSERT_EQUAL_UINT16(0x1000, r.value);
+    TEST_ASSERT_TRUE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -400,6 +474,18 @@ int main(void) {
     RUN_TEST(test_alu_xor8_with_zero_operand);
     RUN_TEST(test_alu_xor8_zero_with_zero);
     RUN_TEST(test_alu_xor8_alternating_bits);
+
+    // alu_add16
+    RUN_TEST(test_alu_add16_basic_addition);
+    RUN_TEST(test_alu_add16_zero_plus_zero);
+    RUN_TEST(test_alu_add16_wraps_on_overflow_and_sets_carry);
+    RUN_TEST(test_alu_add16_no_carry_below_max);
+    RUN_TEST(test_alu_add16_max_values_sets_carry);
+    RUN_TEST(test_alu_add16_sets_half_carry_on_bit11_overflow);
+    RUN_TEST(test_alu_add16_no_half_carry_just_below_bit11_overflow);
+    RUN_TEST(test_alu_add16_half_carry_ignores_upper_nibble);
+    RUN_TEST(test_alu_add16_carry_without_half_carry);
+    RUN_TEST(test_alu_add16_add_with_itself);
 
     return UNITY_END();
 }

@@ -91,3 +91,15 @@ alu8_result_t alu_xor8(uint8_t a, uint8_t value) {
         }
     };
 }
+
+alu16_result_t alu_add16(uint16_t hl, uint16_t value) {
+    uint32_t r = hl + value;
+
+    return (alu16_result_t) {
+        .value = (uint16_t)r,
+            .status = {
+                .half_carry = ((hl & 0x0FFF) + (value & 0x0FFF)) > 0x0FFF,
+                .carry = r > 0xFFFF,
+        }
+    };
+}

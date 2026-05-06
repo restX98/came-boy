@@ -13,6 +13,15 @@ typedef struct {
     } status;
 } alu8_result_t;
 
+typedef struct {
+    uint16_t value;
+    struct alu {
+        bool half_carry;
+        bool carry;
+    } status;
+} alu16_result_t;
+
+
 alu8_result_t alu_add8(uint8_t a, uint8_t value, uint8_t carry);
 alu8_result_t alu_sub8(uint8_t a, uint8_t value, uint8_t carry);
 
@@ -22,5 +31,7 @@ alu8_result_t alu_dec8(uint8_t value);
 alu8_result_t alu_and8(uint8_t a, uint8_t value);
 alu8_result_t alu_or8(uint8_t a, uint8_t value);
 alu8_result_t alu_xor8(uint8_t a, uint8_t value);
+
+alu16_result_t alu_add16(uint16_t hl, uint16_t value);
 
 #endif // ALU_H
