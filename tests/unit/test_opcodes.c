@@ -1834,6 +1834,45 @@ void test_op_ret_cycles_independent_of_flags(void) {
     TEST_ASSERT_EQUAL(16, cycles);
 }
 
+// ---- op_reti ----
+void test_op_reti_loads_pc_from_stack(void) {
+    mock_cpu.sp = 0xFFFC;
+    mock_memory[0xFFFC] = 0x34; // lo byte
+    mock_memory[0xFFFC + 1] = 0x12; // hi byte
+
+    uint8_t opcode = 0xD9; // RETI
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp);
+}
+
+void test_op_reti_sets_ime_immediately(void) {
+    mock_cpu.sp = 0xFFFC;
+    mock_cpu.ime = false;
+
+    uint8_t opcode = 0xD9; // RETI
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_TRUE(mock_cpu.ime);
+}
+
+void test_op_reti_sets_ime_even_when_not_scheduled(void) {
+    mock_cpu.sp = 0xFFFC;
+    mock_cpu.ime = false;
+    mock_cpu.ime_scheduled = false;
+
+    uint8_t opcode = 0xD9; // RETI
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    // Unlike EI, RETI enables IME immediately without going through ime_scheduled
+    TEST_ASSERT_TRUE(mock_cpu.ime);
+}
+
 // ---- op_ld_r8_r8 ----
 struct reg_entry_t {
     r8_operand_t code;
@@ -4555,6 +4594,9 @@ int main(void) {
     RUN_TEST(test_op_ret_c_condition_true);
     RUN_TEST(test_op_ret_loads_pc_from_stack);
     RUN_TEST(test_op_ret_cycles_independent_of_flags);
+    RUN_TEST(test_op_reti_loads_pc_from_stack);
+    RUN_TEST(test_op_reti_sets_ime_immediately);
+    RUN_TEST(test_op_reti_sets_ime_even_when_not_scheduled);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);

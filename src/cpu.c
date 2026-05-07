@@ -33,6 +33,15 @@ int cpu_step(cpu_t *cpu, bus_t *bus) {
 
     opcode_fn fn = opcode_table[instruction];
     if (fn) {
+        // EI delays enabling IME by one instruction. It sets ime_scheduled, and we
+        // promote it to ime here, at the START of the following step, before executing
+        // the next instruction. This guarantees that instruction runs uninterrupted,
+        // and interrupts can only fire from the step after that.
+        if (cpu->ime_scheduled) {
+            cpu->ime = true;
+            cpu->ime_scheduled = false;
+        }
+
         cpu->pc++;
         int cycles = fn(cpu, bus, instruction);
         LOG_DEBUG("Executed opcode 0x%02X in %d cycles", instruction, cycles);

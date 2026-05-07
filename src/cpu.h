@@ -26,6 +26,9 @@ typedef struct {
     reg16_t hl;
     uint16_t sp;
     uint16_t pc;
+
+    bool ime;           // Interrupt Master Enable
+    bool ime_scheduled; // For EI's one-instruction delay
 } cpu_t;
 
 void cpu_init(cpu_t *cpu);
