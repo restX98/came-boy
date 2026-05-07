@@ -294,6 +294,10 @@ opcode_fn opcode_table[256] = {
     [0xEF] = op_rst_tgt3,        // RST $28
     [0xF7] = op_rst_tgt3,        // RST $30
     [0xFF] = op_rst_tgt3,        // RST $38
-
+    // Type: POP r16stk
+    [0xC1] = op_pop_r16stk,      // POP BC
+    [0xD1] = op_pop_r16stk,      // POP DE
+    [0xE1] = op_pop_r16stk,      // POP HL
+    [0xF1] = op_pop_r16stk,      // POP AF
     // ... (initialize other opcodes as needed)
 };

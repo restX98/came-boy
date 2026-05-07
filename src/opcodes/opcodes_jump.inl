@@ -131,6 +131,30 @@ static int op_rst_tgt3(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return 16;
 }
 
+static int op_pop_r16stk(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    r16stk_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
+
+    uint16_t sp = cpu->sp;
+    uint8_t lo = bus_read(bus, cpu->sp);
+    uint8_t hi = bus_read(bus, cpu->sp + 1);
+    uint16_t value = ((uint16_t)hi << 8) | lo;
+
+    // The lower 4 bits of F are always 0 on the Game Boy
+    if (register_code == OP_REG_AF_STK) {
+        value &= 0xFFF0;
+    }
+
+    write_r16stk(cpu, register_code, value);
+    cpu->sp += 2;
+
+    LOG_DEBUG("POP %s val=0x%04X SP=0x%04X->0x%04X at PC=0x%04X (opcode=0x%02X)",
+        get_r16stk_name(register_code), value, sp, cpu->sp, instr_pc, opcode);
+
+    return 12;
+}
+
 static int op_ret_cond(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t instr_pc = cpu->pc - 1;
 

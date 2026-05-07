@@ -38,6 +38,13 @@ typedef enum {
     OP_C,
 } cond_operand_t;
 
+typedef enum {
+    OP_REG_BC_STK = 0,
+    OP_REG_DE_STK,
+    OP_REG_HL_STK,
+    OP_REG_AF_STK,
+} r16stk_operand_t;
+
 typedef int (*opcode_fn)(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 extern opcode_fn opcode_table[256];

@@ -2170,6 +2170,64 @@ void test_op_rst_return_address_roundtrip(void) {
     TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp);
 }
 
+// ---- op_pop_r16stk ----
+void test_op_pop_r16stk_matrix(void) {
+    struct {
+        uint8_t opcode;
+        uint16_t *reg;
+        const char *name;
+    } cases[] = {
+        { 0xC1, &mock_cpu.bc.reg, "BC" },
+        { 0xD1, &mock_cpu.de.reg, "DE" },
+        { 0xE1, &mock_cpu.hl.reg, "HL" },
+    };
+
+    for (int i = 0; i < 3; i++) {
+        mock_cpu.sp = 0xFFFC;
+        mock_cpu.bc.reg = 0;
+        mock_cpu.de.reg = 0;
+        mock_cpu.hl.reg = 0;
+        mock_memory[0xFFFC] = 0x34; // lo
+        mock_memory[0xFFFC + 1] = 0x12; // hi
+
+        int cycles = opcode_table[cases[i].opcode](&mock_cpu, &mock_bus, cases[i].opcode);
+
+        TEST_ASSERT_EQUAL_MESSAGE(12, cycles, cases[i].name);
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(0x1234, *cases[i].reg, cases[i].name);
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(0xFFFE, mock_cpu.sp, cases[i].name);
+    }
+}
+
+void test_op_pop_af_loads_flags(void) {
+    // Stack contains F=0xF0 (Z=1, N=1, H=1, C=1) and A=0xAB
+    mock_cpu.sp = 0xFFFC;
+    mock_cpu.af.reg = 0;
+    mock_memory[0xFFFC] = FLAG_Z | FLAG_N | FLAG_H | FLAG_C; // F byte (all flags set)
+    mock_memory[0xFFFC + 1] = 0xAB;                          // A byte
+
+    int cycles = opcode_table[0xF1](&mock_cpu, &mock_bus, 0xF1); // POP AF
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, mock_cpu.af.hi);
+    TEST_ASSERT_TRUE(flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_TRUE(flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_TRUE(flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_TRUE(flag_get(&mock_cpu, FLAG_C));
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp);
+}
+
+void test_op_pop_af_masks_lower_nibble_of_f(void) {
+    // Stack F byte has lower nibble set — hardware always clears it
+    mock_cpu.sp = 0xFFFC;
+    mock_cpu.af.reg = 0;
+    mock_memory[0xFFFC] = 0xFF; // F with lower nibble set (should be masked out)
+    mock_memory[0xFFFC + 1] = 0x00;
+
+    opcode_table[0xF1](&mock_cpu, &mock_bus, 0xF1); // POP AF
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.af.lo & 0x0F); // lower nibble of F is always 0
+}
+
 // ---- op_ld_r8_r8 ----
 struct reg_entry_t {
     r8_operand_t code;
@@ -4370,7 +4428,7 @@ void test_op_xor_a_imm8(void) {
 
     alu_xor8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0xFF,
-        .status = { .zero = false }
+        .status = {.zero = false }
     };
 
     uint8_t opcode = 0xEE; // XOR A, imm8
@@ -4392,7 +4450,7 @@ void test_op_xor_a_imm8_sets_z_flag_when_result_is_zero(void) {
 
     alu_xor8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x00,
-        .status = { .zero = true }
+        .status = {.zero = true }
     };
 
     uint8_t opcode = 0xEE;
@@ -4409,7 +4467,7 @@ void test_op_xor_a_imm8_clears_z_flag_when_result_is_nonzero(void) {
 
     alu_xor8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0xFF,
-        .status = { .zero = false }
+        .status = {.zero = false }
     };
 
     uint8_t opcode = 0xEE;
@@ -4466,7 +4524,7 @@ void test_op_and_a_imm8(void) {
 
     alu_and8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x00,
-        .status = { .zero = true }
+        .status = {.zero = true }
     };
 
     uint8_t opcode = 0xE6; // AND A, imm8
@@ -4488,7 +4546,7 @@ void test_op_and_a_imm8_sets_z_flag_when_result_is_zero(void) {
 
     alu_and8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x00,
-        .status = { .zero = true }
+        .status = {.zero = true }
     };
 
     uint8_t opcode = 0xE6;
@@ -4505,7 +4563,7 @@ void test_op_and_a_imm8_clears_z_flag_when_result_is_nonzero(void) {
 
     alu_and8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x0F,
-        .status = { .zero = false }
+        .status = {.zero = false }
     };
 
     uint8_t opcode = 0xE6;
@@ -4562,7 +4620,7 @@ void test_op_or_a_imm8(void) {
 
     alu_or8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0xAB,
-        .status = { .zero = false }
+        .status = {.zero = false }
     };
 
     uint8_t opcode = 0xF6; // OR A, imm8
@@ -4584,7 +4642,7 @@ void test_op_or_a_imm8_sets_z_flag_when_result_is_zero(void) {
 
     alu_or8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x00,
-        .status = { .zero = true }
+        .status = {.zero = true }
     };
 
     uint8_t opcode = 0xF6;
@@ -4601,7 +4659,7 @@ void test_op_or_a_imm8_clears_z_flag_when_result_is_nonzero(void) {
 
     alu_or8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0xAB,
-        .status = { .zero = false }
+        .status = {.zero = false }
     };
 
     uint8_t opcode = 0xF6;
@@ -4685,7 +4743,7 @@ void test_op_cp_a_imm8_sets_z_flag_when_result_is_zero(void) {
 
     alu_sub8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x00,
-        .status = { .zero = true }
+        .status = {.zero = true }
     };
 
     uint8_t opcode = 0xFE;
@@ -4703,7 +4761,7 @@ void test_op_cp_a_imm8_clears_z_flag_when_result_is_nonzero(void) {
 
     alu_sub8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x20,
-        .status = { .zero = false }
+        .status = {.zero = false }
     };
 
     uint8_t opcode = 0xFE;
@@ -4731,7 +4789,7 @@ void test_op_cp_a_imm8_sets_h_flag_on_half_borrow(void) {
 
     alu_sub8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x0F,
-        .status = { .half_carry = true }
+        .status = {.half_carry = true }
     };
 
     uint8_t opcode = 0xFE;
@@ -4747,7 +4805,7 @@ void test_op_cp_a_imm8_clears_h_flag_when_no_half_borrow(void) {
 
     alu_sub8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x01,
-        .status = { .half_carry = false }
+        .status = {.half_carry = false }
     };
 
     uint8_t opcode = 0xFE;
@@ -4763,7 +4821,7 @@ void test_op_cp_a_imm8_sets_c_flag_on_borrow(void) {
 
     alu_sub8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0xFF,
-        .status = { .carry = true }
+        .status = {.carry = true }
     };
 
     uint8_t opcode = 0xFE;
@@ -4780,7 +4838,7 @@ void test_op_cp_a_imm8_clears_c_flag_when_no_borrow(void) {
 
     alu_sub8_stats.calls[0].return_value = (alu8_result_t){
         .value = 0x0F,
-        .status = { .carry = false }
+        .status = {.carry = false }
     };
 
     uint8_t opcode = 0xFE;
@@ -4915,6 +4973,9 @@ int main(void) {
     RUN_TEST(test_op_call_c_condition_true);
     RUN_TEST(test_op_rst_tgt3_matrix);
     RUN_TEST(test_op_rst_return_address_roundtrip);
+    RUN_TEST(test_op_pop_r16stk_matrix);
+    RUN_TEST(test_op_pop_af_loads_flags);
+    RUN_TEST(test_op_pop_af_masks_lower_nibble_of_f);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);

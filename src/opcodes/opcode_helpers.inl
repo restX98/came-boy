@@ -79,6 +79,34 @@ static const char *get_r16_name(r16_operand_t r16_op) {
     return names[r16_op];
 }
 
+static uint16_t read_r16stk(cpu_t *cpu, r16stk_operand_t r16stk_op) {
+    switch (r16stk_op) {
+        case OP_REG_BC_STK: return cpu->bc.reg;
+        case OP_REG_DE_STK: return cpu->de.reg;
+        case OP_REG_HL_STK: return cpu->hl.reg;
+        case OP_REG_AF_STK: return cpu->af.reg;
+        default: assert(0 && "Invalid r16stk operand");
+    }
+}
+
+static void write_r16stk(cpu_t *cpu, r16stk_operand_t r16stk_op, uint16_t value) {
+    switch (r16stk_op) {
+        case OP_REG_BC_STK: cpu->bc.reg = value; break;
+        case OP_REG_DE_STK: cpu->de.reg = value; break;
+        case OP_REG_HL_STK: cpu->hl.reg = value; break;
+        case OP_REG_AF_STK: cpu->af.reg = value; break;
+        default: assert(0 && "Invalid r16stk operand");
+    }
+}
+
+static const char *get_r16stk_name(r16_operand_t r16stk_op) {
+    static const char *names[] = {
+        "BC","DE","HL","AF"
+    };
+    if (r16stk_op > OP_REG_AF_STK) return "??";
+    return names[r16stk_op];
+}
+
 static uint16_t read_r16mem(cpu_t *cpu, r16mem_operand_t r16mem_op) {
     switch (r16mem_op) {
         case OP_REG_BC_MEM: return cpu->bc.reg;
