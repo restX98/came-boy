@@ -299,5 +299,10 @@ opcode_fn opcode_table[256] = {
     [0xD1] = op_pop_r16stk,      // POP DE
     [0xE1] = op_pop_r16stk,      // POP HL
     [0xF1] = op_pop_r16stk,      // POP AF
+    // Type: PUSH r16stk
+    [0xC5] = op_push_r16stk,     // PUSH BC
+    [0xD5] = op_push_r16stk,     // PUSH DE
+    [0xE5] = op_push_r16stk,     // PUSH HL
+    [0xF5] = op_push_r16stk,     // PUSH AF
     // ... (initialize other opcodes as needed)
 };

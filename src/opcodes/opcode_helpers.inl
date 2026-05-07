@@ -99,7 +99,7 @@ static void write_r16stk(cpu_t *cpu, r16stk_operand_t r16stk_op, uint16_t value)
     }
 }
 
-static const char *get_r16stk_name(r16_operand_t r16stk_op) {
+static const char *get_r16stk_name(r16stk_operand_t r16stk_op) {
     static const char *names[] = {
         "BC","DE","HL","AF"
     };

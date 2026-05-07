@@ -2228,6 +2228,56 @@ void test_op_pop_af_masks_lower_nibble_of_f(void) {
     TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.af.lo & 0x0F); // lower nibble of F is always 0
 }
 
+// ---- op_push_r16stk ----
+void test_op_push_r16stk_matrix(void) {
+    struct {
+        uint8_t opcode;
+        uint16_t value;
+        uint16_t *reg;
+        const char *name;
+    } cases[] = {
+        { 0xC5, 0x1234, &mock_cpu.bc.reg, "BC" },
+        { 0xD5, 0x5678, &mock_cpu.de.reg, "DE" },
+        { 0xE5, 0x9ABC, &mock_cpu.hl.reg, "HL" },
+    };
+
+    for (int i = 0; i < 3; i++) {
+        mock_cpu.sp = 0xFFFE;
+        memset(mock_memory, 0, sizeof(mock_memory));
+        *cases[i].reg = cases[i].value;
+
+        int cycles = opcode_table[cases[i].opcode](&mock_cpu, &mock_bus, cases[i].opcode);
+
+        TEST_ASSERT_EQUAL_MESSAGE(16, cycles, cases[i].name);
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(0xFFFC, mock_cpu.sp, cases[i].name);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(cases[i].value & 0xFF), mock_memory[0xFFFC], cases[i].name); // lo at SP
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(cases[i].value >> 8),   mock_memory[0xFFFD], cases[i].name); // hi at SP+1
+    }
+}
+
+void test_op_push_af_stores_flags(void) {
+    mock_cpu.sp = 0xFFFE;
+    mock_cpu.af.hi = 0xAB; // A
+    mock_cpu.af.lo = FLAG_Z | FLAG_N | FLAG_H | FLAG_C; // F = 0xF0
+
+    int cycles = opcode_table[0xF5](&mock_cpu, &mock_bus, 0xF5); // PUSH AF
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFC, mock_cpu.sp);
+    TEST_ASSERT_EQUAL_UINT8(FLAG_Z | FLAG_N | FLAG_H | FLAG_C, mock_memory[0xFFFC]); // F at lo
+    TEST_ASSERT_EQUAL_UINT8(0xAB, mock_memory[0xFFFD]);                              // A at hi
+}
+
+void test_op_push_af_masks_lower_nibble_of_f(void) {
+    mock_cpu.sp = 0xFFFE;
+    mock_cpu.af.hi = 0x00;
+    mock_cpu.af.lo = 0xFF; // F with lower nibble set (should be masked)
+
+    opcode_table[0xF5](&mock_cpu, &mock_bus, 0xF5); // PUSH AF
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, mock_memory[0xFFFC] & 0x0F); // lower nibble of pushed F is always 0
+}
+
 // ---- op_ld_r8_r8 ----
 struct reg_entry_t {
     r8_operand_t code;
@@ -4976,6 +5026,9 @@ int main(void) {
     RUN_TEST(test_op_pop_r16stk_matrix);
     RUN_TEST(test_op_pop_af_loads_flags);
     RUN_TEST(test_op_pop_af_masks_lower_nibble_of_f);
+    RUN_TEST(test_op_push_r16stk_matrix);
+    RUN_TEST(test_op_push_af_stores_flags);
+    RUN_TEST(test_op_push_af_masks_lower_nibble_of_f);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);
