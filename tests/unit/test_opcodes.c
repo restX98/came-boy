@@ -1873,6 +1873,145 @@ void test_op_reti_sets_ime_even_when_not_scheduled(void) {
     TEST_ASSERT_TRUE(mock_cpu.ime);
 }
 
+// ---- op_jp_imm16 ----
+void test_op_jp_imm16_jumps_to_address(void) {
+    mock_cpu.pc = 0x0100;
+    mock_memory[0x0100] = 0x34; // lo byte of target
+    mock_memory[0x0101] = 0x12; // hi byte of target
+
+    uint8_t opcode = 0xC3; // JP imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.pc);
+}
+
+void test_op_jp_imm16_high_address(void) {
+    mock_cpu.pc = 0x0000;
+    mock_memory[0x0000] = 0xFF; // lo byte
+    mock_memory[0x0001] = 0x80; // hi byte — address above 0x7FFF
+
+    uint8_t opcode = 0xC3; // JP imm16
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    // Must land at 0x80FF, not be misinterpreted as a negative signed value
+    TEST_ASSERT_EQUAL_UINT16(0x80FF, mock_cpu.pc);
+}
+
+// ---- op_jp_cond_imm16 ----
+void test_op_jp_nz_condition_true(void) {
+    mock_cpu.pc = 0x0000;
+    flag_clear(&mock_cpu, FLAG_Z); // NZ = true
+    mock_memory[0x0000] = 0x34;
+    mock_memory[0x0001] = 0x12;
+
+    uint8_t opcode = 0xC2; // JP NZ,imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.pc);
+}
+
+void test_op_jp_nz_condition_false(void) {
+    mock_cpu.pc = 0x0000;
+    flag_set(&mock_cpu, FLAG_Z); // NZ = false
+    mock_memory[0x0000] = 0x34;
+    mock_memory[0x0001] = 0x12;
+
+    uint8_t opcode = 0xC2; // JP NZ,imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x0002, mock_cpu.pc); // only consumed imm16 bytes
+}
+
+void test_op_jp_z_condition_true(void) {
+    mock_cpu.pc = 0x0000;
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_memory[0x0000] = 0x78;
+    mock_memory[0x0001] = 0x56;
+
+    uint8_t opcode = 0xCA; // JP Z,imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
+}
+
+void test_op_jp_nc_condition_true(void) {
+    mock_cpu.pc = 0x0000;
+    flag_clear(&mock_cpu, FLAG_C);
+    mock_memory[0x0000] = 0x78;
+    mock_memory[0x0001] = 0x56;
+
+    uint8_t opcode = 0xD2; // JP NC,imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
+}
+
+void test_op_jp_c_condition_true(void) {
+    mock_cpu.pc = 0x0000;
+    flag_set(&mock_cpu, FLAG_C);
+    mock_memory[0x0000] = 0x78;
+    mock_memory[0x0001] = 0x56;
+
+    uint8_t opcode = 0xDA; // JP C,imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
+}
+
+void test_op_jp_cond_high_address(void) {
+    mock_cpu.pc = 0x0000;
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_memory[0x0000] = 0xFF;
+    mock_memory[0x0001] = 0x80; // target = 0x80FF
+
+    uint8_t opcode = 0xCA; // JP Z,imm16
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT16(0x80FF, mock_cpu.pc);
+}
+
+// ---- op_jp_hl ----
+void test_op_jp_hl_jumps_to_hl(void) {
+    mock_cpu.hl.reg = 0x1234;
+
+    uint8_t opcode = 0xE9; // JP HL
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.pc);
+}
+
+void test_op_jp_hl_does_not_modify_hl(void) {
+    mock_cpu.hl.reg = 0xABCD;
+
+    opcode_table[0xE9](&mock_cpu, &mock_bus, 0xE9);
+
+    TEST_ASSERT_EQUAL_UINT16(0xABCD, mock_cpu.hl.reg);
+}
+
+void test_op_jp_hl_high_address(void) {
+    mock_cpu.hl.reg = 0xFF80; // top of HRAM
+
+    opcode_table[0xE9](&mock_cpu, &mock_bus, 0xE9);
+
+    TEST_ASSERT_EQUAL_UINT16(0xFF80, mock_cpu.pc);
+}
+
 // ---- op_ld_r8_r8 ----
 struct reg_entry_t {
     r8_operand_t code;
@@ -4597,6 +4736,17 @@ int main(void) {
     RUN_TEST(test_op_reti_loads_pc_from_stack);
     RUN_TEST(test_op_reti_sets_ime_immediately);
     RUN_TEST(test_op_reti_sets_ime_even_when_not_scheduled);
+    RUN_TEST(test_op_jp_imm16_jumps_to_address);
+    RUN_TEST(test_op_jp_imm16_high_address);
+    RUN_TEST(test_op_jp_nz_condition_true);
+    RUN_TEST(test_op_jp_nz_condition_false);
+    RUN_TEST(test_op_jp_z_condition_true);
+    RUN_TEST(test_op_jp_nc_condition_true);
+    RUN_TEST(test_op_jp_c_condition_true);
+    RUN_TEST(test_op_jp_cond_high_address);
+    RUN_TEST(test_op_jp_hl_jumps_to_hl);
+    RUN_TEST(test_op_jp_hl_does_not_modify_hl);
+    RUN_TEST(test_op_jp_hl_high_address);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);
