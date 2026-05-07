@@ -4093,6 +4093,102 @@ void test_op_and_a_imm8_always_clears_c_flag(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
+// ---- op_or_a_imm8 ----
+
+void test_op_or_a_imm8(void) {
+    mock_cpu.af.hi = 0xA0;
+    mock_memory[0] = 0x0B;
+
+    alu_or8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0xAB,
+        .status = { .zero = false }
+    };
+
+    uint8_t opcode = 0xF6; // OR A, imm8
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, mock_cpu.af.hi);
+
+    TEST_ASSERT_EQUAL_INT(1, alu_or8_stats.call_count);
+    TEST_ASSERT_EQUAL_UINT8(0xA0, alu_or8_stats.calls[0].a);
+    TEST_ASSERT_EQUAL_UINT8(0x0B, alu_or8_stats.calls[0].value);
+}
+
+void test_op_or_a_imm8_sets_z_flag_when_result_is_zero(void) {
+    mock_cpu.af.hi = 0x00;
+    mock_memory[0] = 0x00;
+
+    alu_or8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0x00,
+        .status = { .zero = true }
+    };
+
+    uint8_t opcode = 0xF6;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_or_a_imm8_clears_z_flag_when_result_is_nonzero(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_cpu.af.hi = 0xA0;
+    mock_memory[0] = 0x0B;
+
+    alu_or8_stats.calls[0].return_value = (alu8_result_t){
+        .value = 0xAB,
+        .status = { .zero = false }
+    };
+
+    uint8_t opcode = 0xF6;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_or_a_imm8_always_clears_n_flag(void) {
+    flag_set(&mock_cpu, FLAG_N);
+    mock_memory[0] = 0x00;
+
+    alu_or8_stats.calls[0].return_value = (alu8_result_t){ 0 };
+
+    uint8_t opcode = 0xF6;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+}
+
+void test_op_or_a_imm8_always_clears_h_flag(void) {
+    flag_set(&mock_cpu, FLAG_H);
+    mock_memory[0] = 0x00;
+
+    alu_or8_stats.calls[0].return_value = (alu8_result_t){ 0 };
+
+    uint8_t opcode = 0xF6;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+void test_op_or_a_imm8_always_clears_c_flag(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_memory[0] = 0x00;
+
+    alu_or8_stats.calls[0].return_value = (alu8_result_t){ 0 };
+
+    uint8_t opcode = 0xF6;
+
+    opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -4287,6 +4383,12 @@ int main(void) {
     RUN_TEST(test_op_xor_a_imm8_always_clears_n_flag);
     RUN_TEST(test_op_xor_a_imm8_always_clears_h_flag);
     RUN_TEST(test_op_xor_a_imm8_always_clears_c_flag);
+    RUN_TEST(test_op_or_a_imm8);
+    RUN_TEST(test_op_or_a_imm8_sets_z_flag_when_result_is_zero);
+    RUN_TEST(test_op_or_a_imm8_clears_z_flag_when_result_is_nonzero);
+    RUN_TEST(test_op_or_a_imm8_always_clears_n_flag);
+    RUN_TEST(test_op_or_a_imm8_always_clears_h_flag);
+    RUN_TEST(test_op_or_a_imm8_always_clears_c_flag);
 
     return UNITY_END();
 }
