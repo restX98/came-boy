@@ -265,5 +265,8 @@ opcode_fn opcode_table[256] = {
     [0xC8] = op_ret_cond,     // RET Z
     [0xD0] = op_ret_cond,     // RET NC
     [0xD8] = op_ret_cond,     // RET C
+    // Type: RET
+    [0xC9] = op_ret,
+
     // ... (initialize other opcodes as needed)
 };
