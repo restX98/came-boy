@@ -120,3 +120,43 @@ static int op_ld_imm16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return 16;
 }
+
+static int op_ldh_a_imm8mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint8_t immediate_value = read_imm8(cpu, bus);
+    uint16_t address = 0xFF00 | immediate_value;
+
+    cpu->af.hi = bus_read(bus, address);
+
+    LOG_DEBUG("LDH A, [0x%02X] address=0x%04X value=0x%02X at PC=0x%04X (opcode=0x%02X)",
+        immediate_value, address, cpu->af.hi, instr_pc, opcode);
+
+    return 12;
+}
+
+static int op_ldh_a_c_mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint16_t address = 0xFF00 | cpu->bc.lo;
+
+    cpu->af.hi = bus_read(bus, address);
+
+    LOG_DEBUG("LDH A, [C] address=0x%04X value=0x%02X at PC=0x%04X (opcode=0x%02X)",
+        address, cpu->af.hi, instr_pc, opcode);
+
+    return 8;
+}
+
+static int op_ld_a_imm16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint16_t address = read_imm16(cpu, bus);
+
+    cpu->af.hi = bus_read(bus, address);
+
+    LOG_DEBUG("LD A, [imm16] address=0x%04X value=0x%02X at PC=0x%04X (opcode=0x%02X)",
+        address, cpu->af.hi, instr_pc, opcode);
+
+    return 16;
+}

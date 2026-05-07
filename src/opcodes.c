@@ -307,8 +307,15 @@ opcode_fn opcode_table[256] = {
     // Type: LDH [imm8], a
     [0xE0] = op_ldh_imm8mem_a,
     // Type: LDH [c], a
-    [0xE2] = op_ldh_c_offset_mem_a,
+    [0xE2] = op_ldh_c_mem_a,
     // Type: LD [imm16], a
     [0xEA] = op_ld_imm16mem_a,
+    // Type: LDH a, [imm8]
+    [0xF0] = op_ldh_a_imm8mem,
+    // Type: LDH a, [c]
+    [0xF2] = op_ldh_a_c_mem,
+    // Type: LD a, [imm16]
+    [0xFA] = op_ld_a_imm16mem,
+
     // ... (initialize other opcodes as needed)
 };

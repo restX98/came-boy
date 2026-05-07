@@ -2330,6 +2330,58 @@ void test_op_ld_imm16mem_a_writes_a_to_address(void) {
     TEST_ASSERT_EQUAL_UINT8(0x42, mock_memory[0x2050]);
 }
 
+// ---- op_ldh_a_imm8mem ----
+void test_op_ldh_a_imm8mem_reads_from_hram(void) {
+    mock_memory[0xFF30] = 0xBE;
+    mock_memory[0x0000] = 0x30; // imm8 = 0x30 → address = 0xFF30
+
+    int cycles = opcode_table[0xF0](&mock_cpu, &mock_bus, 0xF0);
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0xBE, mock_cpu.af.hi);
+}
+
+void test_op_ldh_a_imm8mem_uses_ff00_base(void) {
+    mock_memory[0xFF00] = 0x77;
+    mock_memory[0x0001] = 0x00; // imm8 = 0x00 → address = 0xFF00
+
+    opcode_table[0xF0](&mock_cpu, &mock_bus, 0xF0);
+
+    TEST_ASSERT_EQUAL_UINT8(0x77, mock_cpu.af.hi);
+}
+
+// ---- op_ldh_a_c_mem ----
+void test_op_ldh_a_c_mem_reads_from_hram(void) {
+    mock_cpu.bc.lo = 0x42; // C = 0x42 → address = 0xFF42
+    mock_memory[0xFF42] = 0xDE;
+
+    int cycles = opcode_table[0xF2](&mock_cpu, &mock_bus, 0xF2);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0xDE, mock_cpu.af.hi);
+}
+
+void test_op_ldh_a_c_mem_uses_ff00_base(void) {
+    mock_cpu.bc.lo = 0x00; // C = 0x00 → address = 0xFF00
+    mock_memory[0xFF00] = 0x99;
+
+    opcode_table[0xF2](&mock_cpu, &mock_bus, 0xF2);
+
+    TEST_ASSERT_EQUAL_UINT8(0x99, mock_cpu.af.hi);
+}
+
+// ---- op_ld_a_imm16mem ----
+void test_op_ld_a_imm16mem_reads_from_address(void) {
+    mock_memory[0x0000] = 0x50; // lo
+    mock_memory[0x0001] = 0x20; // hi → address = 0x2050
+    mock_memory[0x2050] = 0xAB;
+
+    int cycles = opcode_table[0xFA](&mock_cpu, &mock_bus, 0xFA);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, mock_cpu.af.hi);
+}
+
 // ---- op_ld_r8_r8 ----
 struct reg_entry_t {
     r8_operand_t code;
@@ -5086,6 +5138,11 @@ int main(void) {
     RUN_TEST(test_op_ldh_c_mem_a_writes_a_to_hram);
     RUN_TEST(test_op_ldh_c_mem_a_uses_ff00_base);
     RUN_TEST(test_op_ld_imm16mem_a_writes_a_to_address);
+    RUN_TEST(test_op_ldh_a_imm8mem_reads_from_hram);
+    RUN_TEST(test_op_ldh_a_imm8mem_uses_ff00_base);
+    RUN_TEST(test_op_ldh_a_c_mem_reads_from_hram);
+    RUN_TEST(test_op_ldh_a_c_mem_uses_ff00_base);
+    RUN_TEST(test_op_ld_a_imm16mem_reads_from_address);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);
