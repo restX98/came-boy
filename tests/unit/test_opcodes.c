@@ -1709,6 +1709,104 @@ void test_op_jr_nc_imm8_negative_offset_condition_false(void) {
     TEST_ASSERT_EQUAL_UINT16(0x0011, mock_cpu.pc);
 }
 
+// ---- op_ret_cond ----
+void test_op_ret_nz_condition_true(void) {
+    mock_cpu.pc = 0x0100;
+    mock_cpu.sp = 0xFFFC;
+    flag_clear(&mock_cpu, FLAG_Z); // NZ = true
+
+    mock_memory[0xFFFC] = 0x34; // lo byte of return address
+    mock_memory[0xFFFC + 1] = 0x12; // hi byte of return address
+
+    uint8_t opcode = 0xC0; // RET NZ
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(20, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp);
+}
+
+void test_op_ret_nz_condition_false(void) {
+    mock_cpu.pc = 0x0100;
+    mock_cpu.sp = 0xFFFC;
+    flag_set(&mock_cpu, FLAG_Z); // NZ = false
+
+    mock_memory[0xFFFC] = 0x34;
+    mock_memory[0xFFFC + 1] = 0x12;
+
+    uint8_t opcode = 0xC0; // RET NZ
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x0100, mock_cpu.pc); // PC unchanged
+    TEST_ASSERT_EQUAL_UINT16(0xFFFC, mock_cpu.sp); // SP unchanged
+}
+
+void test_op_ret_z_condition_true(void) {
+    mock_cpu.pc = 0x0200;
+    mock_cpu.sp = 0xFFFA;
+    flag_set(&mock_cpu, FLAG_Z); // Z = true
+
+    mock_memory[0xFFFA] = 0xCD;
+    mock_memory[0xFFFA + 1] = 0xAB;
+
+    uint8_t opcode = 0xC8; // RET Z
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(20, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0xABCD, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFC, mock_cpu.sp);
+}
+
+void test_op_ret_z_condition_false(void) {
+    mock_cpu.pc = 0x0200;
+    mock_cpu.sp = 0xFFFA;
+    flag_clear(&mock_cpu, FLAG_Z); // Z = false
+
+    uint8_t opcode = 0xC8; // RET Z
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x0200, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFA, mock_cpu.sp);
+}
+
+void test_op_ret_nc_condition_true(void) {
+    mock_cpu.sp = 0xFFFC;
+    flag_clear(&mock_cpu, FLAG_C); // NC = true
+
+    mock_memory[0xFFFC] = 0x78;
+    mock_memory[0xFFFC + 1] = 0x56;
+
+    uint8_t opcode = 0xD0; // RET NC
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(20, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp);
+}
+
+void test_op_ret_c_condition_true(void) {
+    mock_cpu.sp = 0xFFFC;
+    flag_set(&mock_cpu, FLAG_C); // C = true
+
+    mock_memory[0xFFFC] = 0x78;
+    mock_memory[0xFFFC + 1] = 0x56;
+
+    uint8_t opcode = 0xD8; // RET C
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(20, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp);
+}
+
 // ---- op_ld_r8_r8 ----
 struct reg_entry_t {
     r8_operand_t code;
@@ -4422,6 +4520,12 @@ int main(void) {
     RUN_TEST(test_op_jr_z_imm8_positive_offset);
     RUN_TEST(test_op_jr_c_imm8_negative_offset);
     RUN_TEST(test_op_jr_nc_imm8_negative_offset_condition_false);
+    RUN_TEST(test_op_ret_nz_condition_true);
+    RUN_TEST(test_op_ret_nz_condition_false);
+    RUN_TEST(test_op_ret_z_condition_true);
+    RUN_TEST(test_op_ret_z_condition_false);
+    RUN_TEST(test_op_ret_nc_condition_true);
+    RUN_TEST(test_op_ret_c_condition_true);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);

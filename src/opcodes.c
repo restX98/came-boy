@@ -260,6 +260,10 @@ opcode_fn opcode_table[256] = {
     [0xF6] = op_or_a_imm8,
     // Type: CP a, imm8
     [0xFE] = op_cp_a_imm8,
-
+    // Type: RET cond
+    [0xC0] = op_ret_cond,     // RET NZ
+    [0xC8] = op_ret_cond,     // RET Z
+    [0xD0] = op_ret_cond,     // RET NC
+    [0xD8] = op_ret_cond,     // RET C
     // ... (initialize other opcodes as needed)
 };

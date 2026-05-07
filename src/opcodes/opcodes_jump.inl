@@ -32,3 +32,24 @@ static int op_jr_cond_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return condition ? 12 : 8;
 }
+
+static int op_ret_cond(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    cond_operand_t cond_op = (opcode >> 3) & 0b11; // Extract condition code from opcode
+    bool condition = check_condition(cpu, cond_op);
+
+    uint16_t sp = cpu->sp;
+    if (condition) {
+        uint8_t lo = bus_read(bus, cpu->sp);
+        uint8_t hi = bus_read(bus, cpu->sp + 1);
+        cpu->pc = ((uint16_t)hi << 8) | lo;
+        cpu->sp += 2;
+    }
+
+    LOG_DEBUG("RET %s [%s] SP=0x%04X->0x%04X ret_addr=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        get_condition_name(cond_op), condition ? "taken" : "skipped",
+        sp, cpu->sp, cpu->pc, instr_pc, opcode);
+
+    return condition ? 20 : 8;
+}
