@@ -5293,6 +5293,26 @@ void test_op_ld_hl_sp_plus_imm8_clears_c_flag_when_no_lower_byte_carry(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
+// ---- op_ld_sp_hl ----
+void test_op_ld_sp_hl_loads_hl_into_sp(void) {
+    mock_cpu.hl.reg = 0x1234;
+    mock_cpu.sp = 0x0000;
+
+    int cycles = opcode_table[0xF9](&mock_cpu, &mock_bus, 0xF9);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.sp);
+}
+
+void test_op_ld_sp_hl_does_not_modify_hl(void) {
+    mock_cpu.hl.reg = 0xABCD;
+    mock_cpu.sp = 0x0000;
+
+    opcode_table[0xF9](&mock_cpu, &mock_bus, 0xF9);
+
+    TEST_ASSERT_EQUAL_UINT16(0xABCD, mock_cpu.hl.reg);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -5567,6 +5587,8 @@ int main(void) {
     RUN_TEST(test_op_ld_hl_sp_plus_imm8_clears_h_flag_when_no_lower_nibble_carry);
     RUN_TEST(test_op_ld_hl_sp_plus_imm8_sets_c_flag_on_lower_byte_carry);
     RUN_TEST(test_op_ld_hl_sp_plus_imm8_clears_c_flag_when_no_lower_byte_carry);
+    RUN_TEST(test_op_ld_sp_hl_loads_hl_into_sp);
+    RUN_TEST(test_op_ld_sp_hl_does_not_modify_hl);
 
     return UNITY_END();
 }

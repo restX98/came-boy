@@ -193,3 +193,16 @@ static int op_ld_hl_sp_plus_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return 12; // LD HL,sp+imm8 takes 12 cycles
 }
+
+static int op_ld_sp_hl(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    (void)bus;
+
+    uint16_t instr_pc = cpu->pc - 1;
+
+    cpu->sp = cpu->hl.reg;
+
+    LOG_DEBUG("LD SP,HL HL=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        cpu->hl.reg, instr_pc, opcode);
+
+    return 8; // LD SP,HL takes 8 cycles
+}
