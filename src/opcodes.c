@@ -317,6 +317,7 @@ opcode_fn opcode_table[256] = {
     [0xFA] = op_ld_a_imm16mem,
     // Type: ADD sp, imm8
     [0xE8] = op_add_sp_imm8,
-
+    // Type: LD hl, sp + imm8
+    [0xF8] = op_ld_hl_sp_plus_imm8,
     // ... (initialize other opcodes as needed)
 };

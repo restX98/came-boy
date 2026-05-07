@@ -174,3 +174,22 @@ static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return 20; // LD [imm16],sp takes 20 cycles
 }
+
+static int op_ld_hl_sp_plus_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    int8_t offset = (int8_t)read_imm8(cpu, bus);
+
+    alu16_result_t result = alu_add16_s8(cpu->sp, offset);
+    cpu->hl.reg = result.value;
+
+    flag_clear(cpu, FLAG_Z);
+    flag_clear(cpu, FLAG_N);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("LD HL,sp+imm8 offset=%d SP=0x%04X HL=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        offset, cpu->sp, cpu->hl.reg, instr_pc, opcode);
+
+    return 12; // LD HL,sp+imm8 takes 12 cycles
+}
