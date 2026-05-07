@@ -64,6 +64,7 @@ static int op_sbc_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_and_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_xor_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_or_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_cp_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -304,6 +305,9 @@ opcode_fn opcode_table[256] = {
     [0xEE] = op_xor_a_imm8,
     // Type: OR a, imm8
     [0xF6] = op_or_a_imm8,
+    // Type: CP a, imm8
+    [0xFE] = op_cp_a_imm8,
+
     // ... (initialize other opcodes as needed)
 };
 
@@ -1042,6 +1046,26 @@ static int op_or_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
         a, immediate_value, result.value, instr_pc, opcode);
 
     return 8; // OR A,imm8 takes 8 cycles
+}
+
+static int op_cp_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint8_t immediate_value = read_imm8(cpu, bus);
+    uint8_t a = cpu->af.hi;
+
+    alu8_result_t result = alu_sub8(a, immediate_value, 0);
+
+    // N set, Z, H and C set according to result
+    flag_set(cpu, FLAG_N);
+    if (result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("CP A,imm8: 0x%02X - 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        a, immediate_value, instr_pc, opcode);
+
+    return 8; // CP A,imm8 takes 8 cycles
 }
 
 /*-------------------------------------------------------
