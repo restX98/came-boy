@@ -321,5 +321,9 @@ opcode_fn opcode_table[256] = {
     [0xF8] = op_ld_hl_sp_plus_imm8,
     // Type: LD sp, hl
     [0xF9] = op_ld_sp_hl,
+    // Type: DI
+    [0xF3] = op_di,
+    // Type: EI
+    [0xFB] = op_ei,
     // ... (initialize other opcodes as needed)
 };

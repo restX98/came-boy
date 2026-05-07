@@ -5313,6 +5313,44 @@ void test_op_ld_sp_hl_does_not_modify_hl(void) {
     TEST_ASSERT_EQUAL_UINT16(0xABCD, mock_cpu.hl.reg);
 }
 
+// ---- op_di ----
+void test_op_di_clears_ime(void) {
+    mock_cpu.ime = true;
+
+    int cycles = opcode_table[0xF3](&mock_cpu, &mock_bus, 0xF3);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_FALSE(mock_cpu.ime);
+}
+
+void test_op_di_clears_ime_when_already_false(void) {
+    mock_cpu.ime = false;
+
+    opcode_table[0xF3](&mock_cpu, &mock_bus, 0xF3);
+
+    TEST_ASSERT_FALSE(mock_cpu.ime);
+}
+
+// ---- op_ei ----
+void test_op_ei_schedules_ime(void) {
+    mock_cpu.ime_scheduled = false;
+
+    int cycles = opcode_table[0xFB](&mock_cpu, &mock_bus, 0xFB);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_TRUE(mock_cpu.ime_scheduled);
+}
+
+void test_op_ei_does_not_set_ime_immediately(void) {
+    // EI delays by one instruction — IME must NOT be set right away
+    mock_cpu.ime = false;
+    mock_cpu.ime_scheduled = false;
+
+    opcode_table[0xFB](&mock_cpu, &mock_bus, 0xFB);
+
+    TEST_ASSERT_FALSE(mock_cpu.ime);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -5589,6 +5627,10 @@ int main(void) {
     RUN_TEST(test_op_ld_hl_sp_plus_imm8_clears_c_flag_when_no_lower_byte_carry);
     RUN_TEST(test_op_ld_sp_hl_loads_hl_into_sp);
     RUN_TEST(test_op_ld_sp_hl_does_not_modify_hl);
+    RUN_TEST(test_op_di_clears_ime);
+    RUN_TEST(test_op_di_clears_ime_when_already_false);
+    RUN_TEST(test_op_ei_schedules_ime);
+    RUN_TEST(test_op_ei_does_not_set_ime_immediately);
 
     return UNITY_END();
 }
