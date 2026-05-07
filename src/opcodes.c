@@ -58,6 +58,7 @@ static int op_xor_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_or_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_cp_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_add_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_adc_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -284,8 +285,10 @@ opcode_fn opcode_table[256] = {
     [0xBF] = op_cp_a_r8,      // CP a,A
 
     // Block 3:
-    // Type: Add a, imm8
+    // Type: ADD a, imm8
     [0xC6] = op_add_a_imm8,
+    // Type: ADC a, imm8
+    [0xCE] = op_adc_a_imm8,
     // ... (initialize other opcodes as needed)
 };
 
@@ -899,6 +902,29 @@ static int op_add_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return 8;  // ADD A,imm8 takes 8 cycles
 }
+
+static int op_adc_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint8_t immediate_value = read_imm8(cpu, bus);
+    uint8_t a = cpu->af.hi;
+    uint8_t carry_in = flag_get(cpu, FLAG_C) ? 1 : 0;
+
+    alu8_result_t alu_result = alu_add8(a, immediate_value, carry_in);
+    cpu->af.hi = alu_result.value;
+
+    // N cleared, Z, H and C set according to result
+    flag_clear(cpu, FLAG_N);
+    if (alu_result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (alu_result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (alu_result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("ADC A,imm8: 0x%02X + 0x%02X + %d = 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        a, immediate_value, carry_in, alu_result.value, instr_pc, opcode);
+
+    return 8; // ADC A,imm8 takes 8 cycles
+}
+
 
 /*-------------------------------------------------------
  * Private helpers definition
