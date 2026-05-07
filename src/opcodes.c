@@ -59,6 +59,7 @@ static int op_or_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_cp_a_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_add_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 static int op_adc_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
+static int op_sub_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode);
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -289,6 +290,8 @@ opcode_fn opcode_table[256] = {
     [0xC6] = op_add_a_imm8,
     // Type: ADC a, imm8
     [0xCE] = op_adc_a_imm8,
+    // Type: SUB a, imm8
+    [0xD6] = op_sub_a_imm8,
     // ... (initialize other opcodes as needed)
 };
 
@@ -892,6 +895,7 @@ static int op_add_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     alu8_result_t result = alu_add8(a, immediate_value, 0);
     cpu->af.hi = result.value;
 
+    // N cleared, Z, H and C set according to result
     flag_clear(cpu, FLAG_N);
     if (result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
     if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
@@ -925,6 +929,26 @@ static int op_adc_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return 8; // ADC A,imm8 takes 8 cycles
 }
 
+static int op_sub_a_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint8_t immediate_value = read_imm8(cpu, bus);
+    uint8_t a = cpu->af.hi;
+
+    alu8_result_t result = alu_sub8(a, immediate_value, 0);
+    cpu->af.hi = result.value;
+
+    // N set, Z, H and C set according to result
+    flag_set(cpu, FLAG_N);
+    if (result.status.zero)       flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("SUB A,imm8: 0x%02X - 0x%02X = 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        a, immediate_value, result.value, instr_pc, opcode);
+
+    return 8;  // SUB A,imm8 takes 8 cycles
+}
 
 /*-------------------------------------------------------
  * Private helpers definition
