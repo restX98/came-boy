@@ -76,6 +76,44 @@ static int op_jp_hl(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return 4;
 }
 
+static int op_call_cond_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    cond_operand_t cond_op = (opcode >> 3) & 0b11; // Extract condition code from opcode
+    bool condition = check_condition(cpu, cond_op);
+    uint16_t address = read_imm16(cpu, bus);
+
+    if (condition) {
+        uint16_t return_addr = cpu->pc;
+        bus_write(bus, cpu->sp - 1, return_addr >> 8);
+        bus_write(bus, cpu->sp - 2, return_addr & 0xFF);
+        cpu->sp -= 2;
+        cpu->pc = address;
+    }
+
+    LOG_DEBUG("CALL %s [%s] addr=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        get_condition_name(cond_op), condition ? "taken" : "skipped", address, instr_pc, opcode);
+
+    return condition ? 24 : 12;
+}
+
+static int op_call_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint16_t address = read_imm16(cpu, bus);
+
+    uint16_t return_addr = cpu->pc;
+    bus_write(bus, cpu->sp - 1, return_addr >> 8);
+    bus_write(bus, cpu->sp - 2, return_addr & 0xFF);
+    cpu->sp -= 2;
+    cpu->pc = address;
+
+    LOG_DEBUG("CALL addr=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        address, instr_pc, opcode);
+
+    return 24;
+}
+
 static int op_ret_cond(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t instr_pc = cpu->pc - 1;
 

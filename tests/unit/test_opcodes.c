@@ -2012,6 +2012,122 @@ void test_op_jp_hl_high_address(void) {
     TEST_ASSERT_EQUAL_UINT16(0xFF80, mock_cpu.pc);
 }
 
+// ---- op_call_imm16 ----
+void test_op_call_imm16_jumps_to_address(void) {
+    mock_cpu.pc = 0x0100;
+    mock_cpu.sp = 0xFFFE;
+    mock_memory[0x0100] = 0x34; // lo byte of target
+    mock_memory[0x0101] = 0x12; // hi byte of target
+
+    uint8_t opcode = 0xCD; // CALL imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(24, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.pc);
+}
+
+void test_op_call_imm16_pushes_return_address(void) {
+    mock_cpu.pc = 0x0100;
+    mock_cpu.sp = 0xFFFE;
+    mock_memory[0x0100] = 0x34;
+    mock_memory[0x0101] = 0x12;
+
+    opcode_table[0xCD](&mock_cpu, &mock_bus, 0xCD);
+
+    // Return address is 0x0102 (byte after the 3-byte CALL instruction)
+    TEST_ASSERT_EQUAL_UINT16(0xFFFC, mock_cpu.sp);
+    TEST_ASSERT_EQUAL_UINT8(0x02, mock_memory[0xFFFC]); // lo byte at SP
+    TEST_ASSERT_EQUAL_UINT8(0x01, mock_memory[0xFFFD]); // hi byte at SP+1
+}
+
+void test_op_call_imm16_return_address_roundtrip(void) {
+    mock_cpu.pc = 0x0200;
+    mock_cpu.sp = 0xFFFE;
+    mock_memory[0x0200] = 0x00; // lo: jump to 0x0300
+    mock_memory[0x0201] = 0x03; // hi
+
+    opcode_table[0xCD](&mock_cpu, &mock_bus, 0xCD); // CALL 0x0300
+    opcode_table[0xC9](&mock_cpu, &mock_bus, 0xC9); // RET
+
+    TEST_ASSERT_EQUAL_UINT16(0x0202, mock_cpu.pc); // back to instruction after CALL
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp); // SP restored
+}
+
+// ---- op_call_cond_imm16 ----
+void test_op_call_nz_condition_true(void) {
+    mock_cpu.pc = 0x0100;
+    mock_cpu.sp = 0xFFFE;
+    flag_clear(&mock_cpu, FLAG_Z); // NZ = true
+    mock_memory[0x0100] = 0x34;
+    mock_memory[0x0101] = 0x12;
+
+    uint8_t opcode = 0xC4; // CALL NZ,imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(24, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFC, mock_cpu.sp);
+    TEST_ASSERT_EQUAL_UINT8(0x02, mock_memory[0xFFFC]); // lo of return addr
+    TEST_ASSERT_EQUAL_UINT8(0x01, mock_memory[0xFFFD]); // hi of return addr
+}
+
+void test_op_call_nz_condition_false(void) {
+    mock_cpu.pc = 0x0100;
+    mock_cpu.sp = 0xFFFE;
+    flag_set(&mock_cpu, FLAG_Z); // NZ = false
+    mock_memory[0x0100] = 0x34;
+    mock_memory[0x0101] = 0x12;
+
+    uint8_t opcode = 0xC4; // CALL NZ,imm16
+
+    int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x0102, mock_cpu.pc); // only consumed imm16
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp); // SP unchanged
+}
+
+void test_op_call_z_condition_true(void) {
+    mock_cpu.pc = 0x0000;
+    mock_cpu.sp = 0xFFFE;
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_memory[0x0000] = 0x78;
+    mock_memory[0x0001] = 0x56;
+
+    int cycles = opcode_table[0xCC](&mock_cpu, &mock_bus, 0xCC); // CALL Z,imm16
+
+    TEST_ASSERT_EQUAL(24, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
+}
+
+void test_op_call_nc_condition_true(void) {
+    mock_cpu.pc = 0x0000;
+    mock_cpu.sp = 0xFFFE;
+    flag_clear(&mock_cpu, FLAG_C);
+    mock_memory[0x0000] = 0x78;
+    mock_memory[0x0001] = 0x56;
+
+    int cycles = opcode_table[0xD4](&mock_cpu, &mock_bus, 0xD4); // CALL NC,imm16
+
+    TEST_ASSERT_EQUAL(24, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
+}
+
+void test_op_call_c_condition_true(void) {
+    mock_cpu.pc = 0x0000;
+    mock_cpu.sp = 0xFFFE;
+    flag_set(&mock_cpu, FLAG_C);
+    mock_memory[0x0000] = 0x78;
+    mock_memory[0x0001] = 0x56;
+
+    int cycles = opcode_table[0xDC](&mock_cpu, &mock_bus, 0xDC); // CALL C,imm16
+
+    TEST_ASSERT_EQUAL(24, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
+}
+
 // ---- op_ld_r8_r8 ----
 struct reg_entry_t {
     r8_operand_t code;
@@ -4747,6 +4863,14 @@ int main(void) {
     RUN_TEST(test_op_jp_hl_jumps_to_hl);
     RUN_TEST(test_op_jp_hl_does_not_modify_hl);
     RUN_TEST(test_op_jp_hl_high_address);
+    RUN_TEST(test_op_call_imm16_jumps_to_address);
+    RUN_TEST(test_op_call_imm16_pushes_return_address);
+    RUN_TEST(test_op_call_imm16_return_address_roundtrip);
+    RUN_TEST(test_op_call_nz_condition_true);
+    RUN_TEST(test_op_call_nz_condition_false);
+    RUN_TEST(test_op_call_z_condition_true);
+    RUN_TEST(test_op_call_nc_condition_true);
+    RUN_TEST(test_op_call_c_condition_true);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);

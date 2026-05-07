@@ -269,15 +269,22 @@ opcode_fn opcode_table[256] = {
     [0xC9] = op_ret,
     // Type: RETI
     [0xD9] = op_reti,
-    // Type: JP imm16
-    [0xC3] = op_jp_imm16,
     // Type: JP cond, imm16
     [0xC2] = op_jp_cond_imm16, // JP NZ,imm16
     [0xCA] = op_jp_cond_imm16, // JP Z,imm16
     [0xD2] = op_jp_cond_imm16, // JP NC,imm16
     [0xDA] = op_jp_cond_imm16, // JP C,imm16
+    // Type: JP imm16
+    [0xC3] = op_jp_imm16,
     // Type: JP hl
     [0xE9] = op_jp_hl,
+    // Type: CALL cond, imm16
+    [0xC4] = op_call_cond_imm16, // CALL NZ,imm16
+    [0xCC] = op_call_cond_imm16, // CALL Z,imm16
+    [0xD4] = op_call_cond_imm16, // CALL NC,imm16
+    [0xDC] = op_call_cond_imm16, // CALL C,imm16
+    // Type: CALL imm16
+    [0xCD] = op_call_imm16
 
     // ... (initialize other opcodes as needed)
 };
