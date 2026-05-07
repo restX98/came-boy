@@ -103,3 +103,15 @@ alu16_result_t alu_add16(uint16_t hl, uint16_t value) {
         }
     };
 }
+
+alu16_result_t alu_add16_s8(uint16_t base, int8_t offset) {
+    uint8_t u = (uint8_t)offset;
+
+    return (alu16_result_t) {
+        .value = (uint16_t)(base + offset),
+            .status = {
+                .half_carry = ((base & 0x0F) + (u & 0x0F)) > 0x0F,
+                .carry = ((base & 0xFF) + u) > 0xFF,
+        }
+    };
+}

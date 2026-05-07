@@ -33,5 +33,6 @@ alu8_result_t alu_or8(uint8_t a, uint8_t value);
 alu8_result_t alu_xor8(uint8_t a, uint8_t value);
 
 alu16_result_t alu_add16(uint16_t hl, uint16_t value);
+alu16_result_t alu_add16_s8(uint16_t base, int8_t offset);
 
 #endif // ALU_H

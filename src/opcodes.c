@@ -17,7 +17,6 @@
 #include "opcodes/opcodes_jump.inl"
 #include "opcodes/opcodes_load.inl"
 #include "opcodes/opcodes_misc.inl"
-#include "opcodes/opcodes_stack.inl"
 
 opcode_fn opcode_table[256] = {
     // Block 0
@@ -316,6 +315,8 @@ opcode_fn opcode_table[256] = {
     [0xF2] = op_ldh_a_c_mem,
     // Type: LD a, [imm16]
     [0xFA] = op_ld_a_imm16mem,
+    // Type: ADD sp, imm8
+    [0xE8] = op_add_sp_imm8,
 
     // ... (initialize other opcodes as needed)
 };

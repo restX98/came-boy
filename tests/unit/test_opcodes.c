@@ -237,6 +237,34 @@ alu16_result_t alu_add16(uint16_t hl, uint16_t value) {
     return alu_add16_stats.calls[alu_add16_stats.call_count - 1].return_value;
 }
 
+// Mock alu_add16_s8
+typedef struct {
+    uint16_t base;
+    int8_t offset;
+    alu16_result_t return_value;
+} alu_add16_s8_call_t;
+
+typedef struct {
+    size_t call_count;
+    alu_add16_s8_call_t calls[10];
+} alu_add16_s8_stats_t;
+
+static alu_add16_s8_stats_t alu_add16_s8_stats;
+
+alu16_result_t alu_add16_s8(uint16_t base, int8_t offset) {
+    if (alu_add16_s8_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for alu_add16_s8");
+    }
+
+    alu_add16_s8_call_t *call = &alu_add16_s8_stats.calls[alu_add16_s8_stats.call_count];
+    call->base = base;
+    call->offset = offset;
+
+    alu_add16_s8_stats.call_count++;
+
+    return alu_add16_s8_stats.calls[alu_add16_s8_stats.call_count - 1].return_value;
+}
+
 void setUp(void) {
     suppress_logs();
     alu_add8_stats = (alu_add8_stats_t){ 0 };
@@ -247,6 +275,7 @@ void setUp(void) {
     alu_or8_stats = (alu_or8_stats_t){ 0 };
     alu_xor8_stats = (alu_xor8_stats_t){ 0 };
     alu_add16_stats = (alu_add16_stats_t){ 0 };
+    alu_add16_s8_stats = (alu_add16_s8_stats_t){ 0 };
 }
 
 void tearDown(void) {
@@ -5002,6 +5031,138 @@ void test_op_cp_a_imm8_clears_c_flag_when_no_borrow(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
 }
 
+// ---- op_add_sp_imm8 ----
+void test_op_add_sp_imm8_positive_offset(void) {
+    mock_cpu.sp = 0x0100;
+    mock_memory[0] = 0x05; // offset +5
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0x0105, .status = { .half_carry = false, .carry = false }
+    };
+
+    int cycles = opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x0105, mock_cpu.sp);
+    TEST_ASSERT_EQUAL_INT(1, alu_add16_s8_stats.call_count);
+    TEST_ASSERT_EQUAL_UINT16(0x0100, alu_add16_s8_stats.calls[0].base);
+    TEST_ASSERT_EQUAL_INT8(5, alu_add16_s8_stats.calls[0].offset);
+}
+
+void test_op_add_sp_imm8_negative_offset(void) {
+    mock_cpu.sp = 0x0100;
+    mock_memory[0] = 0xFF; // offset -1
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0x00FF, .status = { .half_carry = false, .carry = false }
+    };
+
+    opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL_UINT16(0x00FF, mock_cpu.sp);
+    TEST_ASSERT_EQUAL_INT8(-1, alu_add16_s8_stats.calls[0].offset);
+}
+
+void test_op_add_sp_imm8_negative_offset_wraps_sp(void) {
+    // SP=0x0000, offset=-1 → SP wraps to 0xFFFF
+    mock_cpu.sp = 0x0000;
+    mock_memory[0] = 0xFF; // offset -1
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0xFFFF, .status = { .half_carry = false, .carry = false }
+    };
+
+    opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL_UINT16(0xFFFF, mock_cpu.sp);
+}
+
+void test_op_add_sp_imm8_always_clears_z_flag(void) {
+    // Even when the result is 0, Z must be cleared
+    mock_cpu.sp = 0x0001;
+    mock_memory[0] = 0xFF; // offset -1 → result 0x0000
+    flag_set(&mock_cpu, FLAG_Z);
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0x0000, .status = { .half_carry = false, .carry = false }
+    };
+
+    opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_add_sp_imm8_always_clears_n_flag(void) {
+    mock_cpu.sp = 0x0100;
+    mock_memory[0] = 0x01;
+    flag_set(&mock_cpu, FLAG_N);
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0x0101, .status = { .half_carry = false, .carry = false }
+    };
+
+    opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+}
+
+void test_op_add_sp_imm8_sets_h_flag_on_lower_nibble_carry(void) {
+    // SP=0x000F, offset=+1: (0xF & 0xF) + (0x1 & 0xF) = 0x10 > 0xF → H=1
+    mock_cpu.sp = 0x000F;
+    mock_memory[0] = 0x01;
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0x0010, .status = { .half_carry = true, .carry = false }
+    };
+
+    opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_add_sp_imm8_clears_h_flag_when_no_lower_nibble_carry(void) {
+    mock_cpu.sp = 0x0010;
+    mock_memory[0] = 0x01;
+    flag_set(&mock_cpu, FLAG_H);
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0x0011, .status = { .half_carry = false, .carry = false }
+    };
+
+    opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+void test_op_add_sp_imm8_sets_c_flag_on_lower_byte_carry(void) {
+    // SP=0x00FF, offset=+1: 0xFF + 0x01 = 0x100 > 0xFF → C=1
+    mock_cpu.sp = 0x00FF;
+    mock_memory[0] = 0x01;
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0x0100, .status = { .half_carry = true, .carry = true }
+    };
+
+    opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_add_sp_imm8_clears_c_flag_when_no_lower_byte_carry(void) {
+    mock_cpu.sp = 0x0080;
+    mock_memory[0] = 0x01;
+    flag_set(&mock_cpu, FLAG_C);
+
+    alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
+        .value = 0x0081, .status = { .half_carry = false, .carry = false }
+    };
+
+    opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -5258,6 +5419,15 @@ int main(void) {
     RUN_TEST(test_op_cp_a_imm8_clears_h_flag_when_no_half_borrow);
     RUN_TEST(test_op_cp_a_imm8_sets_c_flag_on_borrow);
     RUN_TEST(test_op_cp_a_imm8_clears_c_flag_when_no_borrow);
+    RUN_TEST(test_op_add_sp_imm8_positive_offset);
+    RUN_TEST(test_op_add_sp_imm8_negative_offset);
+    RUN_TEST(test_op_add_sp_imm8_negative_offset_wraps_sp);
+    RUN_TEST(test_op_add_sp_imm8_always_clears_z_flag);
+    RUN_TEST(test_op_add_sp_imm8_always_clears_n_flag);
+    RUN_TEST(test_op_add_sp_imm8_sets_h_flag_on_lower_nibble_carry);
+    RUN_TEST(test_op_add_sp_imm8_clears_h_flag_when_no_lower_nibble_carry);
+    RUN_TEST(test_op_add_sp_imm8_sets_c_flag_on_lower_byte_carry);
+    RUN_TEST(test_op_add_sp_imm8_clears_c_flag_when_no_lower_byte_carry);
 
     return UNITY_END();
 }

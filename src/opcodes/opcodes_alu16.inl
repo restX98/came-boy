@@ -52,3 +52,22 @@ static int op_dec_r16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return 8; // DEC r16 takes 8 cycles
 }
+
+static int op_add_sp_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    int8_t offset = (int8_t)read_imm8(cpu, bus);
+
+    alu16_result_t result = alu_add16_s8(cpu->sp, offset);
+    cpu->sp = result.value;
+
+    flag_clear(cpu, FLAG_Z);
+    flag_clear(cpu, FLAG_N);
+    if (result.status.half_carry) flag_set(cpu, FLAG_H); else flag_clear(cpu, FLAG_H);
+    if (result.status.carry)      flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("ADD SP,imm8 offset=%d SP=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        offset, cpu->sp, instr_pc, opcode);
+
+    return 16; // ADD SP,imm8 takes 16 cycles
+}
