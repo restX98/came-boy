@@ -2251,7 +2251,7 @@ void test_op_push_r16stk_matrix(void) {
         TEST_ASSERT_EQUAL_MESSAGE(16, cycles, cases[i].name);
         TEST_ASSERT_EQUAL_UINT16_MESSAGE(0xFFFC, mock_cpu.sp, cases[i].name);
         TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(cases[i].value & 0xFF), mock_memory[0xFFFC], cases[i].name); // lo at SP
-        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(cases[i].value >> 8),   mock_memory[0xFFFD], cases[i].name); // hi at SP+1
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(cases[i].value >> 8), mock_memory[0xFFFD], cases[i].name); // hi at SP+1
     }
 }
 
@@ -2276,6 +2276,58 @@ void test_op_push_af_masks_lower_nibble_of_f(void) {
     opcode_table[0xF5](&mock_cpu, &mock_bus, 0xF5); // PUSH AF
 
     TEST_ASSERT_EQUAL_UINT8(0x00, mock_memory[0xFFFC] & 0x0F); // lower nibble of pushed F is always 0
+}
+
+// ---- op_ldh_imm8mem_a ----
+void test_op_ldh_imm8mem_a_writes_a_to_hram(void) {
+    mock_cpu.af.hi = 0xAB;
+    mock_memory[0x0000] = 0x10; // imm8 = 0x10 → address = 0xFF10
+
+    int cycles = opcode_table[0xE0](&mock_cpu, &mock_bus, 0xE0);
+
+    TEST_ASSERT_EQUAL(12, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, mock_memory[0xFF10]);
+}
+
+void test_op_ldh_imm8mem_a_uses_ff00_base(void) {
+    mock_cpu.af.hi = 0x55;
+    mock_memory[0x0000] = 0x00; // imm8 = 0x00 → address = 0xFF00
+
+    opcode_table[0xE0](&mock_cpu, &mock_bus, 0xE0);
+
+    TEST_ASSERT_EQUAL_UINT8(0x55, mock_memory[0xFF00]);
+}
+
+// ---- op_ldh_c_mem_a ----
+void test_op_ldh_c_mem_a_writes_a_to_hram(void) {
+    mock_cpu.af.hi = 0xCD;
+    mock_cpu.bc.lo = 0x20; // C = 0x20 → address = 0xFF20
+
+    int cycles = opcode_table[0xE2](&mock_cpu, &mock_bus, 0xE2);
+
+    TEST_ASSERT_EQUAL(8, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0xCD, mock_memory[0xFF20]);
+}
+
+void test_op_ldh_c_mem_a_uses_ff00_base(void) {
+    mock_cpu.af.hi = 0x77;
+    mock_cpu.bc.lo = 0x00; // C = 0x00 → address = 0xFF00
+
+    opcode_table[0xE2](&mock_cpu, &mock_bus, 0xE2);
+
+    TEST_ASSERT_EQUAL_UINT8(0x77, mock_memory[0xFF00]);
+}
+
+// ---- op_ld_imm16mem_a ----
+void test_op_ld_imm16mem_a_writes_a_to_address(void) {
+    mock_cpu.af.hi = 0x42;
+    mock_memory[0x0000] = 0x50; // lo
+    mock_memory[0x0001] = 0x20; // hi → address = 0x2050
+
+    int cycles = opcode_table[0xEA](&mock_cpu, &mock_bus, 0xEA);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0x42, mock_memory[0x2050]);
 }
 
 // ---- op_ld_r8_r8 ----
@@ -5029,6 +5081,11 @@ int main(void) {
     RUN_TEST(test_op_push_r16stk_matrix);
     RUN_TEST(test_op_push_af_stores_flags);
     RUN_TEST(test_op_push_af_masks_lower_nibble_of_f);
+    RUN_TEST(test_op_ldh_imm8mem_a_writes_a_to_hram);
+    RUN_TEST(test_op_ldh_imm8mem_a_uses_ff00_base);
+    RUN_TEST(test_op_ldh_c_mem_a_writes_a_to_hram);
+    RUN_TEST(test_op_ldh_c_mem_a_uses_ff00_base);
+    RUN_TEST(test_op_ld_imm16mem_a_writes_a_to_address);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);

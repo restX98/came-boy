@@ -304,5 +304,11 @@ opcode_fn opcode_table[256] = {
     [0xD5] = op_push_r16stk,     // PUSH DE
     [0xE5] = op_push_r16stk,     // PUSH HL
     [0xF5] = op_push_r16stk,     // PUSH AF
+    // Type: LDH [imm8], a
+    [0xE0] = op_ldh_imm8mem_a,
+    // Type: LDH [c], a
+    [0xE2] = op_ldh_c_offset_mem_a,
+    // Type: LD [imm16], a
+    [0xEA] = op_ld_imm16mem_a,
     // ... (initialize other opcodes as needed)
 };
