@@ -1880,26 +1880,26 @@ void test_op_reti_loads_pc_from_stack(void) {
 
 void test_op_reti_sets_ime_immediately(void) {
     mock_cpu.sp = 0xFFFC;
-    mock_cpu.ime = false;
+    mock_cpu.ime.enabled = false;
 
     uint8_t opcode = 0xD9; // RETI
 
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_TRUE(mock_cpu.ime);
+    TEST_ASSERT_TRUE(mock_cpu.ime.enabled);
 }
 
 void test_op_reti_sets_ime_even_when_not_scheduled(void) {
     mock_cpu.sp = 0xFFFC;
-    mock_cpu.ime = false;
-    mock_cpu.ime_scheduled = false;
+    mock_cpu.ime.enabled = false;
+    mock_cpu.ime.scheduled = false;
 
     uint8_t opcode = 0xD9; // RETI
 
     opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
     // Unlike EI, RETI enables IME immediately without going through ime_scheduled
-    TEST_ASSERT_TRUE(mock_cpu.ime);
+    TEST_ASSERT_TRUE(mock_cpu.ime.enabled);
 }
 
 // ---- op_jp_imm16 ----
@@ -5037,7 +5037,7 @@ void test_op_add_sp_imm8_positive_offset(void) {
     mock_memory[0] = 0x05; // offset +5
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0x0105, .status = { .half_carry = false, .carry = false }
+        .value = 0x0105, .status = {.half_carry = false, .carry = false }
     };
 
     int cycles = opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5054,7 +5054,7 @@ void test_op_add_sp_imm8_negative_offset(void) {
     mock_memory[0] = 0xFF; // offset -1
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0x00FF, .status = { .half_carry = false, .carry = false }
+        .value = 0x00FF, .status = {.half_carry = false, .carry = false }
     };
 
     opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5069,7 +5069,7 @@ void test_op_add_sp_imm8_negative_offset_wraps_sp(void) {
     mock_memory[0] = 0xFF; // offset -1
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0xFFFF, .status = { .half_carry = false, .carry = false }
+        .value = 0xFFFF, .status = {.half_carry = false, .carry = false }
     };
 
     opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5084,7 +5084,7 @@ void test_op_add_sp_imm8_always_clears_z_flag(void) {
     flag_set(&mock_cpu, FLAG_Z);
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0x0000, .status = { .half_carry = false, .carry = false }
+        .value = 0x0000, .status = {.half_carry = false, .carry = false }
     };
 
     opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5098,7 +5098,7 @@ void test_op_add_sp_imm8_always_clears_n_flag(void) {
     flag_set(&mock_cpu, FLAG_N);
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0x0101, .status = { .half_carry = false, .carry = false }
+        .value = 0x0101, .status = {.half_carry = false, .carry = false }
     };
 
     opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5112,7 +5112,7 @@ void test_op_add_sp_imm8_sets_h_flag_on_lower_nibble_carry(void) {
     mock_memory[0] = 0x01;
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0x0010, .status = { .half_carry = true, .carry = false }
+        .value = 0x0010, .status = {.half_carry = true, .carry = false }
     };
 
     opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5127,7 +5127,7 @@ void test_op_add_sp_imm8_clears_h_flag_when_no_lower_nibble_carry(void) {
     flag_set(&mock_cpu, FLAG_H);
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0x0011, .status = { .half_carry = false, .carry = false }
+        .value = 0x0011, .status = {.half_carry = false, .carry = false }
     };
 
     opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5141,7 +5141,7 @@ void test_op_add_sp_imm8_sets_c_flag_on_lower_byte_carry(void) {
     mock_memory[0] = 0x01;
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0x0100, .status = { .half_carry = true, .carry = true }
+        .value = 0x0100, .status = {.half_carry = true, .carry = true }
     };
 
     opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5155,7 +5155,7 @@ void test_op_add_sp_imm8_clears_c_flag_when_no_lower_byte_carry(void) {
     flag_set(&mock_cpu, FLAG_C);
 
     alu_add16_s8_stats.calls[0].return_value = (alu16_result_t){
-        .value = 0x0081, .status = { .half_carry = false, .carry = false }
+        .value = 0x0081, .status = {.half_carry = false, .carry = false }
     };
 
     opcode_table[0xE8](&mock_cpu, &mock_bus, 0xE8);
@@ -5315,40 +5315,40 @@ void test_op_ld_sp_hl_does_not_modify_hl(void) {
 
 // ---- op_di ----
 void test_op_di_clears_ime(void) {
-    mock_cpu.ime = true;
+    mock_cpu.ime.enabled = true;
 
     int cycles = opcode_table[0xF3](&mock_cpu, &mock_bus, 0xF3);
 
     TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_FALSE(mock_cpu.ime);
+    TEST_ASSERT_FALSE(mock_cpu.ime.enabled);
 }
 
 void test_op_di_clears_ime_when_already_false(void) {
-    mock_cpu.ime = false;
+    mock_cpu.ime.enabled = false;
 
     opcode_table[0xF3](&mock_cpu, &mock_bus, 0xF3);
 
-    TEST_ASSERT_FALSE(mock_cpu.ime);
+    TEST_ASSERT_FALSE(mock_cpu.ime.enabled);
 }
 
 // ---- op_ei ----
 void test_op_ei_schedules_ime(void) {
-    mock_cpu.ime_scheduled = false;
+    mock_cpu.ime.scheduled = false;
 
     int cycles = opcode_table[0xFB](&mock_cpu, &mock_bus, 0xFB);
 
     TEST_ASSERT_EQUAL(4, cycles);
-    TEST_ASSERT_TRUE(mock_cpu.ime_scheduled);
+    TEST_ASSERT_TRUE(mock_cpu.ime.scheduled);
 }
 
 void test_op_ei_does_not_set_ime_immediately(void) {
     // EI delays by one instruction — IME must NOT be set right away
-    mock_cpu.ime = false;
-    mock_cpu.ime_scheduled = false;
+    mock_cpu.ime.enabled = false;
+    mock_cpu.ime.scheduled = false;
 
     opcode_table[0xFB](&mock_cpu, &mock_bus, 0xFB);
 
-    TEST_ASSERT_FALSE(mock_cpu.ime);
+    TEST_ASSERT_FALSE(mock_cpu.ime.enabled);
 }
 
 int main(void) {

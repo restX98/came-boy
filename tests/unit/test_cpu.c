@@ -66,6 +66,8 @@ void test_cpu_init_sets_registers_to_initial_values(void) {
     TEST_ASSERT_EQUAL_UINT16(0x014D, cpu.hl.reg);
     TEST_ASSERT_EQUAL_UINT16(0xFFFE, cpu.sp);
     TEST_ASSERT_EQUAL_UINT16(0x0100, cpu.pc);
+    TEST_ASSERT_FALSE(cpu.ime.enabled);
+    TEST_ASSERT_FALSE(cpu.ime.scheduled);
 }
 
 // ---- cpu_step ----
@@ -107,6 +109,53 @@ void test_cpu_step_increments_pc_by_1_before_execution(void) {
     TEST_ASSERT_EQUAL_UINT16(1, cpu.pc);
 }
 
+// ---- ime scheduling ----
+
+void test_cpu_step_promotes_ime_scheduled_to_enabled_before_execution(void) {
+    uint8_t opcode = 0x00;
+    bus_read_stats.calls[0].return_value = opcode;
+
+    int mock_operation(cpu_t * _cpu, bus_t * _bus, uint8_t _opcode) {
+        (void)_bus; (void)_opcode; (void)cpu;
+        return 4;
+    }
+    opcode_table[opcode] = mock_operation;
+
+    cpu.ime.scheduled = true;
+    cpu.ime.enabled = false;
+
+    cpu_step(&cpu, &bus);
+
+    TEST_ASSERT_TRUE(cpu.ime.enabled);
+    TEST_ASSERT_FALSE(cpu.ime.scheduled);
+}
+
+void test_cpu_step_wait_until_next_step_to_set_ime(void) {
+    uint8_t op_nop = 0x00;
+    uint8_t op_schedule = 0x01;
+    bus_read_stats.calls[0].return_value = op_schedule;
+    bus_read_stats.calls[1].return_value = op_nop;
+
+    int mock_operation(cpu_t * _cpu, bus_t * _bus, uint8_t _opcode) {
+        (void)_cpu; (void)_bus;
+        if (_opcode == op_schedule) {
+            cpu.ime.scheduled = true;
+        }
+        return 1;
+    }
+    opcode_table[op_nop] = mock_operation;
+    opcode_table[op_schedule] = mock_operation;
+
+    cpu.ime.scheduled = false;
+    cpu.ime.enabled = false;
+
+    cpu_step(&cpu, &bus);
+    cpu_step(&cpu, &bus);
+
+    TEST_ASSERT_TRUE(cpu.ime.enabled);
+    TEST_ASSERT_FALSE(cpu.ime.scheduled);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -114,6 +163,8 @@ int main(void) {
     RUN_TEST(test_cpu_step_returns_minus1_on_unknown_opcode);
     RUN_TEST(test_cpu_step_returns_cycles_from_opcode);
     RUN_TEST(test_cpu_step_increments_pc_by_1_before_execution);
+    RUN_TEST(test_cpu_step_promotes_ime_scheduled_to_enabled_before_execution);
+    RUN_TEST(test_cpu_step_wait_until_next_step_to_set_ime);
 
     return UNITY_END();
 }

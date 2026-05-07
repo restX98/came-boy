@@ -17,7 +17,7 @@ static int op_di(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)opcode;
     (void)bus;
 
-    cpu->ime = false;
+    cpu->ime.enabled = false;
 
     LOG_DEBUG("DI at PC=0x%04X", cpu->pc - 1);
 
@@ -28,7 +28,7 @@ static int op_ei(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)opcode;
     (void)bus;
 
-    cpu->ime_scheduled = true;
+    cpu->ime.scheduled = true;
 
     LOG_DEBUG("EI at PC=0x%04X", cpu->pc - 1);
 

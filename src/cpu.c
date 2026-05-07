@@ -13,6 +13,8 @@ void cpu_init(cpu_t *cpu) {
     cpu->hl.reg = 0x014D;
     cpu->sp = 0xFFFE;
     cpu->pc = 0x0100;
+    cpu->ime.enabled = false;
+    cpu->ime.scheduled = false;
 
     LOG_DEBUG(
         "CPU initialized:\n"
@@ -37,9 +39,9 @@ int cpu_step(cpu_t *cpu, bus_t *bus) {
         // promote it to ime here, at the START of the following step, before executing
         // the next instruction. This guarantees that instruction runs uninterrupted,
         // and interrupts can only fire from the step after that.
-        if (cpu->ime_scheduled) {
-            cpu->ime = true;
-            cpu->ime_scheduled = false;
+        if (cpu->ime.scheduled) {
+            cpu->ime.enabled = true;
+            cpu->ime.scheduled = false;
         }
 
         cpu->pc++;

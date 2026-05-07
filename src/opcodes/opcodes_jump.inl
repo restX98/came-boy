@@ -226,7 +226,7 @@ static int op_reti(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     // RETI enables IME immediately (unlike EI which delays by one instruction).
     // Setting IME directly here ensures interrupts can fire as soon as we return
     // to the caller, with no extra scheduling step needed.
-    cpu->ime = true;
+    cpu->ime.enabled = true;
 
     LOG_DEBUG("RETI SP=0x%04X->0x%04X ret_addr=0x%04X IME=enabled at PC=0x%04X (opcode=0x%02X)",
         sp, cpu->sp, cpu->pc, instr_pc, opcode);
