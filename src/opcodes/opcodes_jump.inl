@@ -114,6 +114,23 @@ static int op_call_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return 24;
 }
 
+static int op_rst_tgt3(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint16_t address = opcode & 0b111000; // Extract vec address from opcode
+
+    uint16_t return_addr = cpu->pc;
+    bus_write(bus, cpu->sp - 1, return_addr >> 8);
+    bus_write(bus, cpu->sp - 2, return_addr & 0xFF);
+    cpu->sp -= 2;
+    cpu->pc = address;
+
+    LOG_DEBUG("RST tgt3 addr=0x%04X at PC=0x%04X (opcode=0x%02X)",
+        address, instr_pc, opcode);
+
+    return 16;
+}
+
 static int op_ret_cond(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t instr_pc = cpu->pc - 1;
 

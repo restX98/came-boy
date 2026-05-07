@@ -2128,6 +2128,48 @@ void test_op_call_c_condition_true(void) {
     TEST_ASSERT_EQUAL_UINT16(0x5678, mock_cpu.pc);
 }
 
+// ---- op_rst_tgt3 ----
+void test_op_rst_tgt3_matrix(void) {
+    struct { uint8_t opcode; uint16_t vector; } cases[] = {
+        { 0xC7, 0x0000 }, // RST $00
+        { 0xCF, 0x0008 }, // RST $08
+        { 0xD7, 0x0010 }, // RST $10
+        { 0xDF, 0x0018 }, // RST $18
+        { 0xE7, 0x0020 }, // RST $20
+        { 0xEF, 0x0028 }, // RST $28
+        { 0xF7, 0x0030 }, // RST $30
+        { 0xFF, 0x0038 }, // RST $38
+    };
+
+    for (int i = 0; i < 8; i++) {
+        mock_cpu.pc = 0x0150;
+        mock_cpu.sp = 0xFFFE;
+        memset(mock_memory, 0, sizeof(mock_memory));
+
+        uint8_t opcode = cases[i].opcode;
+        uint16_t expected_vector = cases[i].vector;
+
+        int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+        TEST_ASSERT_EQUAL_MESSAGE(16, cycles, "cycle count");
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(expected_vector, mock_cpu.pc, "jump target");
+        TEST_ASSERT_EQUAL_UINT16_MESSAGE(0xFFFC, mock_cpu.sp, "SP after push");
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x50, mock_memory[0xFFFC], "return addr lo");
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x01, mock_memory[0xFFFD], "return addr hi");
+    }
+}
+
+void test_op_rst_return_address_roundtrip(void) {
+    mock_cpu.pc = 0x0150;
+    mock_cpu.sp = 0xFFFE;
+
+    opcode_table[0xC7](&mock_cpu, &mock_bus, 0xC7); // RST $00
+    opcode_table[0xC9](&mock_cpu, &mock_bus, 0xC9); // RET
+
+    TEST_ASSERT_EQUAL_UINT16(0x0150, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_UINT16(0xFFFE, mock_cpu.sp);
+}
+
 // ---- op_ld_r8_r8 ----
 struct reg_entry_t {
     r8_operand_t code;
@@ -4871,6 +4913,8 @@ int main(void) {
     RUN_TEST(test_op_call_z_condition_true);
     RUN_TEST(test_op_call_nc_condition_true);
     RUN_TEST(test_op_call_c_condition_true);
+    RUN_TEST(test_op_rst_tgt3_matrix);
+    RUN_TEST(test_op_rst_return_address_roundtrip);
     RUN_TEST(test_op_ld_hl_mem_r8);
     RUN_TEST(test_op_ld_r8_hl_mem);
     RUN_TEST(test_op_ld_r8_r8_matrix);

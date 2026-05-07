@@ -284,7 +284,16 @@ opcode_fn opcode_table[256] = {
     [0xD4] = op_call_cond_imm16, // CALL NC,imm16
     [0xDC] = op_call_cond_imm16, // CALL C,imm16
     // Type: CALL imm16
-    [0xCD] = op_call_imm16
+    [0xCD] = op_call_imm16,
+    // Type: RST tgt3
+    [0xC7] = op_rst_tgt3,        // RST $00
+    [0xCF] = op_rst_tgt3,        // RST $08
+    [0xD7] = op_rst_tgt3,        // RST $10
+    [0xDF] = op_rst_tgt3,        // RST $18
+    [0xE7] = op_rst_tgt3,        // RST $20
+    [0xEF] = op_rst_tgt3,        // RST $28
+    [0xF7] = op_rst_tgt3,        // RST $30
+    [0xFF] = op_rst_tgt3,        // RST $38
 
     // ... (initialize other opcodes as needed)
 };
