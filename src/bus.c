@@ -6,7 +6,9 @@
 #include "mem.h"
 
 static uint8_t read_rom0(bus_t *bus, uint16_t addr);
+static void write_rom0(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_rom1(bus_t *bus, uint16_t addr);
+static void write_rom1(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_vram(bus_t *bus, uint16_t addr);
 static void write_vram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_external_ram(bus_t *bus, uint16_t addr);
@@ -21,8 +23,8 @@ static void write_hram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_interrupt_reg(bus_t *bus, uint16_t addr);
 
 static const mem_region_t memory_map[] = {
-    {"ROM Bank 0", 0x0000, 0x3FFF, read_rom0, NULL},                        // 16 KiB ROM bank 00 (fixed)
-    {"ROM Bank 1", 0x4000, 0x7FFF, read_rom1, NULL},                        // 16 KiB ROM bank 01~NN (switchable, if supported)
+    {"ROM Bank 0", 0x0000, 0x3FFF, read_rom0, write_rom0},                  // 16 KiB ROM bank 00 (fixed)
+    {"ROM Bank 1", 0x4000, 0x7FFF, read_rom1, write_rom1},                  // 16 KiB ROM bank 01~NN (switchable, if supported)
     {"VRAM", 0x8000, 0x9FFF, read_vram, write_vram},                        // 8 KiB Video RAM (VRAM)
     {"External RAM", 0xA000, 0xBFFF, read_external_ram, NULL},              // 8 KiB External RAM (if supported)
     {"WRAM", 0xC000, 0xDFFF, read_wram, write_wram},                        // 8 KiB Work RAM (WRAM)
@@ -104,12 +106,20 @@ static uint8_t read_rom0(bus_t *bus, uint16_t addr) {
     return value;
 }
 
+static void write_rom0(bus_t *bus, uint16_t addr, uint8_t value) {
+    assert(0 && "Illegal write to ROM Bank 0 (read-only)");
+}
+
 static uint8_t read_rom1(bus_t *bus, uint16_t addr) {
     // TODO: Implement MBC support to read from switchable ROM banks
     uint8_t value = bus->cartridge->rom[addr];
     LOG_DEBUG("ROM bank 1 read: [0x%04X] = 0x%02X", addr, value);
 
     return value;
+}
+
+static void write_rom1(bus_t *bus, uint16_t addr, uint8_t value) {
+    assert(0 && "Illegal write to ROM Bank 1 (read-only)");
 }
 
 static uint8_t read_vram(bus_t *bus, uint16_t addr) {
