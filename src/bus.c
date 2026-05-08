@@ -8,26 +8,29 @@
 static uint8_t read_rom0(bus_t *bus, uint16_t addr);
 static uint8_t read_rom1(bus_t *bus, uint16_t addr);
 static uint8_t read_vram(bus_t *bus, uint16_t addr);
+static void write_vram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_external_ram(bus_t *bus, uint16_t addr);
 static uint8_t read_wram(bus_t *bus, uint16_t addr);
+static void write_wram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_echo_ram(bus_t *bus, uint16_t addr);
 static uint8_t read_oam(bus_t *bus, uint16_t addr);
 static uint8_t read_not_usable(bus_t *bus, uint16_t addr);
 static uint8_t read_io_reg(bus_t *bus, uint16_t addr);
 static uint8_t read_hram(bus_t *bus, uint16_t addr);
+static void write_hram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_interrupt_reg(bus_t *bus, uint16_t addr);
 
 static const mem_region_t memory_map[] = {
     {"ROM Bank 0", 0x0000, 0x3FFF, read_rom0, NULL},                        // 16 KiB ROM bank 00 (fixed)
     {"ROM Bank 1", 0x4000, 0x7FFF, read_rom1, NULL},                        // 16 KiB ROM bank 01~NN (switchable, if supported)
-    {"VRAM", 0x8000, 0x9FFF, read_vram, NULL},                              // 8 KiB Video RAM (VRAM)
+    {"VRAM", 0x8000, 0x9FFF, read_vram, write_vram},                        // 8 KiB Video RAM (VRAM)
     {"External RAM", 0xA000, 0xBFFF, read_external_ram, NULL},              // 8 KiB External RAM (if supported)
-    {"WRAM", 0xC000, 0xDFFF, read_wram, NULL},                              // 8 KiB Work RAM (WRAM)
+    {"WRAM", 0xC000, 0xDFFF, read_wram, write_wram},                        // 8 KiB Work RAM (WRAM)
     {"Echo RAM", 0xE000, 0xFDFF, read_echo_ram, NULL},                      // Echo RAM (mirrors 0xC000~0xDDFF)
     {"OAM", 0xFE00, 0xFE9F, read_oam, NULL},                                // Object Attribute Memory (OAM)
     {"Not Usable", 0xFEA0, 0xFEFF, read_not_usable, NULL},                  // Not usable
     {"I/O Registers", 0xFF00, 0xFF7F, read_io_reg, NULL},                   // I/O Registers
-    {"HRAM", 0xFF80, 0xFFFE, read_hram, NULL},                              // High RAM (HRAM) - 127 bytes
+    {"HRAM", 0xFF80, 0xFFFE, read_hram, write_hram},                        // High RAM (HRAM) - 127 bytes
     {"Interrupt Enable Register", 0xFFFF, 0xFFFF, read_interrupt_reg, NULL} // Interrupt Enable Register (IE)
 };
 
@@ -85,7 +88,7 @@ void bus_write(bus_t *bus, uint16_t addr, uint8_t value) {
     for (size_t i = 0; i < sizeof(memory_map) / sizeof(mem_region_t); i++) {
         mem_region_t region = memory_map[i];
         if (addr >= region.start && addr <= region.end) {
-            region.read_fn(bus, addr);
+            region.write_fn(bus, addr, value);
             return;
         }
     }
@@ -117,6 +120,12 @@ static uint8_t read_vram(bus_t *bus, uint16_t addr) {
     return value;
 }
 
+static void write_vram(bus_t *bus, uint16_t addr, uint8_t value) {
+    uint16_t vram_address = addr - 0x8000;
+    bus->vram.mem[vram_address] = value;
+    LOG_DEBUG("VRAM write: [0x%04X] = 0x%02X", vram_address, value);
+}
+
 static uint8_t read_external_ram(bus_t *bus, uint16_t addr) {
     (void)bus;
     (void)addr;
@@ -130,6 +139,12 @@ static uint8_t read_wram(bus_t *bus, uint16_t addr) {
     LOG_DEBUG("WRAM read: [0x%04X] = 0x%02X", wram_address, value);
 
     return value;
+}
+
+static void write_wram(bus_t *bus, uint16_t addr, uint8_t value) {
+    uint16_t wram_address = addr - 0xC000;
+    bus->wram.mem[wram_address] = value;
+    LOG_DEBUG("HRAM write: [0x%04X] = 0x%02X", wram_address, value);
 }
 
 static uint8_t read_echo_ram(bus_t *bus, uint16_t addr) {
@@ -168,6 +183,12 @@ static uint8_t read_hram(bus_t *bus, uint16_t addr) {
     LOG_DEBUG("HRAM read: [0x%04X] = 0x%02X", hram_address, value);
 
     return value;
+}
+
+static void write_hram(bus_t *bus, uint16_t addr, uint8_t value) {
+    uint16_t hram_address = addr - 0xFF80;
+    bus->wram.mem[hram_address] = value;
+    LOG_DEBUG("VRAM write: [0x%04X] = 0x%02X", hram_address, value);
 }
 
 static uint8_t read_interrupt_reg(bus_t *bus, uint16_t addr) {

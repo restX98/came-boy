@@ -303,6 +303,10 @@ opcode_fn opcode_table[256] = {
     [0xD5] = op_push_r16stk,     // PUSH DE
     [0xE5] = op_push_r16stk,     // PUSH HL
     [0xF5] = op_push_r16stk,     // PUSH AF
+
+    // TODO: complete opcodes
+    // Type: Prefixed
+
     // Type: LDH [imm8], a
     [0xE0] = op_ldh_imm8mem_a,
     // Type: LDH [c], a
