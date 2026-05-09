@@ -6,18 +6,24 @@
 #include "cpu.h"
 #include "logger.h"
 
-int main(void) {
+int main(int argc, char *argv[]) {
+
+    if (argc < 2) {
+        LOG_ERROR("Usage: %s <rom>", argv[0]);
+        return -1;
+    }
 
     cartridge_t cartridge = { 0 };
     bus_t bus = { 0 };
     cpu_t cpu = { 0 };
 
-    if (cartridge_load(&cartridge, "./roms/Tetris.gb") != 0) {
+    if (cartridge_load(&cartridge, argv[1]) != 0) {
         LOG_ERROR("Could not load cartridge");
         return -1;
     }
 
     if (bus_init(&bus, &cartridge) != 0) {
+        cartridge_unload(&cartridge);
         LOG_ERROR("Could not initialize bus");
         return -1;
     }
