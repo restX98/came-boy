@@ -46,12 +46,28 @@ int cartridge_load(cartridge_t *cartridge, const char *filename) {
     if (read_size != cartridge->size) {
         LOG_ERROR("Could not read file %s: expected %zu bytes, got %zu", filename, cartridge->size, read_size);
         free(cartridge->rom);
+        cartridge->rom = NULL;
+        cartridge->size = 0;
+        cartridge->bank = 0;
         fclose(ptr);
+
         return -1;
     }
 
     fclose(ptr);
+
+    if (mem_init(&cartridge->ext_ram, EXT_RAM_SIZE, "External RAM") != 0) {
+        LOG_ERROR("Could not initialize external RAM");
+        free(cartridge->rom);
+        cartridge->rom = NULL;
+        cartridge->size = 0;
+        cartridge->bank = 0;
+
+        return -1;
+    }
+
     LOG_INFO("ROM loaded successfully: %zu bytes", cartridge->size);
+
     return 0;
 }
 
@@ -67,4 +83,6 @@ void cartridge_unload(cartridge_t *cartridge) {
     cartridge->rom = NULL;
     cartridge->size = 0;
     cartridge->bank = 0;
+
+    mem_free(&cartridge->ext_ram);
 }

@@ -107,6 +107,7 @@ static uint8_t read_rom0(bus_t *bus, uint16_t addr) {
 }
 
 static void write_rom0(bus_t *bus, uint16_t addr, uint8_t value) {
+    (void)bus; (void)addr; (void)value;
     assert(0 && "Illegal write to ROM Bank 0 (read-only)");
 }
 
@@ -119,6 +120,7 @@ static uint8_t read_rom1(bus_t *bus, uint16_t addr) {
 }
 
 static void write_rom1(bus_t *bus, uint16_t addr, uint8_t value) {
+    (void)bus; (void)addr; (void)value;
     assert(0 && "Illegal write to ROM Bank 1 (read-only)");
 }
 
