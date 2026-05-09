@@ -8,7 +8,7 @@
 #include "cartridge.h"
 
 #define DUMMY_ROM_PATH "/tmp/test_rom.gb"
-#define DUMMY_ROM_SIZE 32
+#define DUMMY_ROM_SIZE 512
 
 static cartridge_t cartridge;
 
@@ -63,6 +63,30 @@ void mem_free(mem_t *memory) {
     mem_free_stats.call_count++;
 }
 
+// ---- ROM helpers ----
+
+static void set_checksum(uint8_t *rom) {
+    uint8_t checksum = 0;
+    for (uint16_t addr = 0x0134; addr <= 0x014C; addr++) {
+        checksum = checksum - rom[addr] - 1;
+    }
+    rom[0x014D] = checksum;
+}
+
+static void make_valid_rom(uint8_t *rom, uint8_t mbc_code, uint8_t rom_size_code, uint8_t ram_size_code) {
+    memset(rom, 0, DUMMY_ROM_SIZE);
+    rom[0x0147] = mbc_code;
+    rom[0x0148] = rom_size_code;
+    rom[0x0149] = ram_size_code;
+    set_checksum(rom);
+}
+
+static void write_rom_file(const uint8_t *data, size_t size) {
+    FILE *ptr = fopen(DUMMY_ROM_PATH, "wb");
+    fwrite(data, 1, size, ptr);
+    fclose(ptr);
+}
+
 void setUp(void) {
     suppress_logs();
     memset(&cartridge, 0, sizeof(cartridge));
@@ -70,10 +94,9 @@ void setUp(void) {
     mem_init_stats = (mem_init_stats_t){ 0 };
     mem_free_stats = (mem_free_stats_t){ 0 };
 
-    FILE *ptr = fopen(DUMMY_ROM_PATH, "wb");
-    uint8_t dummy_data[DUMMY_ROM_SIZE] = { 0 };
-    fwrite(dummy_data, sizeof(dummy_data), 1, ptr);
-    fclose(ptr);
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 0x00, 0x00);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
 }
 
 void tearDown(void) {
@@ -111,34 +134,118 @@ void test_cartridge_load_rom_pointer_not_null(void) {
 }
 
 void test_cartridge_load_rom_content_is_correct(void) {
-    FILE *f = fopen(DUMMY_ROM_PATH, "wb");
-    uint8_t expected[DUMMY_ROM_SIZE];
-    for (int i = 0; i < DUMMY_ROM_SIZE; i++) {
-        expected[i] = (uint8_t)i;
-    }
-    fwrite(expected, 1, DUMMY_ROM_SIZE, f);
-    fclose(f);
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 0x00, 0x00);
+    rom[0x0150] = 0xAB;
+    rom[0x0151] = 0xCD;
+    write_rom_file(rom, DUMMY_ROM_SIZE);
 
     cartridge_load(&cartridge, DUMMY_ROM_PATH);
-    TEST_ASSERT_EQUAL_MEMORY(expected, cartridge.rom, DUMMY_ROM_SIZE);
+    TEST_ASSERT_EQUAL_MEMORY(rom, cartridge.rom, DUMMY_ROM_SIZE);
 }
 
 void test_cartridge_load_calls_mem_init_for_ext_ram(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 0x00, 0x02);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
     cartridge_load(&cartridge, DUMMY_ROM_PATH);
 
     TEST_ASSERT_EQUAL_size_t(1, mem_init_stats.call_count);
     TEST_ASSERT_EQUAL_PTR(&cartridge.ext_ram, mem_init_stats.calls[0].memory);
-    TEST_ASSERT_EQUAL_size_t(EXT_RAM_SIZE, mem_init_stats.calls[0].size);
+    TEST_ASSERT_EQUAL_size_t(8 * 1024, mem_init_stats.calls[0].size);
     TEST_ASSERT_EQUAL_STRING("External RAM", mem_init_stats.calls[0].name);
 }
 
+void test_cartridge_load_does_not_call_mem_init_when_no_ext_ram(void) {
+    cartridge_load(&cartridge, DUMMY_ROM_PATH);
+    TEST_ASSERT_EQUAL_size_t(0, mem_init_stats.call_count);
+}
+
 void test_cartridge_load_returns_minus1_on_ext_ram_init_failure(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 0x00, 0x02);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
     mem_init_stats.calls[0].return_value = -1;
 
     int result = cartridge_load(&cartridge, DUMMY_ROM_PATH);
 
     TEST_ASSERT_EQUAL_INT(-1, result);
     TEST_ASSERT_EQUAL_size_t(1, mem_init_stats.call_count);
+}
+
+void test_cartridge_load_returns_minus1_on_unknown_mbc(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x04, 0x00, 0x00);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
+    int result = cartridge_load(&cartridge, DUMMY_ROM_PATH);
+    TEST_ASSERT_EQUAL_INT(-1, result);
+}
+
+void test_cartridge_load_returns_minus1_on_unknown_rom_size(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 9, 0x00);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
+    int result = cartridge_load(&cartridge, DUMMY_ROM_PATH);
+    TEST_ASSERT_EQUAL_INT(-1, result);
+}
+
+void test_cartridge_load_returns_minus1_on_wrong_checksum(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 0x00, 0x00);
+    rom[0x014D] ^= 0xFF;
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
+    int result = cartridge_load(&cartridge, DUMMY_ROM_PATH);
+    TEST_ASSERT_EQUAL_INT(-1, result);
+}
+
+void test_cartridge_load_sets_mbc(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x01, 0x00, 0x00);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
+    cartridge_load(&cartridge, DUMMY_ROM_PATH);
+
+    TEST_ASSERT_EQUAL_UINT8(0x01, cartridge.mbc.code);
+    TEST_ASSERT_EQUAL_STRING("MBC1", cartridge.mbc.name);
+}
+
+void test_cartridge_load_sets_banks_number(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 0x01, 0x00);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
+    cartridge_load(&cartridge, DUMMY_ROM_PATH);
+
+    TEST_ASSERT_EQUAL_UINT8(4, cartridge.banks_number);
+}
+
+void test_cartridge_load_sets_title(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 0x00, 0x00);
+    memcpy(rom + 0x0134, "TESTROM         ", 16);
+    set_checksum(rom);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
+    cartridge_load(&cartridge, DUMMY_ROM_PATH);
+
+    TEST_ASSERT_EQUAL_MEMORY("TESTROM         ", cartridge.title, 16);
+}
+
+void test_cartridge_load_sets_version(void) {
+    uint8_t rom[DUMMY_ROM_SIZE];
+    make_valid_rom(rom, 0x00, 0x00, 0x00);
+    rom[0x014C] = 0x03;
+    set_checksum(rom);
+    write_rom_file(rom, DUMMY_ROM_SIZE);
+
+    cartridge_load(&cartridge, DUMMY_ROM_PATH);
+
+    TEST_ASSERT_EQUAL_UINT8(0x03, cartridge.version);
 }
 
 // ---- cartridge_unload ----
@@ -173,7 +280,15 @@ int main(void) {
     RUN_TEST(test_cartridge_load_rom_pointer_not_null);
     RUN_TEST(test_cartridge_load_rom_content_is_correct);
     RUN_TEST(test_cartridge_load_calls_mem_init_for_ext_ram);
+    RUN_TEST(test_cartridge_load_does_not_call_mem_init_when_no_ext_ram);
     RUN_TEST(test_cartridge_load_returns_minus1_on_ext_ram_init_failure);
+    RUN_TEST(test_cartridge_load_returns_minus1_on_unknown_mbc);
+    RUN_TEST(test_cartridge_load_returns_minus1_on_unknown_rom_size);
+    RUN_TEST(test_cartridge_load_returns_minus1_on_wrong_checksum);
+    RUN_TEST(test_cartridge_load_sets_mbc);
+    RUN_TEST(test_cartridge_load_sets_banks_number);
+    RUN_TEST(test_cartridge_load_sets_title);
+    RUN_TEST(test_cartridge_load_sets_version);
     RUN_TEST(test_cartridge_unload_frees_rom_memory);
     RUN_TEST(test_cartridge_unload_calls_mem_free_for_ext_ram);
     RUN_TEST(test_cartridge_unload_does_not_crash_on_null_pointer);
