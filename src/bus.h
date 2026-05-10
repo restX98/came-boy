@@ -2,6 +2,7 @@
 #define BUS_H
 
 #include "cartridge.h"
+#include "io_reg.h"
 #include "mem.h"
 
 typedef struct {
@@ -10,6 +11,7 @@ typedef struct {
     mem_t vram;
     mem_t hram;
 
+    io_reg_t io_reg;
     // TODO: Later add other components like RAM, PPU, APU, etc.
 } bus_t;
 
