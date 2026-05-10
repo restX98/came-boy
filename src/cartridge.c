@@ -1,7 +1,6 @@
 #include "cartridge.h"
 
 #include <errno.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,6 +134,23 @@ void cartridge_unload(cartridge_t *cartridge) {
     mem_free(&cartridge->ext_ram);
 }
 
+
+uint8_t cartridge_rom_read(cartridge_t *cartridge, uint16_t addr) {
+    return cartridge->rom[addr];
+}
+
+uint8_t cartridge_ext_ram_read(cartridge_t *cartridge, uint16_t addr) {
+    if (!cartridge->mbc.hasRam) {
+        return 0xFF;
+    }
+    return cartridge->ext_ram.mem[addr];
+}
+void cartridge_ext_ram_write(cartridge_t *cartridge, uint16_t addr, uint8_t value) {
+    if (cartridge->mbc.hasRam) {
+        cartridge->ext_ram.mem[addr] = value;
+    }
+}
+
 static bool checksum_verify(uint8_t *rom) {
     uint8_t checksum = 0;
     for (uint16_t address = 0x0134; address <= 0x014C; address++) {
@@ -145,34 +161,34 @@ static bool checksum_verify(uint8_t *rom) {
 }
 
 const mbc_t mbc_types[256] = {
-    [0x00] = {0x00, "ROM ONLY"},
-    [0x01] = {0x01, "MBC1"},
-    [0x02] = {0x02, "MBC1+RAM"},
-    [0x03] = {0x03, "MBC1+RAM+BATTERY"},
-    [0x05] = {0x05, "MBC2"},
-    [0x06] = {0x06, "MBC2+BATTERY"},
-    [0x08] = {0x08, "ROM+RAM"},
-    [0x09] = {0x09, "ROM+RAM+BATTERY"},
-    [0x0B] = {0x0B, "MMM01"},
-    [0x0C] = {0x0C, "MMM01+RAM"},
-    [0x0D] = {0x0D, "MMM01+RAM+BATTERY"},
-    [0x0F] = {0x0F, "MBC3+TIMER+BATTERY"},
-    [0x10] = {0x10, "MBC3+TIMER+RAM+BATTERY"},
-    [0x11] = {0x11, "MBC3"},
-    [0x12] = {0x12, "MBC3+RAM"},
-    [0x13] = {0x13, "MBC3+RAM+BATTERY"},
-    [0x19] = {0x19, "MBC5"},
-    [0x1A] = {0x1A, "MBC5+RAM"},
-    [0x1B] = {0x1B, "MBC5+RAM+BATTERY"},
-    [0x1C] = {0x1C, "MBC5+RUMBLE"},
-    [0x1D] = {0x1D, "MBC5+RUMBLE+RAM"},
-    [0x1E] = {0x1E, "MBC5+RUMBLE+RAM+BATTERY"},
-    [0x20] = {0x20, "MBC6"},
-    [0x22] = {0x22, "MBC7+SENSOR+RUMBLE+RAM+BATTERY"},
-    [0xFC] = {0xFC, "POCKET CAMERA"},
-    [0xFD] = {0xFD, "BANDAI TAMA5"},
-    [0xFE] = {0xFE, "HuC3"},
-    [0xFF] = {0xFF, "HuC1+RAM+BATTERY"},
+    [0x00] = {0x00, "ROM ONLY", false},
+    [0x01] = {0x01, "MBC1", false},
+    [0x02] = {0x02, "MBC1+RAM", true},
+    [0x03] = {0x03, "MBC1+RAM+BATTERY", true},
+    [0x05] = {0x05, "MBC2", false},
+    [0x06] = {0x06, "MBC2+BATTERY", false},
+    [0x08] = {0x08, "ROM+RAM", true},
+    [0x09] = {0x09, "ROM+RAM+BATTERY", true},
+    [0x0B] = {0x0B, "MMM01", false},
+    [0x0C] = {0x0C, "MMM01+RAM", true},
+    [0x0D] = {0x0D, "MMM01+RAM+BATTERY", true},
+    [0x0F] = {0x0F, "MBC3+TIMER+BATTERY", false},
+    [0x10] = {0x10, "MBC3+TIMER+RAM+BATTERY", true},
+    [0x11] = {0x11, "MBC3", false},
+    [0x12] = {0x12, "MBC3+RAM", true},
+    [0x13] = {0x13, "MBC3+RAM+BATTERY", true},
+    [0x19] = {0x19, "MBC5", false},
+    [0x1A] = {0x1A, "MBC5+RAM", true},
+    [0x1B] = {0x1B, "MBC5+RAM+BATTERY", true},
+    [0x1C] = {0x1C, "MBC5+RUMBLE", false},
+    [0x1D] = {0x1D, "MBC5+RUMBLE+RAM", true},
+    [0x1E] = {0x1E, "MBC5+RUMBLE+RAM+BATTERY", true},
+    [0x20] = {0x20, "MBC6", false},
+    [0x22] = {0x22, "MBC7+SENSOR+RUMBLE+RAM+BATTERY", true},
+    [0xFC] = {0xFC, "POCKET CAMERA", false},
+    [0xFD] = {0xFD, "BANDAI TAMA5", false},
+    [0xFE] = {0xFE, "HuC3", false},
+    [0xFF] = {0xFF, "HuC1+RAM+BATTERY", true},
 };
 
 const size_t ext_ram_sizes[6] = {

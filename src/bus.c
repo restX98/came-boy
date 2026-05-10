@@ -3,7 +3,6 @@
 #include <assert.h>
 
 #include "logger.h"
-#include "mem.h"
 
 static uint8_t read_rom0(bus_t *bus, uint16_t addr);
 static void write_rom0(bus_t *bus, uint16_t addr, uint8_t value);
@@ -11,7 +10,8 @@ static uint8_t read_rom1(bus_t *bus, uint16_t addr);
 static void write_rom1(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_vram(bus_t *bus, uint16_t addr);
 static void write_vram(bus_t *bus, uint16_t addr, uint8_t value);
-static uint8_t read_external_ram(bus_t *bus, uint16_t addr);
+static uint8_t read_ext_ram(bus_t *bus, uint16_t addr);
+static void write_ext_ram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_wram(bus_t *bus, uint16_t addr);
 static void write_wram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_echo_ram(bus_t *bus, uint16_t addr);
@@ -26,7 +26,7 @@ static const mem_region_t memory_map[] = {
     {"ROM Bank 0", 0x0000, 0x3FFF, read_rom0, write_rom0},                  // 16 KiB ROM bank 00 (fixed)
     {"ROM Bank 1", 0x4000, 0x7FFF, read_rom1, write_rom1},                  // 16 KiB ROM bank 01~NN (switchable, if supported)
     {"VRAM", 0x8000, 0x9FFF, read_vram, write_vram},                        // 8 KiB Video RAM (VRAM)
-    {"External RAM", 0xA000, 0xBFFF, read_external_ram, NULL},              // 8 KiB External RAM (if supported)
+    {"External RAM", 0xA000, 0xBFFF, read_ext_ram, write_ext_ram},          // 8 KiB External RAM (if supported)
     {"WRAM", 0xC000, 0xDFFF, read_wram, write_wram},                        // 8 KiB Work RAM (WRAM)
     {"Echo RAM", 0xE000, 0xFDFF, read_echo_ram, NULL},                      // Echo RAM (mirrors 0xC000~0xDDFF)
     {"OAM", 0xFE00, 0xFE9F, read_oam, NULL},                                // Object Attribute Memory (OAM)
@@ -100,7 +100,7 @@ void bus_write(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_rom0(bus_t *bus, uint16_t addr) {
-    uint8_t value = bus->cartridge->rom[addr];
+    uint8_t value = cartridge_rom_read(bus->cartridge, addr);
     LOG_DEBUG("ROM bank 0 read: [0x%04X] = 0x%02X", addr, value);
 
     return value;
@@ -113,7 +113,7 @@ static void write_rom0(bus_t *bus, uint16_t addr, uint8_t value) {
 
 static uint8_t read_rom1(bus_t *bus, uint16_t addr) {
     // TODO: Implement MBC support to read from switchable ROM banks
-    uint8_t value = bus->cartridge->rom[addr];
+    uint8_t value = cartridge_rom_read(bus->cartridge, addr);
     LOG_DEBUG("ROM bank 1 read: [0x%04X] = 0x%02X", addr, value);
 
     return value;
@@ -138,11 +138,19 @@ static void write_vram(bus_t *bus, uint16_t addr, uint8_t value) {
     LOG_DEBUG("VRAM write: [0x%04X] = 0x%02X", vram_address, value);
 }
 
-static uint8_t read_external_ram(bus_t *bus, uint16_t addr) {
-    (void)bus;
-    (void)addr;
-    // TODO: Implement MBC support to read from external RAM
-    return 0xFF;
+static uint8_t read_ext_ram(bus_t *bus, uint16_t addr) {
+    uint16_t ext_ram_address = addr - 0xA000;
+    uint8_t value = cartridge_ext_ram_read(bus->cartridge, ext_ram_address);
+    LOG_DEBUG("External RAM read: [0x%04X] = 0x%02X", ext_ram_address, value);
+    // TODO: Implement MBC support to read from external RAM (?)
+
+    return value;
+}
+
+static void write_ext_ram(bus_t *bus, uint16_t addr, uint8_t value) {
+    uint16_t ext_ram_address = addr - 0xA000;
+    cartridge_ext_ram_write(bus->cartridge, ext_ram_address, value);
+    LOG_DEBUG("External RAM write: [0x%04X] = 0x%02X", ext_ram_address, value);
 }
 
 static uint8_t read_wram(bus_t *bus, uint16_t addr) {
@@ -156,7 +164,7 @@ static uint8_t read_wram(bus_t *bus, uint16_t addr) {
 static void write_wram(bus_t *bus, uint16_t addr, uint8_t value) {
     uint16_t wram_address = addr - 0xC000;
     bus->wram.mem[wram_address] = value;
-    LOG_DEBUG("HRAM write: [0x%04X] = 0x%02X", wram_address, value);
+    LOG_DEBUG("WRAM write: [0x%04X] = 0x%02X", wram_address, value);
 }
 
 static uint8_t read_echo_ram(bus_t *bus, uint16_t addr) {

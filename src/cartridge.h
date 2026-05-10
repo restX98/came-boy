@@ -1,6 +1,7 @@
 #ifndef CARTRIDGE_H
 #define CARTRIDGE_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -9,6 +10,7 @@
 typedef struct {
     uint8_t code;
     char name[32];
+    bool hasRam;
 } mbc_t;
 
 typedef struct {
@@ -29,6 +31,10 @@ typedef struct {
 int cartridge_load(cartridge_t *cartridge, const char *filename);
 
 void cartridge_unload(cartridge_t *cartridge);
+
+uint8_t cartridge_rom_read(cartridge_t *cartridge, uint16_t addr);
+uint8_t cartridge_ext_ram_read(cartridge_t *cartridge, uint16_t addr);
+void cartridge_ext_ram_write(cartridge_t *cartridge, uint16_t addr, uint8_t value);
 
 extern const mbc_t mbc_types[256];
 extern const size_t ext_ram_sizes[6];
