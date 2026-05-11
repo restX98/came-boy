@@ -333,6 +333,7 @@ opcode_fn opcode_table[256] = {
 };
 
 opcode_fn opcode_cb_table[256] = {
+    // Type: RLC r8
     [0x00] = op_rlc_r8, // RLC B
     [0x01] = op_rlc_r8, // RLC C
     [0x02] = op_rlc_r8, // RLC D
@@ -341,4 +342,13 @@ opcode_fn opcode_cb_table[256] = {
     [0x05] = op_rlc_r8, // RLC L
     [0x06] = op_rlc_r8, // RLC [HL]
     [0x07] = op_rlc_r8, // RLC A
+    // Type: RRC r8
+    [0x08] = op_rrc_r8, // RRC a,B
+    [0x09] = op_rrc_r8, // RRC a,C
+    [0x0A] = op_rrc_r8, // RRC a,D
+    [0x0B] = op_rrc_r8, // RRC a,E
+    [0x0C] = op_rrc_r8, // RRC a,H
+    [0x0D] = op_rrc_r8, // RRC a,L
+    [0x0E] = op_rrc_r8, // RRC a,[HL]
+    [0x0F] = op_rrc_r8, // RRC a,A
 };

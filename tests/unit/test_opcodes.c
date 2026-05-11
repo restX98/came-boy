@@ -1464,6 +1464,91 @@ void test_op_rlc_r8_clears_n_and_h_flags(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
 }
 
+// ---- op_rrc_r8 ----
+void test_op_rrc_r8_matrix(void) {
+    // opcodes 0x08-0x0D = RRC B,C,D,E,H,L; 0x0F = RRC A (0x0E is [HL], tested separately)
+    uint8_t r8_opcodes[7] = {0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0F};
+
+    for (int i = 0; i < 7; i++) {
+        *regs[i].reg = 0b10110101;
+
+        int cycles = opcode_cb_table[r8_opcodes[i]](&mock_cpu, &mock_bus, r8_opcodes[i]);
+
+        TEST_ASSERT_EQUAL_MESSAGE(8, cycles, "expected 8 cycles for register variant");
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0b11011010, *regs[i].reg, "expected right-rotation with lsb wrapped to msb");
+    }
+}
+
+void test_op_rrc_r8_hl_mem(void) {
+    mock_cpu.hl.reg = 0x20;
+    mock_memory[0x20] = 0b10110101;
+
+    uint8_t opcode = 0x0E; // RRC [HL]
+
+    int cycles = opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0b11011010, mock_memory[0x20]);
+}
+
+void test_op_rrc_r8_sets_carry_when_lsb_is_1(void) {
+    mock_cpu.bc.hi = 0b10000001; // B
+
+    uint8_t opcode = 0x08; // RRC B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0b11000000, mock_cpu.bc.hi);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_rrc_r8_clears_carry_when_lsb_is_0(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0b10000000; // B
+
+    uint8_t opcode = 0x08; // RRC B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0b01000000, mock_cpu.bc.hi);
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_rrc_r8_sets_zero_flag_when_result_is_zero(void) {
+    mock_cpu.bc.hi = 0x00; // B = 0, rotation of 0 stays 0
+
+    uint8_t opcode = 0x08; // RRC B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.bc.hi);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_rrc_r8_clears_zero_flag_when_result_is_nonzero(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_cpu.bc.hi = 0b00000010; // B
+
+    uint8_t opcode = 0x08; // RRC B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_rrc_r8_clears_n_and_h_flags(void) {
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.bc.hi = 0b10000010; // B
+
+    uint8_t opcode = 0x08; // RRC B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
 // ---- op_daa ----
 
 // After addition
@@ -5510,6 +5595,13 @@ int main(void) {
     RUN_TEST(test_op_rlc_r8_sets_zero_flag_when_result_is_zero);
     RUN_TEST(test_op_rlc_r8_clears_zero_flag_when_result_is_nonzero);
     RUN_TEST(test_op_rlc_r8_clears_n_and_h_flags);
+    RUN_TEST(test_op_rrc_r8_matrix);
+    RUN_TEST(test_op_rrc_r8_hl_mem);
+    RUN_TEST(test_op_rrc_r8_sets_carry_when_lsb_is_1);
+    RUN_TEST(test_op_rrc_r8_clears_carry_when_lsb_is_0);
+    RUN_TEST(test_op_rrc_r8_sets_zero_flag_when_result_is_zero);
+    RUN_TEST(test_op_rrc_r8_clears_zero_flag_when_result_is_nonzero);
+    RUN_TEST(test_op_rrc_r8_clears_n_and_h_flags);
     RUN_TEST(test_op_daa_no_adjustment_needed);
     RUN_TEST(test_op_daa_adjusts_lower_nibble_after_addition);
     RUN_TEST(test_op_daa_adjusts_upper_nibble_after_addition);
