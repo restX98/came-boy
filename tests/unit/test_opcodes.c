@@ -2210,6 +2210,65 @@ void test_op_res_b3_r8_does_not_modify_flags(void) {
     TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
 }
 
+// ---- op_set_b3_r8 ----
+void test_op_set_b3_r8_matrix(void) {
+    // opcode = 0xC0 + (bit_index << 3) + reg_code; reg codes: B=0..L=5, A=7
+    uint8_t reg_codes[7] = {0, 1, 2, 3, 4, 5, 7};
+
+    for (int bit = 0; bit < 8; bit++) {
+        for (int ri = 0; ri < 7; ri++) {
+            uint8_t opcode = 0xC0 + (bit << 3) + reg_codes[ri];
+
+            *regs[ri].reg = 0x00; // all bits clear
+            int cycles = opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+            TEST_ASSERT_EQUAL_MESSAGE(8, cycles, "expected 8 cycles for register variant");
+            TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, (*regs[ri].reg >> bit) & 0x01, "target bit should be set");
+            // all other bits must remain clear
+            TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(1 << bit), *regs[ri].reg, "only target bit should change");
+        }
+    }
+}
+
+void test_op_set_b3_r8_hl_mem(void) {
+    mock_cpu.hl.reg = 0x20;
+    mock_memory[0x20] = 0x00;
+
+    uint8_t opcode = 0xC6; // SET 0,[HL]
+
+    int cycles = opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0x01, mock_memory[0x20]); // bit 0 set
+}
+
+void test_op_set_b3_r8_already_set_bit_unchanged(void) {
+    mock_cpu.bc.hi = 0xFF; // B, bit already set
+
+    uint8_t opcode = 0xC0; // SET 0,B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0xFF, mock_cpu.bc.hi);
+}
+
+void test_op_set_b3_r8_does_not_modify_flags(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0x00; // B
+
+    uint8_t opcode = 0xC0; // SET 0,B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_H));
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
 // ---- op_daa ----
 
 // After addition
@@ -6317,6 +6376,10 @@ int main(void) {
     RUN_TEST(test_op_res_b3_r8_hl_mem);
     RUN_TEST(test_op_res_b3_r8_already_clear_bit_unchanged);
     RUN_TEST(test_op_res_b3_r8_does_not_modify_flags);
+    RUN_TEST(test_op_set_b3_r8_matrix);
+    RUN_TEST(test_op_set_b3_r8_hl_mem);
+    RUN_TEST(test_op_set_b3_r8_already_set_bit_unchanged);
+    RUN_TEST(test_op_set_b3_r8_does_not_modify_flags);
     RUN_TEST(test_op_daa_no_adjustment_needed);
     RUN_TEST(test_op_daa_adjusts_lower_nibble_after_addition);
     RUN_TEST(test_op_daa_adjusts_upper_nibble_after_addition);
