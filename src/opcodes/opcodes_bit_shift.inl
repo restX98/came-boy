@@ -300,3 +300,19 @@ static int op_bit_b3_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return (register_code == OP_MEM_HL) ? 12 : 8;
 }
+
+static int op_res_b3_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 2;
+
+    r8_operand_t register_code = opcode & 0b111;
+    uint8_t bit_index = (opcode >> 3) & 0b111;
+
+    uint8_t reg_value = read_r8(cpu, bus, register_code);
+
+    write_r8(cpu, bus, register_code, reg_value & ~(1 << bit_index));
+
+    LOG_DEBUG("RES %u,%s at PC=0x%04X (opcode=0x%02X)",
+        bit_index, get_r8_name(register_code), instr_pc, opcode);
+
+    return (register_code == OP_MEM_HL) ? 16 : 8;
+}
