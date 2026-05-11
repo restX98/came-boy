@@ -387,4 +387,24 @@ opcode_fn opcode_cb_table[256] = {
     [0x2D] = op_sra_r8, // SRA L
     [0x2E] = op_sra_r8, // SRA [HL]
     [0x2F] = op_sra_r8, // SRA A
+    // Type: SWAP r8
+    [0x30] = op_swap_r8, // SWAP B
+    [0x31] = op_swap_r8, // SWAP C
+    [0x32] = op_swap_r8, // SWAP D
+    [0x33] = op_swap_r8, // SWAP E
+    [0x34] = op_swap_r8, // SWAP H
+    [0x35] = op_swap_r8, // SWAP L
+    [0x36] = op_swap_r8, // SWAP [HL]
+    [0x37] = op_swap_r8, // SWAP A
+    // Type: SRL r8
+    [0x38] = op_srl_r8, // SRL B
+    [0x39] = op_srl_r8, // SRL C
+    [0x3A] = op_srl_r8, // SRL D
+    [0x3B] = op_srl_r8, // SRL E
+    [0x3C] = op_srl_r8, // SRL H
+    [0x3D] = op_srl_r8, // SRL L
+    [0x3E] = op_srl_r8, // SRL [HL]
+    [0x3F] = op_srl_r8, // SRL A
+    // Type: BIT b3, r8
+
 };
