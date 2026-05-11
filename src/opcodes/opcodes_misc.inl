@@ -55,3 +55,20 @@ static int op_daa(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return 4; // DAA takes 4 cycles
 }
+
+static int op_prefix_cb(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 1;
+
+    uint8_t cb_opcode = read_imm8(cpu, bus);
+
+    opcode_fn fn = opcode_cb_table[cb_opcode];
+    if (!fn) {
+        LOG_ERROR("Unknown CB opcode 0x%02X at PC=0x%04X (opcode=0x%02X)",
+            cb_opcode, instr_pc, opcode);
+        return -1;
+    }
+
+    LOG_DEBUG("PREFIX CB 0x%02X at PC=0x%04X", cb_opcode, instr_pc);
+
+    return fn(cpu, bus, cb_opcode);
+}

@@ -304,8 +304,8 @@ opcode_fn opcode_table[256] = {
     [0xE5] = op_push_r16stk,     // PUSH HL
     [0xF5] = op_push_r16stk,     // PUSH AF
 
-    // TODO: complete opcodes
-    // Type: Prefixed
+    // Type: Prefix
+    [0xCB] = op_prefix_cb,
 
     // Type: LDH [imm8], a
     [0xE0] = op_ldh_imm8mem_a,
@@ -330,4 +330,8 @@ opcode_fn opcode_table[256] = {
     // Type: EI
     [0xFB] = op_ei,
     // ... (initialize other opcodes as needed)
+};
+
+opcode_fn opcode_cb_table[256] = {
+
 };
