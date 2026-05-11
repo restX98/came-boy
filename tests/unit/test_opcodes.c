@@ -1467,7 +1467,7 @@ void test_op_rlc_r8_clears_n_and_h_flags(void) {
 // ---- op_rrc_r8 ----
 void test_op_rrc_r8_matrix(void) {
     // opcodes 0x08-0x0D = RRC B,C,D,E,H,L; 0x0F = RRC A (0x0E is [HL], tested separately)
-    uint8_t r8_opcodes[7] = {0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0F};
+    uint8_t r8_opcodes[7] = { 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0F };
 
     for (int i = 0; i < 7; i++) {
         *regs[i].reg = 0b10110101;
@@ -1542,6 +1542,195 @@ void test_op_rrc_r8_clears_n_and_h_flags(void) {
     mock_cpu.bc.hi = 0b10000010; // B
 
     uint8_t opcode = 0x08; // RRC B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+// ---- op_rl_r8 ----
+void test_op_rl_r8_matrix(void) {
+
+    // opcodes 0x10-0x15 = RL B,C,D,E,H,L; 0x17 = RL A (0x16 is [HL], tested separately)
+    uint8_t r8_opcodes[7] = { 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x17 };
+
+    for (int i = 0; i < 7; i++) {
+        flag_clear(&mock_cpu, FLAG_C);
+        *regs[i].reg = 0b10110100; // carry_in = 0 (default)
+
+        int cycles = opcode_cb_table[r8_opcodes[i]](&mock_cpu, &mock_bus, r8_opcodes[i]);
+
+        TEST_ASSERT_EQUAL_MESSAGE(8, cycles, "expected 8 cycles for register variant");
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0b01101000, *regs[i].reg, "expected left-shift with carry_in=0 in bit 0");
+    }
+}
+
+void test_op_rl_r8_hl_mem(void) {
+    mock_cpu.hl.reg = 0x20;
+    mock_memory[0x20] = 0b10110100;
+
+    uint8_t opcode = 0x16; // RL [HL]
+
+    int cycles = opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0b01101000, mock_memory[0x20]);
+}
+
+void test_op_rl_r8_inserts_carry_into_bit0(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0b00000000; // B
+
+    uint8_t opcode = 0x10; // RL B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0b00000001, mock_cpu.bc.hi);
+}
+
+void test_op_rl_r8_sets_carry_when_msb_is_1(void) {
+    mock_cpu.bc.hi = 0b10000000; // B
+
+    uint8_t opcode = 0x10; // RL B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_rl_r8_clears_carry_when_msb_is_0(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0b01000000; // B, carry_in=1 will go into bit 0
+
+    uint8_t opcode = 0x10; // RL B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_rl_r8_sets_zero_flag_when_result_is_zero(void) {
+    mock_cpu.bc.hi = 0x00; // carry_in = 0, result = 0
+
+    uint8_t opcode = 0x10; // RL B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_rl_r8_clears_zero_flag_when_result_is_nonzero(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_cpu.bc.hi = 0b01000000; // B
+
+    uint8_t opcode = 0x10; // RL B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_rl_r8_clears_n_and_h_flags(void) {
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.bc.hi = 0b01000010; // B
+
+    uint8_t opcode = 0x10; // RL B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+// ---- op_rr_r8 ----
+void test_op_rr_r8_matrix(void) {
+    // opcodes 0x18-0x1D = RR B,C,D,E,H,L; 0x1F = RR A (0x1E is [HL], tested separately)
+    uint8_t r8_opcodes[7] = { 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1F };
+
+    for (int i = 0; i < 7; i++) {
+        flag_clear(&mock_cpu, FLAG_C);
+        *regs[i].reg = 0b10110101; // carry_in = 0 (default)
+
+        int cycles = opcode_cb_table[r8_opcodes[i]](&mock_cpu, &mock_bus, r8_opcodes[i]);
+
+        TEST_ASSERT_EQUAL_MESSAGE(8, cycles, "expected 8 cycles for register variant");
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0b01011010, *regs[i].reg, "expected right-shift with carry_in=0 in bit 7");
+    }
+}
+
+void test_op_rr_r8_hl_mem(void) {
+    mock_cpu.hl.reg = 0x20;
+    mock_memory[0x20] = 0b10110101;
+
+    uint8_t opcode = 0x1E; // RR [HL]
+
+    int cycles = opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0b01011010, mock_memory[0x20]);
+}
+
+void test_op_rr_r8_inserts_carry_into_bit7(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0b00000000; // B
+
+    uint8_t opcode = 0x18; // RR B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0b10000000, mock_cpu.bc.hi);
+}
+
+void test_op_rr_r8_sets_carry_when_lsb_is_1(void) {
+    mock_cpu.bc.hi = 0b00000001; // B
+
+    uint8_t opcode = 0x18; // RR B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_rr_r8_clears_carry_when_lsb_is_0(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0b00000010; // B, carry_in=1 will go into bit 7
+
+    uint8_t opcode = 0x18; // RR B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_rr_r8_sets_zero_flag_when_result_is_zero(void) {
+    mock_cpu.bc.hi = 0x00; // carry_in = 0, result = 0
+
+    uint8_t opcode = 0x18; // RR B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_rr_r8_clears_zero_flag_when_result_is_nonzero(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_cpu.bc.hi = 0b00000010; // B
+
+    uint8_t opcode = 0x18; // RR B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_rr_r8_clears_n_and_h_flags(void) {
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.bc.hi = 0b01000010; // B
+
+    uint8_t opcode = 0x18; // RR B
 
     opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
 
@@ -5602,6 +5791,22 @@ int main(void) {
     RUN_TEST(test_op_rrc_r8_sets_zero_flag_when_result_is_zero);
     RUN_TEST(test_op_rrc_r8_clears_zero_flag_when_result_is_nonzero);
     RUN_TEST(test_op_rrc_r8_clears_n_and_h_flags);
+    RUN_TEST(test_op_rl_r8_matrix);
+    RUN_TEST(test_op_rl_r8_hl_mem);
+    RUN_TEST(test_op_rl_r8_inserts_carry_into_bit0);
+    RUN_TEST(test_op_rl_r8_sets_carry_when_msb_is_1);
+    RUN_TEST(test_op_rl_r8_clears_carry_when_msb_is_0);
+    RUN_TEST(test_op_rl_r8_sets_zero_flag_when_result_is_zero);
+    RUN_TEST(test_op_rl_r8_clears_zero_flag_when_result_is_nonzero);
+    RUN_TEST(test_op_rl_r8_clears_n_and_h_flags);
+    RUN_TEST(test_op_rr_r8_matrix);
+    RUN_TEST(test_op_rr_r8_hl_mem);
+    RUN_TEST(test_op_rr_r8_inserts_carry_into_bit7);
+    RUN_TEST(test_op_rr_r8_sets_carry_when_lsb_is_1);
+    RUN_TEST(test_op_rr_r8_clears_carry_when_lsb_is_0);
+    RUN_TEST(test_op_rr_r8_sets_zero_flag_when_result_is_zero);
+    RUN_TEST(test_op_rr_r8_clears_zero_flag_when_result_is_nonzero);
+    RUN_TEST(test_op_rr_r8_clears_n_and_h_flags);
     RUN_TEST(test_op_daa_no_adjustment_needed);
     RUN_TEST(test_op_daa_adjusts_lower_nibble_after_addition);
     RUN_TEST(test_op_daa_adjusts_upper_nibble_after_addition);

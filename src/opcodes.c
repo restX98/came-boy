@@ -351,4 +351,22 @@ opcode_fn opcode_cb_table[256] = {
     [0x0D] = op_rrc_r8, // RRC a,L
     [0x0E] = op_rrc_r8, // RRC a,[HL]
     [0x0F] = op_rrc_r8, // RRC a,A
+    // Type: RL r8
+    [0x10] = op_rl_r8, // RL B
+    [0x11] = op_rl_r8, // RL C
+    [0x12] = op_rl_r8, // RL D
+    [0x13] = op_rl_r8, // RL E
+    [0x14] = op_rl_r8, // RL H
+    [0x15] = op_rl_r8, // RL L
+    [0x16] = op_rl_r8, // RL [HL]
+    [0x17] = op_rl_r8, // RL A
+    // Type: RR r8
+    [0x18] = op_rr_r8, // RR B
+    [0x19] = op_rr_r8, // RR C
+    [0x1A] = op_rr_r8, // RR D
+    [0x1B] = op_rr_r8, // RR E
+    [0x1C] = op_rr_r8, // RR H
+    [0x1D] = op_rr_r8, // RR L
+    [0x1E] = op_rr_r8, // RR [HL]
+    [0x1F] = op_rr_r8, // RR A
 };
