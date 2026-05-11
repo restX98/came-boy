@@ -231,3 +231,28 @@ static int op_sra_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     return (register_code == OP_MEM_HL) ? 16 : 8;
 }
+
+static int op_swap_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 2;
+
+    r8_operand_t register_code = opcode & 0b111;
+
+    uint8_t reg_value = read_r8(cpu, bus, register_code);
+    uint8_t hi = reg_value >> 4;
+    uint8_t lo = reg_value << 4;
+    uint8_t swapped_value = hi | lo;
+
+    bool zero = swapped_value == 0;
+
+    write_r8(cpu, bus, register_code, swapped_value);
+
+    flag_clear(cpu, FLAG_N);
+    flag_clear(cpu, FLAG_H);
+    flag_clear(cpu, FLAG_C);
+    if (zero) flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+
+    LOG_DEBUG("SWAP %s 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        get_r8_name(register_code), reg_value, swapped_value, instr_pc, opcode);
+
+    return (register_code == OP_MEM_HL) ? 16 : 8;
+}
