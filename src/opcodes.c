@@ -333,5 +333,12 @@ opcode_fn opcode_table[256] = {
 };
 
 opcode_fn opcode_cb_table[256] = {
-
+    [0x00] = op_rlc_r8, // RLC B
+    [0x01] = op_rlc_r8, // RLC C
+    [0x02] = op_rlc_r8, // RLC D
+    [0x03] = op_rlc_r8, // RLC E
+    [0x04] = op_rlc_r8, // RLC H
+    [0x05] = op_rlc_r8, // RLC L
+    [0x06] = op_rlc_r8, // RLC [HL]
+    [0x07] = op_rlc_r8, // RLC A
 };
