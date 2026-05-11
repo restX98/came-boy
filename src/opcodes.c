@@ -369,4 +369,22 @@ opcode_fn opcode_cb_table[256] = {
     [0x1D] = op_rr_r8, // RR L
     [0x1E] = op_rr_r8, // RR [HL]
     [0x1F] = op_rr_r8, // RR A
+    // Type: SLA r8
+    [0x20] = op_sla_r8, // SLA B
+    [0x21] = op_sla_r8, // SLA C
+    [0x22] = op_sla_r8, // SLA D
+    [0x23] = op_sla_r8, // SLA E
+    [0x24] = op_sla_r8, // SLA H
+    [0x25] = op_sla_r8, // SLA L
+    [0x26] = op_sla_r8, // SLA [HL]
+    [0x27] = op_sla_r8, // SLA A
+    // Type: SRA r8
+    [0x28] = op_sra_r8, // SRA B
+    [0x29] = op_sra_r8, // SRA C
+    [0x2A] = op_sra_r8, // SRA D
+    [0x2B] = op_sra_r8, // SRA E
+    [0x2C] = op_sra_r8, // SRA H
+    [0x2D] = op_sra_r8, // SRA L
+    [0x2E] = op_sra_r8, // SRA [HL]
+    [0x2F] = op_sra_r8, // SRA A
 };

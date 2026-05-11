@@ -1738,6 +1738,195 @@ void test_op_rr_r8_clears_n_and_h_flags(void) {
     TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
 }
 
+// ---- op_sla_r8 ----
+void test_op_sla_r8_matrix(void) {
+    // opcodes 0x20-0x25 = SLA B,C,D,E,H,L; 0x27 = SLA A (0x26 is [HL], tested separately)
+    uint8_t r8_opcodes[7] = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x27};
+
+    for (int i = 0; i < 7; i++) {
+        *regs[i].reg = 0b10110100;
+
+        int cycles = opcode_cb_table[r8_opcodes[i]](&mock_cpu, &mock_bus, r8_opcodes[i]);
+
+        TEST_ASSERT_EQUAL_MESSAGE(8, cycles, "expected 8 cycles for register variant");
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0b01101000, *regs[i].reg, "expected left-shift with 0 in bit 0");
+    }
+}
+
+void test_op_sla_r8_hl_mem(void) {
+    mock_cpu.hl.reg = 0x20;
+    mock_memory[0x20] = 0b10110100;
+
+    uint8_t opcode = 0x26; // SLA [HL]
+
+    int cycles = opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0b01101000, mock_memory[0x20]);
+}
+
+void test_op_sla_r8_bit0_is_always_zero(void) {
+    // SLA never wraps bit 7 into bit 0, unlike RLC
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0b10000001; // B
+
+    uint8_t opcode = 0x20; // SLA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0b00000010, mock_cpu.bc.hi);
+}
+
+void test_op_sla_r8_sets_carry_when_msb_is_1(void) {
+    mock_cpu.bc.hi = 0b10000000; // B
+
+    uint8_t opcode = 0x20; // SLA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_sla_r8_clears_carry_when_msb_is_0(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0b01000000; // B
+
+    uint8_t opcode = 0x20; // SLA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_sla_r8_sets_zero_flag_when_result_is_zero(void) {
+    mock_cpu.bc.hi = 0b10000000; // B, result = 0x00
+
+    uint8_t opcode = 0x20; // SLA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, mock_cpu.bc.hi);
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_sla_r8_clears_zero_flag_when_result_is_nonzero(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_cpu.bc.hi = 0b01000000; // B
+
+    uint8_t opcode = 0x20; // SLA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_sla_r8_clears_n_and_h_flags(void) {
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.bc.hi = 0b01000010; // B
+
+    uint8_t opcode = 0x20; // SLA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
+// ---- op_sra_r8 ----
+void test_op_sra_r8_matrix(void) {
+    // opcodes 0x28-0x2D = SRA B,C,D,E,H,L; 0x2F = SRA A (0x2E is [HL], tested separately)
+    uint8_t r8_opcodes[7] = {0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2F};
+
+    for (int i = 0; i < 7; i++) {
+        *regs[i].reg = 0b10110100;
+
+        int cycles = opcode_cb_table[r8_opcodes[i]](&mock_cpu, &mock_bus, r8_opcodes[i]);
+
+        TEST_ASSERT_EQUAL_MESSAGE(8, cycles, "expected 8 cycles for register variant");
+        // bit 7 preserved (sign extension): 0b10110100 >> 1 | 0x80 = 0b11011010
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(0b11011010, *regs[i].reg, "expected right-shift with msb preserved");
+    }
+}
+
+void test_op_sra_r8_hl_mem(void) {
+    mock_cpu.hl.reg = 0x20;
+    mock_memory[0x20] = 0b10110100;
+
+    uint8_t opcode = 0x2E; // SRA [HL]
+
+    int cycles = opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL(16, cycles);
+    TEST_ASSERT_EQUAL_UINT8(0b11011010, mock_memory[0x20]);
+}
+
+void test_op_sra_r8_preserves_msb(void) {
+    // SRA preserves bit 7 (sign extension), unlike RR which fills from carry
+    mock_cpu.bc.hi = 0b10000000; // B, MSB=1
+
+    uint8_t opcode = 0x28; // SRA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0b11000000, mock_cpu.bc.hi);
+}
+
+void test_op_sra_r8_sets_carry_when_lsb_is_1(void) {
+    mock_cpu.bc.hi = 0b00000001; // B
+
+    uint8_t opcode = 0x28; // SRA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_sra_r8_clears_carry_when_lsb_is_0(void) {
+    flag_set(&mock_cpu, FLAG_C);
+    mock_cpu.bc.hi = 0b10000010; // B
+
+    uint8_t opcode = 0x28; // SRA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_C));
+}
+
+void test_op_sra_r8_sets_zero_flag_when_result_is_zero(void) {
+    mock_cpu.bc.hi = 0x00; // B = 0, result = 0
+
+    uint8_t opcode = 0x28; // SRA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(1, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_sra_r8_clears_zero_flag_when_result_is_nonzero(void) {
+    flag_set(&mock_cpu, FLAG_Z);
+    mock_cpu.bc.hi = 0b00000010; // B
+
+    uint8_t opcode = 0x28; // SRA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_Z));
+}
+
+void test_op_sra_r8_clears_n_and_h_flags(void) {
+    flag_set(&mock_cpu, FLAG_N);
+    flag_set(&mock_cpu, FLAG_H);
+    mock_cpu.bc.hi = 0b01000010; // B
+
+    uint8_t opcode = 0x28; // SRA B
+
+    opcode_cb_table[opcode](&mock_cpu, &mock_bus, opcode);
+
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_N));
+    TEST_ASSERT_EQUAL_UINT8(0, flag_get(&mock_cpu, FLAG_H));
+}
+
 // ---- op_daa ----
 
 // After addition
@@ -5807,6 +5996,22 @@ int main(void) {
     RUN_TEST(test_op_rr_r8_sets_zero_flag_when_result_is_zero);
     RUN_TEST(test_op_rr_r8_clears_zero_flag_when_result_is_nonzero);
     RUN_TEST(test_op_rr_r8_clears_n_and_h_flags);
+    RUN_TEST(test_op_sla_r8_matrix);
+    RUN_TEST(test_op_sla_r8_hl_mem);
+    RUN_TEST(test_op_sla_r8_bit0_is_always_zero);
+    RUN_TEST(test_op_sla_r8_sets_carry_when_msb_is_1);
+    RUN_TEST(test_op_sla_r8_clears_carry_when_msb_is_0);
+    RUN_TEST(test_op_sla_r8_sets_zero_flag_when_result_is_zero);
+    RUN_TEST(test_op_sla_r8_clears_zero_flag_when_result_is_nonzero);
+    RUN_TEST(test_op_sla_r8_clears_n_and_h_flags);
+    RUN_TEST(test_op_sra_r8_matrix);
+    RUN_TEST(test_op_sra_r8_hl_mem);
+    RUN_TEST(test_op_sra_r8_preserves_msb);
+    RUN_TEST(test_op_sra_r8_sets_carry_when_lsb_is_1);
+    RUN_TEST(test_op_sra_r8_clears_carry_when_lsb_is_0);
+    RUN_TEST(test_op_sra_r8_sets_zero_flag_when_result_is_zero);
+    RUN_TEST(test_op_sra_r8_clears_zero_flag_when_result_is_nonzero);
+    RUN_TEST(test_op_sra_r8_clears_n_and_h_flags);
     RUN_TEST(test_op_daa_no_adjustment_needed);
     RUN_TEST(test_op_daa_adjusts_lower_nibble_after_addition);
     RUN_TEST(test_op_daa_adjusts_upper_nibble_after_addition);

@@ -184,3 +184,50 @@ static int op_rr_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     return (register_code == OP_MEM_HL) ? 16 : 8;
 }
 
+static int op_sla_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 2;
+
+    r8_operand_t register_code = opcode & 0b111;
+
+    uint8_t reg_value = read_r8(cpu, bus, register_code);
+    uint8_t shifted_value = reg_value << 1;
+
+    bool carry = (reg_value >> 7) == 1;
+    bool zero = shifted_value == 0;
+
+    write_r8(cpu, bus, register_code, shifted_value);
+
+    flag_clear(cpu, FLAG_N);
+    flag_clear(cpu, FLAG_H);
+    if (zero)  flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (carry) flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("SLA %s 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        get_r8_name(register_code), reg_value, shifted_value, instr_pc, opcode);
+
+    return (register_code == OP_MEM_HL) ? 16 : 8;
+}
+
+static int op_sra_r8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    uint16_t instr_pc = cpu->pc - 2;
+
+    r8_operand_t register_code = opcode & 0b111;
+
+    uint8_t reg_value = read_r8(cpu, bus, register_code);
+    uint8_t shifted_value = (reg_value >> 1) | (reg_value & 0x80);
+
+    bool carry = (reg_value & 0x01) == 1;
+    bool zero = shifted_value == 0;
+
+    write_r8(cpu, bus, register_code, shifted_value);
+
+    flag_clear(cpu, FLAG_N);
+    flag_clear(cpu, FLAG_H);
+    if (zero)  flag_set(cpu, FLAG_Z); else flag_clear(cpu, FLAG_Z);
+    if (carry) flag_set(cpu, FLAG_C); else flag_clear(cpu, FLAG_C);
+
+    LOG_DEBUG("SRA %s 0x%02X -> 0x%02X at PC=0x%04X (opcode=0x%02X)",
+        get_r8_name(register_code), reg_value, shifted_value, instr_pc, opcode);
+
+    return (register_code == OP_MEM_HL) ? 16 : 8;
+}
