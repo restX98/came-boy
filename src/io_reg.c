@@ -46,8 +46,8 @@ int io_reg_init(io_reg_t *io_reg) {
     io_reg->audio.nr51 = 0xF3;
     io_reg->audio.nr52 = 0xF1;
 
-    io_reg->lcd.lcdc = 0x91;
-    io_reg->lcd.stat = 0x85;
+    io_reg->lcd.ctrl.reg = 0x91;
+    io_reg->lcd.stat.reg = 0x85;
     io_reg->lcd.scy = 0x00;
     io_reg->lcd.scx = 0x00;
     io_reg->lcd.ly = 0x00;
@@ -117,9 +117,9 @@ static void io_interrupt_write(interrupt_regs_t *interrupts, uint16_t addr, uint
 static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr) {
     switch (addr) {
         case 0xFF40:
-            return lcd->lcdc;
+            return lcd->ctrl.reg;
         case 0xFF41:
-            return lcd->stat;
+            return lcd->stat.reg;
         case 0xFF42:
             return lcd->scy;
         case 0xFF43:
@@ -148,11 +148,11 @@ static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr) {
 static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
     switch (addr) {
         case 0xFF40:
-            lcd->lcdc = value;
+            lcd->ctrl.reg = value;
             break;
         case 0xFF41:
             // TODO: fix writability (0, 1, 2, bits are read only)
-            lcd->stat = value;
+            lcd->stat.reg = value;
             break;
         case 0xFF42:
             lcd->scy = value;
