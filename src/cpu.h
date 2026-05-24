@@ -31,6 +31,9 @@ typedef struct {
         bool enabled;   // Interrupt Master Enable
         bool scheduled; // For EI's one-instruction delay
     } ime;
+
+    bool halted;
+    bool halt_bug;
 } cpu_t;
 
 void cpu_init(cpu_t *cpu);
