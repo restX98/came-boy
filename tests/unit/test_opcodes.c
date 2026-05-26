@@ -9,7 +9,7 @@
 
 static cpu_t mock_cpu = { 0 };
 static bus_t mock_bus = { 0 };
-static uint8_t mock_memory[0xFFFF] = { 0 };
+static uint8_t mock_memory[0x10000] = { 0 };
 
 // ---- Mock functions ----
 
@@ -6242,6 +6242,79 @@ void test_op_ei_does_not_set_ime_immediately(void) {
     TEST_ASSERT_FALSE(mock_cpu.ime.enabled);
 }
 
+// ---- op_halt ----
+void test_op_halt_returns_4_cycles_and_does_not_change_pc(void) {
+    mock_cpu.pc = 0x1234;
+    mock_cpu.ime.enabled = false;
+    mock_memory[0xFFFF] = 0x00;
+    mock_memory[0xFF0F] = 0x00;
+
+    int cycles = opcode_table[0x76](&mock_cpu, &mock_bus, 0x76);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, mock_cpu.pc);
+}
+
+void test_op_halt_halts_when_ime_enabled_and_no_irq_pending(void) {
+    mock_cpu.ime.enabled = true;
+    mock_memory[0xFFFF] = 0x00;
+    mock_memory[0xFF0F] = 0x00;
+
+    opcode_table[0x76](&mock_cpu, &mock_bus, 0x76);
+
+    TEST_ASSERT_TRUE(mock_cpu.halted);
+    TEST_ASSERT_FALSE(mock_cpu.halt_bug);
+}
+
+void test_op_halt_halts_when_ime_enabled_and_irq_pending(void) {
+    // With IME=1, HALT always sleeps regardless of pending IRQs.
+    mock_cpu.ime.enabled = true;
+    mock_memory[0xFFFF] = 0x01; // IE: VBlank enabled
+    mock_memory[0xFF0F] = 0x01; // IF: VBlank requested
+
+    opcode_table[0x76](&mock_cpu, &mock_bus, 0x76);
+
+    TEST_ASSERT_TRUE(mock_cpu.halted);
+    TEST_ASSERT_FALSE(mock_cpu.halt_bug);
+}
+
+void test_op_halt_halts_when_ime_disabled_and_no_irq_pending(void) {
+    mock_cpu.ime.enabled = false;
+    mock_memory[0xFFFF] = 0x01; // IE has bits, but...
+    mock_memory[0xFF0F] = 0x00; // ...IF is clear -> no pending IRQ
+
+    opcode_table[0x76](&mock_cpu, &mock_bus, 0x76);
+
+    TEST_ASSERT_TRUE(mock_cpu.halted);
+    TEST_ASSERT_FALSE(mock_cpu.halt_bug);
+}
+
+void test_op_halt_triggers_halt_bug_when_ime_disabled_and_irq_pending(void) {
+    // IME=0 AND a pending IRQ triggers the HALT bug: CPU doesn't halt,
+    // and the next instruction byte will be read twice (handled in cpu_step).
+    mock_cpu.ime.enabled = false;
+    mock_memory[0xFFFF] = 0x04; // IE: Timer enabled
+    mock_memory[0xFF0F] = 0x04; // IF: Timer requested
+
+    opcode_table[0x76](&mock_cpu, &mock_bus, 0x76);
+
+    TEST_ASSERT_FALSE(mock_cpu.halted);
+    TEST_ASSERT_TRUE(mock_cpu.halt_bug);
+}
+
+void test_op_halt_ignores_upper_bits_when_checking_pending(void) {
+    // Only the lower 5 bits of IE & IF are valid interrupt sources.
+    // Upper bits set in both must NOT count as a pending IRQ.
+    mock_cpu.ime.enabled = false;
+    mock_memory[0xFFFF] = 0xE0; // upper 3 bits set
+    mock_memory[0xFF0F] = 0xE0;
+
+    opcode_table[0x76](&mock_cpu, &mock_bus, 0x76);
+
+    TEST_ASSERT_TRUE(mock_cpu.halted);
+    TEST_ASSERT_FALSE(mock_cpu.halt_bug);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -6594,6 +6667,12 @@ int main(void) {
     RUN_TEST(test_op_di_clears_ime_when_already_false);
     RUN_TEST(test_op_ei_schedules_ime);
     RUN_TEST(test_op_ei_does_not_set_ime_immediately);
+    RUN_TEST(test_op_halt_returns_4_cycles_and_does_not_change_pc);
+    RUN_TEST(test_op_halt_halts_when_ime_enabled_and_no_irq_pending);
+    RUN_TEST(test_op_halt_halts_when_ime_enabled_and_irq_pending);
+    RUN_TEST(test_op_halt_halts_when_ime_disabled_and_no_irq_pending);
+    RUN_TEST(test_op_halt_triggers_halt_bug_when_ime_disabled_and_irq_pending);
+    RUN_TEST(test_op_halt_ignores_upper_bits_when_checking_pending);
 
     return UNITY_END();
 }
