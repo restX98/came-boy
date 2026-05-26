@@ -411,6 +411,103 @@ void test_alu_add16_add_with_itself(void) {
     TEST_ASSERT_FALSE(r.status.carry);
 }
 
+// ---- alu_add16_s8 ----
+
+void test_alu_add16_s8_basic_positive_offset(void) {
+    alu16_result_t r = alu_add16_s8(0x1000, 0x05);
+    TEST_ASSERT_EQUAL_UINT16(0x1005, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_basic_negative_offset(void) {
+    alu16_result_t r = alu_add16_s8(0x1010, -0x05);
+    TEST_ASSERT_EQUAL_UINT16(0x100B, r.value);
+}
+
+void test_alu_add16_s8_zero_offset_clears_flags(void) {
+    alu16_result_t r = alu_add16_s8(0x1234, 0);
+    TEST_ASSERT_EQUAL_UINT16(0x1234, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_sets_half_carry_on_bit3_overflow(void) {
+    // Lower nibble overflows: 0x0F + 0x01 = 0x10
+    alu16_result_t r = alu_add16_s8(0x000F, 0x01);
+    TEST_ASSERT_EQUAL_UINT16(0x0010, r.value);
+    TEST_ASSERT_TRUE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_no_half_carry_just_below_bit3_overflow(void) {
+    alu16_result_t r = alu_add16_s8(0x000E, 0x01);
+    TEST_ASSERT_EQUAL_UINT16(0x000F, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_sets_carry_on_bit7_overflow(void) {
+    // Lower byte overflows: 0xFF + 0x01 = 0x100
+    alu16_result_t r = alu_add16_s8(0x00FF, 0x01);
+    TEST_ASSERT_EQUAL_UINT16(0x0100, r.value);
+    TEST_ASSERT_TRUE(r.status.half_carry);
+    TEST_ASSERT_TRUE(r.status.carry);
+}
+
+void test_alu_add16_s8_no_carry_below_bit7_overflow(void) {
+    alu16_result_t r = alu_add16_s8(0x007F, 0x01);
+    TEST_ASSERT_EQUAL_UINT16(0x0080, r.value);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_flags_use_lower_byte_only(void) {
+    // Upper byte of base must not influence flags
+    alu16_result_t r = alu_add16_s8(0xFF00, 0x01);
+    TEST_ASSERT_EQUAL_UINT16(0xFF01, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_max_positive_offset(void) {
+    alu16_result_t r = alu_add16_s8(0x1000, 0x7F);
+    TEST_ASSERT_EQUAL_UINT16(0x107F, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_max_negative_offset(void) {
+    // offset = -128 (0x80 as unsigned): low nibble is 0, low byte is 0x80
+    alu16_result_t r = alu_add16_s8(0x0100, -128);
+    TEST_ASSERT_EQUAL_UINT16(0x0080, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_negative_offset_sets_both_flags(void) {
+    // 0x0001 + (-1): low byte 0x01 + 0xFF = 0x100, low nibble 0x01 + 0x0F = 0x10
+    alu16_result_t r = alu_add16_s8(0x0001, -1);
+    TEST_ASSERT_EQUAL_UINT16(0x0000, r.value);
+    TEST_ASSERT_TRUE(r.status.half_carry);
+    TEST_ASSERT_TRUE(r.status.carry);
+}
+
+void test_alu_add16_s8_negative_offset_no_flags_when_low_byte_zero(void) {
+    // 0x0100 + (-1) = 0x00FF: low byte 0x00 + 0xFF = 0xFF (no carry/half-carry)
+    alu16_result_t r = alu_add16_s8(0x0100, -1);
+    TEST_ASSERT_EQUAL_UINT16(0x00FF, r.value);
+    TEST_ASSERT_FALSE(r.status.half_carry);
+    TEST_ASSERT_FALSE(r.status.carry);
+}
+
+void test_alu_add16_s8_wraps_around_16bit_boundary(void) {
+    // 0xFFFF + 1 = 0x0000 (16-bit wrap); flags reflect lower-byte arithmetic
+    alu16_result_t r = alu_add16_s8(0xFFFF, 0x01);
+    TEST_ASSERT_EQUAL_UINT16(0x0000, r.value);
+    TEST_ASSERT_TRUE(r.status.half_carry);
+    TEST_ASSERT_TRUE(r.status.carry);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -486,6 +583,21 @@ int main(void) {
     RUN_TEST(test_alu_add16_half_carry_ignores_upper_nibble);
     RUN_TEST(test_alu_add16_carry_without_half_carry);
     RUN_TEST(test_alu_add16_add_with_itself);
+
+    // alu_add16_s8
+    RUN_TEST(test_alu_add16_s8_basic_positive_offset);
+    RUN_TEST(test_alu_add16_s8_basic_negative_offset);
+    RUN_TEST(test_alu_add16_s8_zero_offset_clears_flags);
+    RUN_TEST(test_alu_add16_s8_sets_half_carry_on_bit3_overflow);
+    RUN_TEST(test_alu_add16_s8_no_half_carry_just_below_bit3_overflow);
+    RUN_TEST(test_alu_add16_s8_sets_carry_on_bit7_overflow);
+    RUN_TEST(test_alu_add16_s8_no_carry_below_bit7_overflow);
+    RUN_TEST(test_alu_add16_s8_flags_use_lower_byte_only);
+    RUN_TEST(test_alu_add16_s8_max_positive_offset);
+    RUN_TEST(test_alu_add16_s8_max_negative_offset);
+    RUN_TEST(test_alu_add16_s8_negative_offset_sets_both_flags);
+    RUN_TEST(test_alu_add16_s8_negative_offset_no_flags_when_low_byte_zero);
+    RUN_TEST(test_alu_add16_s8_wraps_around_16bit_boundary);
 
     return UNITY_END();
 }
