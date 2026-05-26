@@ -4,25 +4,21 @@
 
 #include "logger.h"
 
-static uint8_t io_interrupt_read(interrupt_regs_t *interrupts, uint16_t addr);
-static void io_interrupt_write(interrupt_regs_t *interrupts, uint16_t addr, uint8_t value);
 static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr);
 static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value);
 static uint8_t io_st_read(st_regs_t *serial_transfer, uint16_t addr);
 static void io_st_write(st_regs_t *serial_transfer, uint16_t addr, uint8_t value);
+static uint8_t io_audio_read(audio_regs_t *audio, uint16_t addr);
+static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value);
 
 int io_reg_init(io_reg_t *io_reg) {
     io_reg->joyp = 0xCF;
     io_reg->serial_transfer.sb = 0x00;
     io_reg->serial_transfer.sc = 0x7E;
 
-    io_reg->interrupts.flag.reg = 0xE1;
-    io_reg->interrupts.enable.reg = 0x00;
+    interrupts_init(&io_reg->interrupts);
 
-    io_reg->timer.div = 0xAB;
-    io_reg->timer.tima = 0x00;
-    io_reg->timer.tma = 0x00;
-    io_reg->timer.tac = 0xF8;
+    timer_init(&io_reg->timer);
 
     io_reg->audio.nr10 = 0x80;
     io_reg->audio.nr11 = 0xBF;
@@ -67,9 +63,13 @@ uint8_t io_reg_read(io_reg_t *io_reg, uint16_t addr) {
     (void)io_reg; (void)addr;
 
     if (addr == 0xFF0F || addr == 0xFFFF) {
-        return io_interrupt_read(&io_reg->interrupts, addr);
+        return interrupts_read(&io_reg->interrupts, addr);
     } else if (addr >= 0xFF01 && addr <= 0xFF02) {
         return io_st_read(&io_reg->serial_transfer, addr);
+    } else if (addr >= 0xFF10 && addr <= 0xFF26) {
+        return io_audio_read(&io_reg->audio, addr);
+    } else if (addr >= 0xFF04 && addr <= 0xFF07) {
+        return timer_read(&io_reg->timer, addr);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         return io_lcd_read(&io_reg->lcd, addr);
     }
@@ -82,35 +82,18 @@ void io_reg_write(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
     (void)io_reg; (void)addr; (void)value;
 
     if (addr == 0xFF0F || addr == 0xFFFF) {
-        io_interrupt_write(&io_reg->interrupts, addr, value);
+        interrupts_write(&io_reg->interrupts, addr, value);
     } else if (addr >= 0xFF01 && addr <= 0xFF02) {
         io_st_write(&io_reg->serial_transfer, addr, value);
+    } else if (addr >= 0xFF04 && addr <= 0xFF07) {
+        timer_write(&io_reg->timer, addr, value);
+    } else if (addr >= 0xFF10 && addr <= 0xFF26) {
+        io_audio_write(&io_reg->audio, addr, value);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         io_lcd_write(&io_reg->lcd, addr, value);
     } else {
         LOG_WARN("io_reg_write: unimplemented register 0x%04X", addr);
         assert(0 && "io_reg_write: unimplemented register");
-    }
-}
-
-static uint8_t io_interrupt_read(interrupt_regs_t *interrupts, uint16_t addr) {
-    if (addr == 0xFF0F) {
-        return interrupts->flag.reg;
-    } else if (addr == 0xFFFF) {
-        return interrupts->enable.reg;
-    }
-
-    assert(0 && "Assert something");
-}
-
-static void io_interrupt_write(interrupt_regs_t *interrupts, uint16_t addr, uint8_t value) {
-    value |= 0b11100000;
-    if (addr == 0xFF0F) {
-        interrupts->flag.reg = value;
-    } else if (addr == 0xFFFF) {
-        interrupts->enable.reg = value;
-    } else {
-        assert(0 && "Assert something");
     }
 }
 
@@ -205,6 +188,102 @@ static void io_st_write(st_regs_t *serial_transfer, uint16_t addr, uint8_t value
         serial_transfer->sb = value;
     } else if (addr == 0xFF02) {
         serial_transfer->sc = value;
+    } else {
+        assert(0 && "Assert something");
+    }
+}
+
+static uint8_t io_audio_read(audio_regs_t *audio, uint16_t addr) {
+    if (addr == 0xFF10) {
+        return audio->nr10;
+    } else if (addr == 0xFF11) {
+        return audio->nr11;
+    } else if (addr == 0xFF12) {
+        return audio->nr12;
+    } else if (addr == 0xFF13) {
+        return audio->nr13;
+    } else if (addr == 0xFF14) {
+        return audio->nr14;
+    } else if (addr == 0xFF16) {
+        return audio->nr21;
+    } else if (addr == 0xFF17) {
+        return audio->nr22;
+    } else if (addr == 0xFF18) {
+        return audio->nr23;
+    } else if (addr == 0xFF19) {
+        return audio->nr24;
+    } else if (addr == 0xFF1A) {
+        return audio->nr30;
+    } else if (addr == 0xFF1B) {
+        return audio->nr31;
+    } else if (addr == 0xFF1C) {
+        return audio->nr32;
+    } else if (addr == 0xFF1D) {
+        return audio->nr33;
+    } else if (addr == 0xFF1E) {
+        return audio->nr34;
+    } else if (addr == 0xFF20) {
+        return audio->nr41;
+    } else if (addr == 0xFF21) {
+        return audio->nr42;
+    } else if (addr == 0xFF22) {
+        return audio->nr43;
+    } else if (addr == 0xFF23) {
+        return audio->nr44;
+    } else if (addr == 0xFF24) {
+        return audio->nr50;
+    } else if (addr == 0xFF25) {
+        return audio->nr51;
+    } else if (addr == 0xFF26) {
+        return audio->nr52;
+    } else {
+        assert(0 && "Assert something");
+    }
+}
+
+static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
+    if (addr == 0xFF10) {
+        audio->nr10 = value;
+    } else if (addr == 0xFF11) {
+        audio->nr11 = value;
+    } else if (addr == 0xFF12) {
+        audio->nr12 = value;
+    } else if (addr == 0xFF13) {
+        audio->nr13 = value;
+    } else if (addr == 0xFF14) {
+        audio->nr14 = value;
+    } else if (addr == 0xFF16) {
+        audio->nr21 = value;
+    } else if (addr == 0xFF17) {
+        audio->nr22 = value;
+    } else if (addr == 0xFF18) {
+        audio->nr23 = value;
+    } else if (addr == 0xFF19) {
+        audio->nr24 = value;
+    } else if (addr == 0xFF1A) {
+        audio->nr30 = value;
+    } else if (addr == 0xFF1B) {
+        audio->nr31 = value;
+    } else if (addr == 0xFF1C) {
+        audio->nr32 = value;
+    } else if (addr == 0xFF1D) {
+        audio->nr33 = value;
+    } else if (addr == 0xFF1E) {
+        audio->nr34 = value;
+    } else if (addr == 0xFF20) {
+        audio->nr41 = value;
+    } else if (addr == 0xFF21) {
+        audio->nr42 = value;
+    } else if (addr == 0xFF22) {
+        audio->nr43 = value;
+    } else if (addr == 0xFF23) {
+        audio->nr44 = value;
+    } else if (addr == 0xFF24) {
+        audio->nr50 = value;
+    } else if (addr == 0xFF25) {
+        audio->nr51 = value;
+    } else if (addr == 0xFF26) {
+        audio->nr52 = value;
     } else {
         assert(0 && "Assert something");
     }

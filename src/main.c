@@ -36,6 +36,8 @@ int main(int argc, char *argv[]) {
             LOG_ERROR("CPU halted, exiting");
             break;
         }
+
+        timer_tick(&bus.io_reg.timer, &bus.io_reg.interrupts, cycles);
     }
 
     // free resources

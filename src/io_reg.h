@@ -3,22 +3,8 @@
 
 #include <stdint.h>
 
-typedef union {
-    uint8_t reg;
-    struct {
-        uint8_t v_blank : 1;
-        uint8_t lcd : 1;
-        uint8_t timer : 1;
-        uint8_t serial : 1;
-        uint8_t joypad : 1;
-        uint8_t _ : 3;  // bits 5–7, always 1 on real hardware
-    };
-} int_flag_t;
-
-typedef struct {
-    int_flag_t flag;    // 0xFF0F — Interrupt flag (IF)
-    int_flag_t enable;  // 0xFFFF — Interrupt enable (IE)
-} interrupt_regs_t;
+#include "timer.h"
+#include "interrupts.h"
 
 typedef union {
     uint8_t reg;
@@ -66,13 +52,6 @@ typedef struct {
     uint8_t sb;         // 0xFF01 — Serial transfer data
     uint8_t sc;         // 0xFF02 — Serial transfer control
 } st_regs_t;
-
-typedef struct {
-    uint8_t div;        // 0xFF04 — Divider register
-    uint8_t tima;       // 0xFF05 — Timer counter
-    uint8_t tma;        // 0xFF06 — Timer modulo
-    uint8_t tac;        // 0xFF07 — Timer control
-} timer_regs_t;
 
 typedef struct {
     uint8_t nr52;       // 0xFF26 — Audio master control

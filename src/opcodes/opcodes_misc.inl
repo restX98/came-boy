@@ -17,6 +17,8 @@ static int op_stop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     read_imm8(cpu, bus);
 
+    bus->io_reg.timer.div_counter = 0; // STOP resets the entire DIV counter
+
     LOG_DEBUG("STOP at PC=0x%04X", cpu->pc - 1);
 
     return 4; // STOP takes 4 cycles
