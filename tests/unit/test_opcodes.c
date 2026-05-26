@@ -6315,6 +6315,26 @@ void test_op_halt_ignores_upper_bits_when_checking_pending(void) {
     TEST_ASSERT_FALSE(mock_cpu.halt_bug);
 }
 
+// ---- op_stop ----
+void test_op_stop_returns_4_cycles_and_advances_pc_by_1(void) {
+    // STOP is encoded as 0x10 followed by a (typically zero) padding byte
+    // that the instruction consumes via read_imm8.
+    mock_cpu.pc = 0;
+
+    int cycles = opcode_table[0x10](&mock_cpu, &mock_bus, 0x10);
+
+    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL_UINT16(1, mock_cpu.pc);
+}
+
+void test_op_stop_resets_div_counter(void) {
+    mock_bus.io_reg.timer.div_counter = 0xABCD;
+
+    opcode_table[0x10](&mock_cpu, &mock_bus, 0x10);
+
+    TEST_ASSERT_EQUAL_UINT16(0, mock_bus.io_reg.timer.div_counter);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -6673,6 +6693,8 @@ int main(void) {
     RUN_TEST(test_op_halt_halts_when_ime_disabled_and_no_irq_pending);
     RUN_TEST(test_op_halt_triggers_halt_bug_when_ime_disabled_and_irq_pending);
     RUN_TEST(test_op_halt_ignores_upper_bits_when_checking_pending);
+    RUN_TEST(test_op_stop_returns_4_cycles_and_advances_pc_by_1);
+    RUN_TEST(test_op_stop_resets_div_counter);
 
     return UNITY_END();
 }
