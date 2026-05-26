@@ -3,7 +3,7 @@
 #include "logger.h"
 #include "opcodes.h"
 
-static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, uint8_t pending);
+static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, int pending);
 
 void cpu_init(cpu_t *cpu) {
     LOG_INFO("Initializing CPU");
@@ -32,17 +32,13 @@ void cpu_init(cpu_t *cpu) {
 }
 
 int cpu_step(cpu_t *cpu, bus_t *bus) {
-    uint8_t ie = bus->io_reg.interrupts.enable.reg;
-    uint8_t if_ = bus->io_reg.interrupts.flag.reg;
-    uint8_t pending = ie & if_ & 0b00011111;
-
-    if (pending && cpu->ime.enabled) {
-        LOG_DEBUG("Pending IRQs: 0x%02X (IE=0x%02X IF=0x%02X)", pending, ie, if_);
+    int pending = interrupts_pending(&bus->io_reg.interrupts);
+    if (pending >= 0 && cpu->ime.enabled) {
         return interrupt_service_routine(cpu, bus, pending);
     }
 
     if (cpu->halted) {
-        if (pending) {
+        if (pending >= 0) {
             // Pending IRQs wake the CPU from HALT even when IME=0.
             LOG_DEBUG("Waking from HALT (IME=0): pending=0x%02X", pending);
             cpu->halted = false;
@@ -78,21 +74,19 @@ int cpu_step(cpu_t *cpu, bus_t *bus) {
     return -1;
 }
 
-static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, uint8_t pending) {
-    // Find lowest set bit (highest priority): 0=VBlank, 1=LCD, 2=Timer, 3=Serial, 4=Joypad.
-    int bit = __builtin_ctz(pending);
+static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, int pending) {
     static const uint16_t handlers[] = { 0x40, 0x48, 0x50, 0x58, 0x60 };
 
     // Dispatching an interrupt always wakes the CPU from HALT.
     cpu->halted = false;
 
-    bus->io_reg.interrupts.flag.reg &= ~(1 << bit); // Clear IF for this interrupt
+    interrupts_acknowledge(&bus->io_reg.interrupts, pending); // Clear IF for this interrupt
     cpu->ime.enabled = false;
 
     bus_write(bus, cpu->sp - 1, cpu->pc >> 8);
     bus_write(bus, cpu->sp - 2, cpu->pc & 0xFF);
     cpu->sp -= 2;
-    cpu->pc = handlers[bit];
+    cpu->pc = handlers[pending];
 
     return 20; // Interrupt handling takes 20 cycles
 }

@@ -31,6 +31,8 @@ typedef struct {
 void interrupts_init(interrupt_regs_t *interrupts);
 
 void interrupts_request(interrupt_regs_t *interrupts, interrupt_t interrupt);
+void interrupts_acknowledge(interrupt_regs_t *interrupts, interrupt_t interrupt);
+int interrupts_pending(const interrupt_regs_t *interrupts);
 
 uint8_t interrupts_read(interrupt_regs_t *interrupts, uint16_t addr);
 void interrupts_write(interrupt_regs_t *interrupts, uint16_t addr, uint8_t value);
