@@ -6335,6 +6335,60 @@ void test_op_stop_resets_div_counter(void) {
     TEST_ASSERT_EQUAL_UINT16(0, mock_bus.io_reg.timer.div_counter);
 }
 
+// ---- op_prefix_cb ----
+static struct {
+    cpu_t *cpu;
+    bus_t *bus;
+    uint8_t opcode;
+    int return_cycles;
+    size_t call_count;
+} prefix_cb_mock;
+
+static int prefix_cb_mock_handler(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
+    prefix_cb_mock.cpu = cpu;
+    prefix_cb_mock.bus = bus;
+    prefix_cb_mock.opcode = opcode;
+    prefix_cb_mock.call_count++;
+    return prefix_cb_mock.return_cycles;
+}
+
+void test_op_prefix_cb_advances_pc_and_dispatches_to_cb_handler(void) {
+    uint8_t cb_opcode = 0x42;
+    opcode_fn original = opcode_cb_table[cb_opcode];
+
+    prefix_cb_mock = (typeof(prefix_cb_mock)){ .return_cycles = 42 };
+    opcode_cb_table[cb_opcode] = prefix_cb_mock_handler;
+
+    mock_cpu.pc = 0;
+    mock_memory[0] = cb_opcode;
+
+    int cycles = opcode_table[0xCB](&mock_cpu, &mock_bus, 0xCB);
+
+    TEST_ASSERT_EQUAL(42, cycles);
+    TEST_ASSERT_EQUAL_UINT16(1, mock_cpu.pc);
+    TEST_ASSERT_EQUAL_size_t(1, prefix_cb_mock.call_count);
+    TEST_ASSERT_EQUAL_PTR(&mock_cpu, prefix_cb_mock.cpu);
+    TEST_ASSERT_EQUAL_PTR(&mock_bus, prefix_cb_mock.bus);
+    TEST_ASSERT_EQUAL_UINT8(cb_opcode, prefix_cb_mock.opcode);
+
+    opcode_cb_table[cb_opcode] = original;
+}
+
+void test_op_prefix_cb_returns_minus1_on_unknown_cb_opcode(void) {
+    uint8_t cb_opcode = 0x42;
+    opcode_fn original = opcode_cb_table[cb_opcode];
+    opcode_cb_table[cb_opcode] = NULL;
+
+    mock_cpu.pc = 0;
+    mock_memory[0] = cb_opcode;
+
+    int cycles = opcode_table[0xCB](&mock_cpu, &mock_bus, 0xCB);
+
+    TEST_ASSERT_EQUAL_INT(-1, cycles);
+
+    opcode_cb_table[cb_opcode] = original;
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -6695,6 +6749,8 @@ int main(void) {
     RUN_TEST(test_op_halt_ignores_upper_bits_when_checking_pending);
     RUN_TEST(test_op_stop_returns_4_cycles_and_advances_pc_by_1);
     RUN_TEST(test_op_stop_resets_div_counter);
+    RUN_TEST(test_op_prefix_cb_advances_pc_and_dispatches_to_cb_handler);
+    RUN_TEST(test_op_prefix_cb_returns_minus1_on_unknown_cb_opcode);
 
     return UNITY_END();
 }
