@@ -2,9 +2,7 @@
 build/
 
 # ROMs (copyrighted)
-roms/*.gb
-roms/*.gbc
-roms/*.gba
+roms/*
 
 # Editor
 .vscode/
