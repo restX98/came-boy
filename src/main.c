@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -6,7 +7,24 @@
 #include "cpu.h"
 #include "logger.h"
 
+static volatile sig_atomic_t running = 1;
+
+static void handle_sigint(int sig) {
+    (void)sig;
+    running = 0;
+}
+
+static void setup_signals(void) {
+    struct sigaction sa = {
+        .sa_handler = handle_sigint,
+        .sa_flags = SA_RESETHAND,
+    };
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGINT, &sa, NULL);
+}
+
 int main(int argc, char *argv[]) {
+    setup_signals();
 
     if (argc < 2) {
         LOG_ERROR("Usage: %s <rom>", argv[0]);
@@ -30,7 +48,7 @@ int main(int argc, char *argv[]) {
 
     cpu_init(&cpu);
 
-    while (1) {
+    while (running) {
         int cycles = cpu_step(&cpu, &bus);
         if (cycles < 0) {
             LOG_ERROR("CPU halted, exiting");
@@ -38,6 +56,11 @@ int main(int argc, char *argv[]) {
         }
 
         timer_tick(&bus.io_reg.timer, &bus.io_reg.interrupts, cycles);
+    }
+
+
+    if (!running) {
+        LOG_INFO("Interrupted, shutting down");
     }
 
     // free resources
