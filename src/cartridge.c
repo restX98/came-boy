@@ -1,5 +1,6 @@
 #include "cartridge.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -131,23 +132,71 @@ void cartridge_unload(cartridge_t *cartridge) {
     cartridge->size = 0;
     cartridge->bank = 0;
 
-    mem_free(&cartridge->ext_ram);
+    mem_free(&cartridge->ram);
 }
 
 
 uint8_t cartridge_rom_read(cartridge_t *cartridge, uint16_t addr) {
-    return cartridge->rom[addr];
+    if (addr < 0x4000) {
+        return cartridge->rom[addr];
+    } else if (addr < 0x8000) {
+        uint32_t bank_offset = cartridge->bank * 0x4000;
+        return cartridge->rom[bank_offset + (addr - 0x4000)];
+    }
+
+    assert(0 && "Address out of range for ROM read");
+    return 0xFF; // Return 0xFF for out of range addresses
+}
+
+void cartridge_rom_write(cartridge_t *cartridge, uint16_t addr, uint8_t value) {
+    if (addr < 0x1FFF) {
+        cartridge->ram_enabled = (value & 0x0F) == 0x0A;
+    } else if (addr <= 0x3FFF) {
+        // ROM Bank Number (lower 5 bits)
+        uint8_t bank = value & 0b00011111;
+        uint8_t mask = cartridge->banks_number - 1;
+
+        // MBC1 quirk: 00→01 translation checks the FULL 5-bit register
+        // but only applies if the ROM is large enough that bit 5 being set
+        // wouldn't just be ignored. For smaller ROMs, setting bit 5 bypasses
+        // the translation, allowing bank 0 to be mapped to $4000-$7FFF.
+        bool can_mirror_bank0 = (cartridge->banks_number <= 16) && (bank & 0x10);
+        if (!can_mirror_bank0 && bank == 0x00) {
+            bank = 0x01;
+        }
+
+        bank = bank & mask;
+
+        // Replace lower 5 bits, preserve upper bits (set by $4000-$5FFF writes)
+        cartridge->bank = (cartridge->bank & 0b01100000) | bank;
+    } else if (addr <= 0x5FFF) {
+        // Upper 2 bits of bank number (or RAM bank in RAM banking mode)
+        uint8_t upper = value & 0x03;
+
+        if (cartridge->banking_mode == 0) {
+            // ROM banking mode: upper 2 bits extend the ROM bank number
+            cartridge->bank = (cartridge->bank & 0x1F) | (upper << 5);
+        } else {
+            // RAM banking mode: selects RAM bank 0-3
+            cartridge->ram_bank = upper;
+        }
+
+    } else if (addr <= 0x7FFF) {
+        // Banking Mode Select
+        cartridge->banking_mode = value & 0x01;
+    }
 }
 
 uint8_t cartridge_ext_ram_read(cartridge_t *cartridge, uint16_t addr) {
     if (!cartridge->mbc.hasRam) {
         return 0xFF;
     }
-    return cartridge->ext_ram.mem[addr];
+    return cartridge->ram.mem[addr];
 }
+
 void cartridge_ext_ram_write(cartridge_t *cartridge, uint16_t addr, uint8_t value) {
     if (cartridge->mbc.hasRam) {
-        cartridge->ext_ram.mem[addr] = value;
+        cartridge->ram.mem[addr] = value;
     }
 }
 

@@ -152,7 +152,7 @@ void test_cartridge_load_calls_mem_init_for_ext_ram(void) {
     cartridge_load(&cartridge, DUMMY_ROM_PATH);
 
     TEST_ASSERT_EQUAL_size_t(1, mem_init_stats.call_count);
-    TEST_ASSERT_EQUAL_PTR(&cartridge.ext_ram, mem_init_stats.calls[0].memory);
+    TEST_ASSERT_EQUAL_PTR(&cartridge.ram, mem_init_stats.calls[0].memory);
     TEST_ASSERT_EQUAL_size_t(8 * 1024, mem_init_stats.calls[0].size);
     TEST_ASSERT_EQUAL_STRING("External RAM", mem_init_stats.calls[0].name);
 }
@@ -263,7 +263,7 @@ void test_cartridge_unload_calls_mem_free_for_ext_ram(void) {
     cartridge_unload(&cartridge);
 
     TEST_ASSERT_EQUAL_size_t(1, mem_free_stats.call_count);
-    TEST_ASSERT_EQUAL_PTR(&cartridge.ext_ram, mem_free_stats.calls[0].memory);
+    TEST_ASSERT_EQUAL_PTR(&cartridge.ram, mem_free_stats.calls[0].memory);
 }
 
 void test_cartridge_unload_does_not_crash_on_null_pointer(void) {

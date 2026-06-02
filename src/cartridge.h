@@ -19,13 +19,16 @@ typedef struct {
     size_t size;
     uint8_t bank;
     uint8_t banks_number;
+    bool ram_enabled;
+    uint8_t banking_mode;
 
     char title[16];
     mbc_t mbc;
     char destination[32];
     uint8_t version;
 
-    mem_t ext_ram;
+    mem_t ram;
+    uint8_t ram_bank;
 } cartridge_t;
 
 int cartridge_load(cartridge_t *cartridge, const char *filename);
@@ -33,6 +36,8 @@ int cartridge_load(cartridge_t *cartridge, const char *filename);
 void cartridge_unload(cartridge_t *cartridge);
 
 uint8_t cartridge_rom_read(cartridge_t *cartridge, uint16_t addr);
+void cartridge_rom_write(cartridge_t *cartridge, uint16_t addr, uint8_t value);
+
 uint8_t cartridge_ext_ram_read(cartridge_t *cartridge, uint16_t addr);
 void cartridge_ext_ram_write(cartridge_t *cartridge, uint16_t addr, uint8_t value);
 
