@@ -188,6 +188,15 @@ static void io_st_write(st_regs_t *serial_transfer, uint16_t addr, uint8_t value
         serial_transfer->sb = value;
     } else if (addr == 0xFF02) {
         serial_transfer->sc = value;
+        if ((value & 0x81) == 0x81) {
+            // Transfer initiated with internal clock — emit the byte
+            log_serial((char)serial_transfer->sb);
+
+            // Clear the transfer-start bit to signal completion
+            serial_transfer->sc &= ~0x80;
+            // Optional: request serial interrupt
+            // request_interrupt(INT_SERIAL);
+        }
     } else {
         assert(0 && "Assert something");
     }

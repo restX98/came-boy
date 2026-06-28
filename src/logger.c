@@ -5,8 +5,9 @@
 
 static const char *level_strings[] = { "DEBUG", "INFO", "WARN", "ERROR" };
 
-static log_level_t min_level = LOG_DEBUG;
+static log_level_t min_level = LOG_LEVEL_DEBUG;
 
+// Internal logger
 void log_msg(log_level_t level, const char *file, int line, const char *fmt, ...) {
     if (level < min_level) {
         return;
@@ -17,4 +18,10 @@ void log_msg(log_level_t level, const char *file, int line, const char *fmt, ...
     vfprintf(stderr, fmt, args);
     va_end(args);
     fprintf(stderr, "\n");
+}
+
+// Serial output
+void log_serial(char c) {
+    fputc(c, stdout);
+    fflush(stdout);
 }
