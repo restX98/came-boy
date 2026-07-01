@@ -11,11 +11,14 @@ void timer_init(timer_regs_t *timer) {
     timer->tac.reg = 0xF8;
 
     timer->tima_reload_pending = 0;
+    timer->tima_just_reloaded = false;
 }
 
 void timer_tick(timer_regs_t *timer, interrupt_regs_t *interrupts, int cycles) {
     uint16_t old_div = timer->div_counter;
     timer->div_counter += cycles;
+
+    timer->tima_just_reloaded = false;
 
     // Handle any pending TIMA reload from a previous overflow.
     if (timer->tima_reload_pending > 0) {
@@ -23,6 +26,7 @@ void timer_tick(timer_regs_t *timer, interrupt_regs_t *interrupts, int cycles) {
             timer->tima = timer->tma;
             interrupts_request(interrupts, INT_TIMER);
             timer->tima_reload_pending = 0;
+            timer->tima_just_reloaded = true;
         } else {
             timer->tima_reload_pending -= cycles;
         }
@@ -92,10 +96,16 @@ void timer_write(timer_regs_t *timer, uint16_t addr, uint8_t value) {
         bool and_after = timer_and_gate(timer, old_cs); // same clock_select, div changed
         timer_apply_falling_edge(timer, and_before, and_after);
     } else if (addr == 0xFF05) {
-        timer->tima = value;
-        timer->tima_reload_pending = 0; // Cancel any pending reload
+        if (!timer->tima_just_reloaded) {
+            timer->tima = value;
+            timer->tima_reload_pending = 0;
+        }
     } else if (addr == 0xFF06) {
         timer->tma = value;
+
+        if (timer->tima_just_reloaded) {
+            timer->tima = value;
+        }
     } else if (addr == 0xFF07) {
         uint8_t old_cs = timer->tac.clock_select;
         bool and_before = timer_and_gate(timer, old_cs);

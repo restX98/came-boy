@@ -1,6 +1,7 @@
 #ifndef TIMER_H
 #define TIMER_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "interrupts.h"
@@ -31,6 +32,8 @@ typedef struct {
     timer_ctrl_t tac;   // 0xFF07 — Timer control
 
     uint8_t tima_reload_pending; // pending reload for TIMA
+    bool tima_just_reloaded;
+
 } timer_regs_t;
 
 void timer_init(timer_regs_t *timer);
