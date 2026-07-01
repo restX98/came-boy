@@ -54,7 +54,6 @@ void test_timer_init_sets_initial_values(void) {
     timer.tima = 0xAA;
     timer.tma = 0xBB;
     timer.tac.reg = 0x07;
-    timer.tima_counter = 999;
     timer.tima_reload_pending = 3;
 
     timer_init(&timer);
@@ -63,7 +62,6 @@ void test_timer_init_sets_initial_values(void) {
     TEST_ASSERT_EQUAL_UINT8(0x00, timer.tima);
     TEST_ASSERT_EQUAL_UINT8(0x00, timer.tma);
     TEST_ASSERT_EQUAL_UINT8(0xF8, timer.tac.reg);
-    TEST_ASSERT_EQUAL_UINT16(0, timer.tima_counter);
     TEST_ASSERT_EQUAL_UINT8(0, timer.tima_reload_pending);
 }
 
@@ -105,7 +103,6 @@ void test_timer_tick_does_not_advance_tima_when_disabled(void) {
     timer_tick(&timer, &interrupts, 1024);
 
     TEST_ASSERT_EQUAL_UINT8(0, timer.tima);
-    TEST_ASSERT_EQUAL_UINT16(0, timer.tima_counter);
 }
 
 // ---- timer_tick: TIMA frequency per clock_select ----

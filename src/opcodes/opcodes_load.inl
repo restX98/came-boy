@@ -28,7 +28,7 @@ static int op_ld_r8_imm8(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     LOG_DEBUG("LD %s,imm8 value=0x%02X at PC=0x%04X (opcode=0x%02X)",
         get_r8_name(register_code), immediate_value, instr_pc, opcode);
 
-    return (register_code == OP_MEM_HL) ? 12 : 4; // LD r8,imm8 takes 4 cycles for normal r8 register and 12 for [HL]
+    return (register_code == OP_MEM_HL) ? 12 : 8; // LD r8,imm8 takes 8 cycles for normal r8 register and 12 for [HL]
 }
 
 static int op_ld_r16_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {

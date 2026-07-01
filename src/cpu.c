@@ -15,8 +15,12 @@ void cpu_init(cpu_t *cpu) {
     cpu->hl.reg = 0x014D;
     cpu->sp = 0xFFFE;
     cpu->pc = 0x0100;
+
     cpu->ime.enabled = false;
     cpu->ime.scheduled = false;
+
+    cpu->halted = false;
+    cpu->halt_bug = false;
 
     LOG_DEBUG(
         "CPU initialized:\n"
@@ -79,14 +83,23 @@ static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, int pending) {
 
     // Dispatching an interrupt always wakes the CPU from HALT.
     cpu->halted = false;
-
-    interrupts_acknowledge(&bus->io_reg.interrupts, pending); // Clear IF for this interrupt
     cpu->ime.enabled = false;
 
     bus_write(bus, cpu->sp - 1, cpu->pc >> 8);
-    bus_write(bus, cpu->sp - 2, cpu->pc & 0xFF);
-    cpu->sp -= 2;
-    cpu->pc = handlers[pending];
+
+    // Re-check pending AFTER high byte push, since IE may have changed
+    pending = interrupts_pending(&bus->io_reg.interrupts);
+    if (pending < 0) {
+        // IE was cleared by the push — corrupted dispatch
+        bus_write(bus, cpu->sp - 2, 0x00);
+        cpu->sp -= 2;
+        cpu->pc = 0x0000;
+    } else {
+        bus_write(bus, cpu->sp - 2, cpu->pc & 0xFF);
+        cpu->sp -= 2;
+        interrupts_acknowledge(&bus->io_reg.interrupts, pending);
+        cpu->pc = handlers[pending];
+    }
 
     return 20; // Interrupt handling takes 20 cycles
 }

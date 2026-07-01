@@ -30,7 +30,6 @@ typedef struct {
     uint8_t tma;        // 0xFF06 — Timer modulo
     timer_ctrl_t tac;   // 0xFF07 — Timer control
 
-    uint16_t tima_counter; // internal counter for TIMA increments
     uint8_t tima_reload_pending; // pending reload for TIMA
 } timer_regs_t;
 
