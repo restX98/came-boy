@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 void timer_init(timer_regs_t *timer) {
-    timer->div_counter = 0xAB00;
+    timer->div_counter = 0xABD4;
     timer->tima = 0x00;
     timer->tma = 0x00;
     timer->tac.reg = 0xF8;
