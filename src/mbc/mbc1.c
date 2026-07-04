@@ -15,7 +15,7 @@ static const uint8_t nintendo_logo[48] = {
 };
 
 static void mbc1_init(cartridge_t *cartridge) {
-    LOG_DEBUG("Resetting MBC1 state");
+    LOG_DEBUG("Initializing MBC1 state");
 
     cartridge->state.mbc1.bank1 = 0x01;
     cartridge->state.mbc1.bank2 = 0x00;

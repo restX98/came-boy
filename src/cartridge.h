@@ -37,7 +37,7 @@ struct cartridge {
             bool is_multicart;
         } mbc1;
         struct {
-            uint8_t romb;
+            uint8_t bank;
             bool ram_enabled;
         } mbc2;
     } state;
