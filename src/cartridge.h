@@ -17,7 +17,8 @@ typedef struct {
     // TODO: eventually make it a mem_t(?)
     uint8_t *rom;
     size_t size;
-    uint8_t bank;
+    uint8_t bank1;
+    uint8_t bank2;
     uint8_t banks_number;
     bool ram_enabled;
     uint8_t banking_mode;
@@ -26,9 +27,9 @@ typedef struct {
     mbc_t mbc;
     char destination[32];
     uint8_t version;
+    bool is_multicart;
 
     mem_t ram;
-    uint8_t ram_bank;
 } cartridge_t;
 
 int cartridge_load(cartridge_t *cartridge, const char *filename);

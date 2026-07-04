@@ -21,7 +21,7 @@ static uint8_t read_hram(bus_t *bus, uint16_t addr);
 static void write_hram(bus_t *bus, uint16_t addr, uint8_t value);
 
 static const mem_region_t memory_map[] = {
-    {"ROM", 0x0000, 0x7FFF, read_rom, write_rom},                   // 16 KiB ROM bank 00 (fixed) + 16 KiB ROM bank 01~NN (switchable, if supported)
+    {"ROM", 0x0000, 0x7FFF, read_rom, write_rom},                            // 16 KiB ROM bank 00 (fixed) + 16 KiB ROM bank 01~NN (switchable, if supported)
     {"VRAM", 0x8000, 0x9FFF, read_vram, write_vram},                         // 8 KiB Video RAM (VRAM)
     {"External RAM", 0xA000, 0xBFFF, read_ext_ram, write_ext_ram},           // 8 KiB External RAM (if supported)
     {"WRAM", 0xC000, 0xDFFF, read_wram, write_wram},                         // 8 KiB Work RAM (WRAM)

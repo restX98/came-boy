@@ -10,6 +10,15 @@
 
 static bool checksum_verify(uint8_t *rom);
 
+static const uint8_t nintendo_logo[] = {
+    0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
+    0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+    0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
+    0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+    0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
+    0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
+};
+
 int cartridge_load(cartridge_t *cartridge, const char *filename) {
     LOG_INFO("Loading ROM: %s", filename);
 
@@ -41,7 +50,10 @@ int cartridge_load(cartridge_t *cartridge, const char *filename) {
         return -1;
     }
     cartridge->size = (size_t)size;
-    cartridge->bank = 1;
+    cartridge->bank1 = 0x01;
+    cartridge->bank2 = 0x00;
+    cartridge->banking_mode = 0;
+    cartridge->ram_enabled = false;
 
     rewind(ptr);
 
@@ -51,7 +63,6 @@ int cartridge_load(cartridge_t *cartridge, const char *filename) {
         free(cartridge->rom);
         cartridge->rom = NULL;
         cartridge->size = 0;
-        cartridge->bank = 0;
         fclose(ptr);
 
         return -1;
@@ -61,12 +72,11 @@ int cartridge_load(cartridge_t *cartridge, const char *filename) {
 
     // 0x0149 — RAM size
     size_t ext_ram_size = ext_ram_sizes[cartridge->rom[0x0149]];
-    if (ext_ram_size != 0 && mem_init(&cartridge->ext_ram, ext_ram_size, "External RAM") != 0) {
+    if (ext_ram_size != 0 && mem_init(&cartridge->ram, ext_ram_size, "External RAM") != 0) {
         LOG_ERROR("Could not initialize external RAM");
         free(cartridge->rom);
         cartridge->rom = NULL;
         cartridge->size = 0;
-        cartridge->bank = 0;
 
         return -1;
     }
@@ -75,12 +85,25 @@ int cartridge_load(cartridge_t *cartridge, const char *filename) {
     memcpy(&cartridge->title, cartridge->rom + 0x0134, 16);
 
     // 0x0147 — Cartridge type
-    cartridge->mbc = mbc_types[cartridge->rom[0x0147]];
+    uint8_t cart_type = cartridge->rom[0x0147];
+    cartridge->mbc = mbc_types[cart_type];
     if (cartridge->mbc.name[0] == '\0') {
-        LOG_ERROR("Unknown MBC type: 0x%02X", cartridge->rom[0x0147]);
+        LOG_ERROR("Unknown MBC type: 0x%02X", cart_type);
         cartridge_unload(cartridge);
 
         return -1;
+    }
+
+    cartridge->is_multicart = false;
+    bool is_mbc1 = (cart_type >= 0x01 && cart_type <= 0x03);
+
+    // MBC1 multicart detection (header can't distinguish it so use logo heuristic)
+    if (is_mbc1 && cartridge->size == 0x100000) {
+        if (memcmp(cartridge->rom + 0x10 * 0x4000 + 0x0104,
+            nintendo_logo, sizeof(nintendo_logo)) == 0) {
+            cartridge->is_multicart = true;
+            LOG_INFO("MBC1 multicart detected");
+        }
     }
 
     // 0x0148 — ROM size
@@ -130,74 +153,67 @@ void cartridge_unload(cartridge_t *cartridge) {
     free(cartridge->rom);
     cartridge->rom = NULL;
     cartridge->size = 0;
-    cartridge->bank = 0;
 
     mem_free(&cartridge->ram);
 }
 
 
 uint8_t cartridge_rom_read(cartridge_t *cartridge, uint16_t addr) {
+    uint32_t bank;
+
     if (addr < 0x4000) {
-        return cartridge->rom[addr];
+        uint8_t shift = cartridge->is_multicart ? 4 : 5;
+        bank = (cartridge->banking_mode == 1) ? (cartridge->bank2 << shift) : 0;
     } else if (addr < 0x8000) {
-        uint32_t bank_offset = cartridge->bank * 0x4000;
-        return cartridge->rom[bank_offset + (addr - 0x4000)];
+        if (cartridge->is_multicart) {
+            bank = (cartridge->bank1 & 0x0F) | (cartridge->bank2 << 4);
+        } else {
+            bank = cartridge->bank1 | (cartridge->bank2 << 5);
+        }
+        addr -= 0x4000;
+    } else {
+        assert(0 && "Address out of range for ROM read");
+        return 0xFF;
     }
 
-    assert(0 && "Address out of range for ROM read");
-    return 0xFF; // Return 0xFF for out of range addresses
+    bank &= cartridge->banks_number - 1;
+    return cartridge->rom[bank * 0x4000 + addr];
 }
 
 void cartridge_rom_write(cartridge_t *cartridge, uint16_t addr, uint8_t value) {
-    if (addr < 0x1FFF) {
+    if (addr <= 0x1FFF) {
         cartridge->ram_enabled = (value & 0x0F) == 0x0A;
     } else if (addr <= 0x3FFF) {
-        // ROM Bank Number (lower 5 bits)
-        uint8_t bank = value & 0b00011111;
-        uint8_t mask = cartridge->banks_number - 1;
-
-        // MBC1 quirk: 00→01 translation checks the FULL 5-bit register
-        // but only applies if the ROM is large enough that bit 5 being set
-        // wouldn't just be ignored. For smaller ROMs, setting bit 5 bypasses
-        // the translation, allowing bank 0 to be mapped to $4000-$7FFF.
-        bool can_mirror_bank0 = (cartridge->banks_number <= 16) && (bank & 0x10);
-        if (!can_mirror_bank0 && bank == 0x00) {
-            bank = 0x01;
+        uint8_t bank1 = value & 0x1F;
+        if (bank1 == 0x00) {
+            bank1 = 0x01;
         }
-
-        bank = bank & mask;
-
-        // Replace lower 5 bits, preserve upper bits (set by $4000-$5FFF writes)
-        cartridge->bank = (cartridge->bank & 0b01100000) | bank;
+        cartridge->bank1 = bank1;
     } else if (addr <= 0x5FFF) {
-        // Upper 2 bits of bank number (or RAM bank in RAM banking mode)
-        uint8_t upper = value & 0x03;
-
-        if (cartridge->banking_mode == 0) {
-            // ROM banking mode: upper 2 bits extend the ROM bank number
-            cartridge->bank = (cartridge->bank & 0x1F) | (upper << 5);
-        } else {
-            // RAM banking mode: selects RAM bank 0-3
-            cartridge->ram_bank = upper;
-        }
-
+        cartridge->bank2 = value & 0x03;
     } else if (addr <= 0x7FFF) {
         // Banking Mode Select
         cartridge->banking_mode = value & 0x01;
     }
 }
 
+static uint32_t ram_offset(cartridge_t *cartridge, uint16_t addr) {
+    uint8_t bank = (cartridge->banking_mode == 1) ? cartridge->bank2 : 0;
+    return ((uint32_t)bank * 0x2000 + addr) & (cartridge->ram.size - 1);
+}
+
 uint8_t cartridge_ext_ram_read(cartridge_t *cartridge, uint16_t addr) {
-    if (!cartridge->mbc.hasRam) {
+    if (!cartridge->mbc.hasRam || !cartridge->ram_enabled) {
         return 0xFF;
     }
-    return cartridge->ram.mem[addr];
+    return cartridge->ram.mem[ram_offset(cartridge, addr)];
 }
 
 void cartridge_ext_ram_write(cartridge_t *cartridge, uint16_t addr, uint8_t value) {
-    if (cartridge->mbc.hasRam) {
-        cartridge->ram.mem[addr] = value;
+    if (!cartridge->mbc.hasRam || !cartridge->ram_enabled) {
+        return;
     }
+    cartridge->ram.mem[ram_offset(cartridge, addr)] = value;
 }
 
 static bool checksum_verify(uint8_t *rom) {
