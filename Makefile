@@ -2,7 +2,7 @@ CC      = gcc
 CFLAGS  = -Wall -Wextra -g -Isrc
 LDFLAGS =
 
-SRC     = $(wildcard src/*.c)
+SRC     = $(shell find src -name '*.c')
 OBJ     = $(SRC:src/%.c=build/%.o)
 
 # --- Test config ---
@@ -40,7 +40,7 @@ build/came-boy: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 build/%.o: src/%.c
-	@mkdir -p build
+	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --- Run all tests ---
