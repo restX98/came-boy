@@ -219,6 +219,73 @@ void test_timer_write_sets_tac_at_0xFF07(void) {
     TEST_ASSERT_EQUAL_UINT8(0xFD, timer.tac.reg);
 }
 
+// ---- timer_write: TMA write during reload cycle ----
+
+void test_timer_write_tma_updates_tima_when_just_reloaded(void) {
+    // Trigger a reload so tima_just_reloaded is set this tick.
+    timer.tima_reload_pending = 4;
+    timer.tima = 0;
+    timer.tma = 0x42;
+    timer_tick(&timer, &interrupts, 4);
+    TEST_ASSERT_TRUE(timer.tima_just_reloaded);
+
+    // Writing TMA on the same cycle also overwrites the freshly reloaded TIMA.
+    timer_write(&timer, 0xFF06, 0x77);
+
+    TEST_ASSERT_EQUAL_UINT8(0x77, timer.tma);
+    TEST_ASSERT_EQUAL_UINT8(0x77, timer.tima);
+}
+
+void test_timer_write_tma_does_not_touch_tima_when_not_just_reloaded(void) {
+    timer.tima = 0x11;
+    timer.tima_just_reloaded = false;
+
+    timer_write(&timer, 0xFF06, 0x77);
+
+    TEST_ASSERT_EQUAL_UINT8(0x77, timer.tma);
+    TEST_ASSERT_EQUAL_UINT8(0x11, timer.tima);
+}
+
+// ---- timer_write: AND-gate falling edge glitch ----
+
+void test_timer_write_div_falling_edge_increments_tima(void) {
+    // clock_select 0 watches DIV bit 9; enable set and that bit high => AND gate high.
+    timer.tac.enable = 1;
+    timer.tac.clock_select = 0;
+    timer.div_counter = 0x0200; // bit 9 set
+    timer.tima = 5;
+
+    // Resetting DIV drops the watched bit to 0: a falling edge that ticks TIMA.
+    timer_write(&timer, 0xFF04, 0x00);
+
+    TEST_ASSERT_EQUAL_UINT16(0, timer.div_counter);
+    TEST_ASSERT_EQUAL_UINT8(6, timer.tima);
+}
+
+void test_timer_write_div_falling_edge_overflow_sets_reload_pending(void) {
+    timer.tac.enable = 1;
+    timer.tac.clock_select = 0;
+    timer.div_counter = 0x0200;
+    timer.tima = 0xFF;
+
+    timer_write(&timer, 0xFF04, 0x00);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, timer.tima);
+    TEST_ASSERT_EQUAL_UINT8(4, timer.tima_reload_pending);
+}
+
+void test_timer_write_tac_disable_falling_edge_increments_tima(void) {
+    timer.tac.enable = 1;
+    timer.tac.clock_select = 0; // bit 9
+    timer.div_counter = 0x0200; // bit 9 set => AND gate high
+    timer.tima = 5;
+
+    // Clearing enable drops the AND gate: a falling edge that ticks TIMA.
+    timer_write(&timer, 0xFF07, 0x00);
+
+    TEST_ASSERT_EQUAL_UINT8(6, timer.tima);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -253,6 +320,15 @@ int main(void) {
     RUN_TEST(test_timer_write_sets_tima_at_0xFF05);
     RUN_TEST(test_timer_write_sets_tma_at_0xFF06);
     RUN_TEST(test_timer_write_sets_tac_at_0xFF07);
+
+    // ---- timer_write: TMA write during reload cycle ----
+    RUN_TEST(test_timer_write_tma_updates_tima_when_just_reloaded);
+    RUN_TEST(test_timer_write_tma_does_not_touch_tima_when_not_just_reloaded);
+
+    // ---- timer_write: AND-gate falling edge glitch ----
+    RUN_TEST(test_timer_write_div_falling_edge_increments_tima);
+    RUN_TEST(test_timer_write_div_falling_edge_overflow_sets_reload_pending);
+    RUN_TEST(test_timer_write_tac_disable_falling_edge_increments_tima);
 
     return UNITY_END();
 }
