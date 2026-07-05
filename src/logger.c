@@ -5,7 +5,7 @@
 
 static const char *level_strings[] = { "DEBUG", "INFO", "WARN", "ERROR" };
 
-static log_level_t min_level = LOG_LEVEL_DEBUG;
+static log_level_t min_level = LOG_LEVEL_INFO;
 
 // Internal logger
 void log_msg(log_level_t level, const char *file, int line, const char *fmt, ...) {
