@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 
-#include "timer.h"
 #include "interrupts.h"
+#include "joypad.h"
+#include "timer.h"
 
 typedef union {
     uint8_t reg;
@@ -78,7 +79,7 @@ typedef struct {
 } audio_regs_t;
 
 typedef struct {
-    uint8_t joyp;       // 0xFF00 — Joypad
+    joypad_reg_t joyp;        // 0xFF00 — Joypad
     interrupt_regs_t interrupts;
     lcd_regs_t lcd;
     st_regs_t serial_transfer;

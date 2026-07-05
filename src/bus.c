@@ -75,6 +75,11 @@ uint8_t bus_read(bus_t *bus, uint16_t addr) {
     for (size_t i = 0; i < sizeof(memory_map) / sizeof(mem_region_t); i++) {
         mem_region_t region = memory_map[i];
         if (addr >= region.start && addr <= region.end) {
+            if (region.read_fn == NULL) {
+                LOG_WARN("bus_read: address 0x%04X is mapped but has no read function", addr);
+                assert(0 && "Address mapped but no read function in bus_read");
+                return 0xFF; // Return 0xFF for unmapped read
+            }
             return region.read_fn(bus, addr);
         }
     }
@@ -89,6 +94,10 @@ void bus_write(bus_t *bus, uint16_t addr, uint8_t value) {
     for (size_t i = 0; i < sizeof(memory_map) / sizeof(mem_region_t); i++) {
         mem_region_t region = memory_map[i];
         if (addr >= region.start && addr <= region.end) {
+            if (region.write_fn == NULL) {
+                LOG_WARN("bus_write: address 0x%04X is mapped but has no write function", addr);
+                assert(0 && "Address mapped but no write function in bus_write");
+            }
             region.write_fn(bus, addr, value);
             return;
         }

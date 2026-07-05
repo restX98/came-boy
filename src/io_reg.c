@@ -4,6 +4,8 @@
 
 #include "logger.h"
 
+static uint8_t io_joyp_read(joypad_reg_t *joyp);
+static void io_joyp_write(joypad_reg_t *joyp, uint8_t value);
 static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr);
 static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value);
 static uint8_t io_st_read(st_regs_t *serial_transfer, uint16_t addr);
@@ -12,7 +14,8 @@ static uint8_t io_audio_read(audio_regs_t *audio, uint16_t addr);
 static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value);
 
 int io_reg_init(io_reg_t *io_reg) {
-    io_reg->joyp = 0xCF;
+    joypad_init(&io_reg->joyp);
+
     io_reg->serial_transfer.sb = 0x00;
     io_reg->serial_transfer.sc = 0x7E;
 
@@ -62,14 +65,16 @@ int io_reg_init(io_reg_t *io_reg) {
 uint8_t io_reg_read(io_reg_t *io_reg, uint16_t addr) {
     (void)io_reg; (void)addr;
 
-    if (addr == 0xFF0F || addr == 0xFFFF) {
-        return interrupts_read(&io_reg->interrupts, addr);
+    if (addr == 0xFF00) {
+        return io_joyp_read(&io_reg->joyp);
     } else if (addr >= 0xFF01 && addr <= 0xFF02) {
         return io_st_read(&io_reg->serial_transfer, addr);
-    } else if (addr >= 0xFF10 && addr <= 0xFF26) {
-        return io_audio_read(&io_reg->audio, addr);
     } else if (addr >= 0xFF04 && addr <= 0xFF07) {
         return timer_read(&io_reg->timer, addr);
+    } else if (addr == 0xFF0F || addr == 0xFFFF) {
+        return interrupts_read(&io_reg->interrupts, addr);
+    } else if (addr >= 0xFF10 && addr <= 0xFF26) {
+        return io_audio_read(&io_reg->audio, addr);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         return io_lcd_read(&io_reg->lcd, addr);
     }
@@ -81,12 +86,14 @@ uint8_t io_reg_read(io_reg_t *io_reg, uint16_t addr) {
 void io_reg_write(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
     (void)io_reg; (void)addr; (void)value;
 
-    if (addr == 0xFF0F || addr == 0xFFFF) {
-        interrupts_write(&io_reg->interrupts, addr, value);
+    if (addr == 0xFF00) {
+        io_joyp_write(&io_reg->joyp, value);
     } else if (addr >= 0xFF01 && addr <= 0xFF02) {
         io_st_write(&io_reg->serial_transfer, addr, value);
     } else if (addr >= 0xFF04 && addr <= 0xFF07) {
         timer_write(&io_reg->timer, addr, value);
+    } else if (addr == 0xFF0F || addr == 0xFFFF) {
+        interrupts_write(&io_reg->interrupts, addr, value);
     } else if (addr >= 0xFF10 && addr <= 0xFF26) {
         io_audio_write(&io_reg->audio, addr, value);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
@@ -95,6 +102,14 @@ void io_reg_write(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
         LOG_WARN("io_reg_write: unimplemented register 0x%04X", addr);
         assert(0 && "io_reg_write: unimplemented register");
     }
+}
+
+static uint8_t io_joyp_read(joypad_reg_t *joyp) {
+    return joypad_read(joyp);
+}
+
+static void io_joyp_write(joypad_reg_t *joyp, uint8_t value) {
+    joypad_write(joyp, value);
 }
 
 static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr) {
@@ -144,7 +159,7 @@ static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
             lcd->scx = value;
             break;
         case 0xFF44:
-            assert(0 && "Register 0xFF44 is read only");
+            LOG_DEBUG("Attempted to write to read-only register 0xFF44 (LY) ignored", addr, value);
             break;
         case 0xFF45:
             lcd->lyc = value;
