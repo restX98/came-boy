@@ -13,8 +13,11 @@ static void write_ext_ram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_wram(bus_t *bus, uint16_t addr);
 static void write_wram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_echo_ram(bus_t *bus, uint16_t addr);
+static void write_echo_ram(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_oam(bus_t *bus, uint16_t addr);
+static void write_oam(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_not_usable(bus_t *bus, uint16_t addr);
+static void write_not_usable(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_io_reg(bus_t *bus, uint16_t addr);
 static void write_io_reg(bus_t *bus, uint16_t addr, uint8_t value);
 static uint8_t read_hram(bus_t *bus, uint16_t addr);
@@ -25,9 +28,9 @@ static const mem_region_t memory_map[] = {
     {"VRAM", 0x8000, 0x9FFF, read_vram, write_vram},                         // 8 KiB Video RAM (VRAM)
     {"External RAM", 0xA000, 0xBFFF, read_ext_ram, write_ext_ram},           // 8 KiB External RAM (if supported)
     {"WRAM", 0xC000, 0xDFFF, read_wram, write_wram},                         // 8 KiB Work RAM (WRAM)
-    {"Echo RAM", 0xE000, 0xFDFF, read_echo_ram, NULL},                       // Echo RAM (mirrors 0xC000~0xDDFF)
-    {"OAM", 0xFE00, 0xFE9F, read_oam, NULL},                                 // Object Attribute Memory (OAM)
-    {"Not Usable", 0xFEA0, 0xFEFF, read_not_usable, NULL},                   // Not usable
+    {"Echo RAM", 0xE000, 0xFDFF, read_echo_ram, write_echo_ram},             // Echo RAM (mirrors 0xC000~0xDDFF)
+    {"OAM", 0xFE00, 0xFE9F, read_oam, write_oam},                            // Object Attribute Memory (OAM)
+    {"Not Usable", 0xFEA0, 0xFEFF, read_not_usable, write_not_usable},       // Not usable
     {"I/O Registers", 0xFF00, 0xFF7F, read_io_reg, write_io_reg},            // I/O Registers
     {"HRAM", 0xFF80, 0xFFFE, read_hram, write_hram},                         // High RAM (HRAM) - 127 bytes
     {"Interrupt Enable Register", 0xFFFF, 0xFFFF, read_io_reg, write_io_reg} // Interrupt Enable Register (IE)
@@ -168,12 +171,25 @@ static uint8_t read_echo_ram(bus_t *bus, uint16_t addr) {
     // TODO: Implement echo RAM support (?) Understand how it works and whether it's necessary to implement
     return 0xFF; // Temporary return 0xFF
 }
+static void write_echo_ram(bus_t *bus, uint16_t addr, uint8_t value) {
+    (void)bus;
+    (void)addr;
+    (void)value;
+    LOG_WARN("Attempted to write to Echo RAM address: 0x%04X with value: 0x%02X - Echo RAM write not implemented yet", addr, value);
+}
 
 static uint8_t read_oam(bus_t *bus, uint16_t addr) {
     (void)bus;
     (void)addr;
     // TODO: Implement OAM support to read from sprite attribute memory
     return 0xFF; // Temporary return 0xFF
+}
+
+static void write_oam(bus_t *bus, uint16_t addr, uint8_t value) {
+    (void)bus;
+    (void)addr;
+    (void)value;
+    LOG_WARN("Attempted to write to OAM address: 0x%04X with value: 0x%02X - OAM write not implemented yet", addr, value);
 }
 
 static uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
@@ -183,6 +199,13 @@ static uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
     // TODO: Implement proper handling for not usable addresses (e.g., return 0xFF, log a warning, etc.)
     // something about OAM corruption, to understand how it works and whether it's necessary to implement
     return 0xFF; // Return 0xFF for not usable addresses
+}
+
+static void write_not_usable(bus_t *bus, uint16_t addr, uint8_t value) {
+    (void)bus;
+    (void)addr;
+    (void)value;
+    LOG_WARN("Attempted to write to not usable address: 0x%04X", addr);
 }
 
 static uint8_t read_io_reg(bus_t *bus, uint16_t addr) {
