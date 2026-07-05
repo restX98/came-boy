@@ -140,7 +140,7 @@ static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr) {
             return lcd->wx;
     }
 
-    assert(0 && "Assert something");
+    assert(0 && "io_lcd_read: unhandled LCD register");
 }
 
 static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
@@ -149,8 +149,7 @@ static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
             lcd->ctrl.reg = value;
             break;
         case 0xFF41:
-            // TODO: fix writability (0, 1, 2, bits are read only)
-            lcd->stat.reg = value;
+            lcd->stat.reg = (lcd->stat.reg & 0x07) | (value & 0x78) | 0x80;
             break;
         case 0xFF42:
             lcd->scy = value;
@@ -183,7 +182,7 @@ static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
             lcd->wx = value;
             break;
         default:
-            assert(0 && "Assert something");
+            assert(0 && "io_lcd_write: unhandled LCD register");
             break;
     }
 }
@@ -195,7 +194,7 @@ static uint8_t io_st_read(st_regs_t *serial_transfer, uint16_t addr) {
         return serial_transfer->sc;
     }
 
-    assert(0 && "Assert something");
+    assert(0 && "io_st_read: unhandled serial register");
 }
 
 static void io_st_write(st_regs_t *serial_transfer, uint16_t addr, uint8_t value) {
@@ -213,7 +212,7 @@ static void io_st_write(st_regs_t *serial_transfer, uint16_t addr, uint8_t value
             // request_interrupt(INT_SERIAL);
         }
     } else {
-        assert(0 && "Assert something");
+        assert(0 && "io_st_write: unhandled serial register");
     }
 }
 
@@ -221,39 +220,39 @@ static uint8_t io_audio_read(audio_regs_t *audio, uint16_t addr) {
     if (addr == 0xFF10) {
         return audio->nr10;
     } else if (addr == 0xFF11) {
-        return audio->nr11;
+        return audio->nr11 | 0b00111111;
     } else if (addr == 0xFF12) {
         return audio->nr12;
     } else if (addr == 0xFF13) {
-        return audio->nr13;
+        return 0xFF; // audio->nr13 | 0b11111111; // read-only, always returns 0xFF
     } else if (addr == 0xFF14) {
-        return audio->nr14;
+        return audio->nr14 | 0b10111111;
     } else if (addr == 0xFF16) {
-        return audio->nr21;
+        return audio->nr21 | 0b00111111;
     } else if (addr == 0xFF17) {
         return audio->nr22;
     } else if (addr == 0xFF18) {
-        return audio->nr23;
+        return 0xFF; // audio->nr23 | 0b11111111; // read-only, always returns 0xFF
     } else if (addr == 0xFF19) {
-        return audio->nr24;
+        return audio->nr24 | 0b10111111;
     } else if (addr == 0xFF1A) {
         return audio->nr30;
     } else if (addr == 0xFF1B) {
-        return audio->nr31;
+        return 0xFF; // audio->nr31 | 0b11111111; // read-only, always returns 0xFF
     } else if (addr == 0xFF1C) {
         return audio->nr32;
     } else if (addr == 0xFF1D) {
-        return audio->nr33;
+        return 0xFF; // audio->nr33 | 0b11111111; // read-only, always returns 0xFF
     } else if (addr == 0xFF1E) {
-        return audio->nr34;
+        return audio->nr34 | 0b10111111;
     } else if (addr == 0xFF20) {
-        return audio->nr41;
+        return 0xFF; // audio->nr41 | 0b11111111; // read-only, always returns 0xFF
     } else if (addr == 0xFF21) {
         return audio->nr42;
     } else if (addr == 0xFF22) {
         return audio->nr43;
     } else if (addr == 0xFF23) {
-        return audio->nr44;
+        return audio->nr44 | 0b10111111;
     } else if (addr == 0xFF24) {
         return audio->nr50;
     } else if (addr == 0xFF25) {
@@ -261,13 +260,14 @@ static uint8_t io_audio_read(audio_regs_t *audio, uint16_t addr) {
     } else if (addr == 0xFF26) {
         return audio->nr52;
     } else {
-        assert(0 && "Assert something");
+        LOG_WARN("Unhandled audio register 0x%04X", addr);
+        return 0xFF;
     }
 }
 
 static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
     if (addr == 0xFF10) {
-        audio->nr10 = value;
+        audio->nr10 = value | 0b10000000;
     } else if (addr == 0xFF11) {
         audio->nr11 = value;
     } else if (addr == 0xFF12) {
@@ -275,7 +275,7 @@ static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
     } else if (addr == 0xFF13) {
         audio->nr13 = value;
     } else if (addr == 0xFF14) {
-        audio->nr14 = value;
+        audio->nr14 = value | 0b00111000;
     } else if (addr == 0xFF16) {
         audio->nr21 = value;
     } else if (addr == 0xFF17) {
@@ -283,32 +283,32 @@ static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
     } else if (addr == 0xFF18) {
         audio->nr23 = value;
     } else if (addr == 0xFF19) {
-        audio->nr24 = value;
+        audio->nr24 = value | 0b00111000;
     } else if (addr == 0xFF1A) {
-        audio->nr30 = value;
+        audio->nr30 = value | 0b01111111;
     } else if (addr == 0xFF1B) {
         audio->nr31 = value;
     } else if (addr == 0xFF1C) {
-        audio->nr32 = value;
+        audio->nr32 = value | 0b10011111;
     } else if (addr == 0xFF1D) {
         audio->nr33 = value;
     } else if (addr == 0xFF1E) {
-        audio->nr34 = value;
+        audio->nr34 = value | 0b00111000;
     } else if (addr == 0xFF20) {
-        audio->nr41 = value;
+        audio->nr41 = value | 0b11000000;
     } else if (addr == 0xFF21) {
         audio->nr42 = value;
     } else if (addr == 0xFF22) {
         audio->nr43 = value;
     } else if (addr == 0xFF23) {
-        audio->nr44 = value;
+        audio->nr44 = value | 0b00111111;
     } else if (addr == 0xFF24) {
         audio->nr50 = value;
     } else if (addr == 0xFF25) {
         audio->nr51 = value;
     } else if (addr == 0xFF26) {
-        audio->nr52 = value;
+        audio->nr52 = value | 0b01111111;
     } else {
-        assert(0 && "Assert something");
+        LOG_WARN("Unhandled audio register 0x%04X", addr);
     }
 }

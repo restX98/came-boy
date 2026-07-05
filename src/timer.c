@@ -110,9 +110,9 @@ void timer_write(timer_regs_t *timer, uint16_t addr, uint8_t value) {
         uint8_t old_cs = timer->tac.clock_select;
         bool and_before = timer_and_gate(timer, old_cs);
 
-        timer->tac.reg = value;
+        timer->tac.reg = value | 0b11111000;
 
-        bool and_after = timer_and_gate(timer, old_cs); // old clock_select, enable may have changed
+        bool and_after = timer_and_gate(timer, timer->tac.clock_select); // old clock_select, enable may have changed
         timer_apply_falling_edge(timer, and_before, and_after);
     } else {
         assert(0 && "Unhandled timer address");
