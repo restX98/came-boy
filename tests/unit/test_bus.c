@@ -365,26 +365,26 @@ void test_bus_free_calls_mem_free_for_hram(void) {
 
 // ---- bus_read ----
 
-void test_bus_read_rom_bank0(void) {
+void test_bus_read_rom(void) {
     bus.cartridge = &cartridge;
     cartridge_rom_read_stats.calls[0].return_value = 0xAB;
 
-    TEST_ASSERT_EQUAL_UINT8(0xAB, bus_read(&bus, 0x0000));
-
-    TEST_ASSERT_EQUAL_size_t(1, cartridge_rom_read_stats.call_count);
-    TEST_ASSERT_EQUAL_PTR(&cartridge, cartridge_rom_read_stats.calls[0].cartridge);
-    TEST_ASSERT_EQUAL_UINT16(0x0000, cartridge_rom_read_stats.calls[0].addr);
-}
-
-void test_bus_read_rom_bank1(void) {
-    bus.cartridge = &cartridge;
-    cartridge_rom_read_stats.calls[0].return_value = 0xEF;
-
-    TEST_ASSERT_EQUAL_UINT8(0xEF, bus_read(&bus, 0x4000));
+    TEST_ASSERT_EQUAL_UINT8(0xAB, bus_read(&bus, 0x4000));
 
     TEST_ASSERT_EQUAL_size_t(1, cartridge_rom_read_stats.call_count);
     TEST_ASSERT_EQUAL_PTR(&cartridge, cartridge_rom_read_stats.calls[0].cartridge);
     TEST_ASSERT_EQUAL_UINT16(0x4000, cartridge_rom_read_stats.calls[0].addr);
+}
+
+void test_bus_write_rom(void) {
+    bus.cartridge = &cartridge;
+
+    bus_write(&bus, 0x2000, 0x0A);
+
+    TEST_ASSERT_EQUAL_size_t(1, cartridge_rom_write_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&cartridge, cartridge_rom_write_stats.calls[0].cartridge);
+    TEST_ASSERT_EQUAL_UINT16(0x2000, cartridge_rom_write_stats.calls[0].addr);
+    TEST_ASSERT_EQUAL_UINT8(0x0A, cartridge_rom_write_stats.calls[0].value);
 }
 
 void test_bus_read_vram(void) {
@@ -393,10 +393,36 @@ void test_bus_read_vram(void) {
     TEST_ASSERT_EQUAL_UINT8(0x55, bus_read(&bus, 0x8000));
 }
 
-void test_bus_read_external_ram(void) {
-    // Since external RAM is not implemented, it should return 0xFF
-    // TODO: complete later when MBC support is added
-    TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xA000));
+void test_bus_write_vram(void) {
+    uint8_t memory[1] = { 0x00 };
+    bus.vram.mem = memory;
+
+    bus_write(&bus, 0x8000, 0x55);
+
+    TEST_ASSERT_EQUAL_UINT8(0x55, memory[0]);
+}
+
+void test_bus_read_ext_ram(void) {
+    bus.cartridge = &cartridge;
+    cartridge_ext_ram_read_stats.calls[0].return_value = 0xCD;
+
+    // The bus passes the cartridge-relative offset (addr - 0xA000).
+    TEST_ASSERT_EQUAL_UINT8(0xCD, bus_read(&bus, 0xA100));
+
+    TEST_ASSERT_EQUAL_size_t(1, cartridge_ext_ram_read_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&cartridge, cartridge_ext_ram_read_stats.calls[0].cartridge);
+    TEST_ASSERT_EQUAL_UINT16(0x0100, cartridge_ext_ram_read_stats.calls[0].addr);
+}
+
+void test_bus_write_ext_ram(void) {
+    bus.cartridge = &cartridge;
+
+    bus_write(&bus, 0xA100, 0x3C);
+
+    TEST_ASSERT_EQUAL_size_t(1, cartridge_ext_ram_write_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&cartridge, cartridge_ext_ram_write_stats.calls[0].cartridge);
+    TEST_ASSERT_EQUAL_UINT16(0x0100, cartridge_ext_ram_write_stats.calls[0].addr);
+    TEST_ASSERT_EQUAL_UINT8(0x3C, cartridge_ext_ram_write_stats.calls[0].value);
 }
 
 void test_bus_read_wram(void) {
@@ -424,9 +450,22 @@ void test_bus_read_not_usable(void) {
 }
 
 void test_bus_read_io_reg(void) {
-    // Since I/O registers are not implemented, it should return 0xFF
-    // TODO: complete later when I/O register support is added
-    TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xFF00));
+    io_reg_read_stats.calls[0].return_value = 0x3C;
+
+    TEST_ASSERT_EQUAL_UINT8(0x3C, bus_read(&bus, 0xFF00));
+
+    TEST_ASSERT_EQUAL_size_t(1, io_reg_read_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&bus.io_reg, io_reg_read_stats.calls[0].io_reg);
+    TEST_ASSERT_EQUAL_UINT16(0xFF00, io_reg_read_stats.calls[0].addr);
+}
+
+void test_bus_write_io_reg(void) {
+    bus_write(&bus, 0xFF00, 0x3C);
+
+    TEST_ASSERT_EQUAL_size_t(1, io_reg_write_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&bus.io_reg, io_reg_write_stats.calls[0].io_reg);
+    TEST_ASSERT_EQUAL_UINT16(0xFF00, io_reg_write_stats.calls[0].addr);
+    TEST_ASSERT_EQUAL_UINT8(0x3C, io_reg_write_stats.calls[0].value);
 }
 
 void test_bus_read_hram(void) {
@@ -435,10 +474,22 @@ void test_bus_read_hram(void) {
     TEST_ASSERT_EQUAL_UINT8(0x77, bus_read(&bus, 0xFF80));
 }
 
-void test_bus_read_interrupt_reg(void) {
-    // Since interrupt register is not implemented, it should return 0xFF
-    // TODO: complete later when interrupt register support is added
-    TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xFFFF));
+void test_bus_write_wram(void) {
+    uint8_t memory[1] = { 0x00 };
+    bus.wram.mem = memory;
+
+    bus_write(&bus, 0xC000, 0x42);
+
+    TEST_ASSERT_EQUAL_UINT8(0x42, memory[0]);
+}
+
+void test_bus_write_hram(void) {
+    uint8_t memory[1] = { 0x00 };
+    bus.hram.mem = memory;
+
+    bus_write(&bus, 0xFF80, 0x77);
+
+    TEST_ASSERT_EQUAL_UINT8(0x77, memory[0]);
 }
 
 int main(void) {
@@ -452,20 +503,34 @@ int main(void) {
     RUN_TEST(test_bus_init_returns_minus1_on_wram_allocation_failure);
     RUN_TEST(test_bus_init_returns_minus1_on_vram_allocation_failure);
     RUN_TEST(test_bus_init_returns_minus1_on_hram_allocation_failure);
+
     RUN_TEST(test_bus_free_calls_mem_free_for_wram);
     RUN_TEST(test_bus_free_calls_mem_free_for_vram);
     RUN_TEST(test_bus_free_calls_mem_free_for_hram);
-    RUN_TEST(test_bus_read_rom_bank0);
-    RUN_TEST(test_bus_read_rom_bank1);
+
+    RUN_TEST(test_bus_read_rom);
+    RUN_TEST(test_bus_write_rom);
+
     RUN_TEST(test_bus_read_vram);
-    // RUN_TEST(test_bus_read_external_ram);
+    RUN_TEST(test_bus_write_vram);
+
+    RUN_TEST(test_bus_read_ext_ram);
+    RUN_TEST(test_bus_write_ext_ram);
+
     RUN_TEST(test_bus_read_wram);
+    RUN_TEST(test_bus_write_wram);
+
     RUN_TEST(test_bus_read_echo_ram);
+
     RUN_TEST(test_bus_read_oam);
+
     RUN_TEST(test_bus_read_not_usable);
-    // RUN_TEST(test_bus_read_io_reg);
+
+    RUN_TEST(test_bus_read_io_reg);
+    RUN_TEST(test_bus_write_io_reg);
+
     RUN_TEST(test_bus_read_hram);
-    // RUN_TEST(test_bus_read_interrupt_reg);
+    RUN_TEST(test_bus_write_hram);
 
     return UNITY_END();
 }
