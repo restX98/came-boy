@@ -4,6 +4,7 @@
 #define WRAM_SIZE (8 * 1024) // 8KB of WRAM
 #define VRAM_SIZE (8 * 1024) // 8KB of VRAM
 #define HRAM_SIZE 127 // 127 bytes of HRAM
+#define OAM_SIZE 160 // 160 bytes of OAM
 
 #include <stddef.h>
 #include <stdint.h>

@@ -11,6 +11,8 @@ typedef struct {
     mem_t vram;
     mem_t hram;
 
+    mem_t oam; // Object Attribute Memory (OAM) for sprite data
+
     io_reg_t io_reg;
     // TODO: Later add other components like RAM, PPU, APU, etc.
 } bus_t;

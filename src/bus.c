@@ -58,6 +58,13 @@ int bus_init(bus_t *bus, cartridge_t *cartridge) {
         mem_free(&bus->vram);
         return -1;
     }
+    if (mem_init(&bus->oam, OAM_SIZE, "OAM") != 0) {
+        LOG_ERROR("Could not initialize OAM");
+        mem_free(&bus->wram);
+        mem_free(&bus->vram);
+        mem_free(&bus->hram);
+        return -1;
+    }
 
     // TODO: Later add other components like RAM, PPU, APU, etc.
 
@@ -70,6 +77,7 @@ void bus_free(bus_t *bus) {
     mem_free(&bus->wram);
     mem_free(&bus->vram);
     mem_free(&bus->hram);
+    mem_free(&bus->oam);
 }
 
 uint8_t bus_read(bus_t *bus, uint16_t addr) {
@@ -179,17 +187,17 @@ static void write_echo_ram(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_oam(bus_t *bus, uint16_t addr) {
-    (void)bus;
-    (void)addr;
-    // TODO: Implement OAM support to read from sprite attribute memory
-    return 0xFF; // Temporary return 0xFF
+    uint16_t oam_address = addr - 0xFE00;
+    uint8_t value = bus->oam.mem[oam_address];
+    LOG_DEBUG("OAM read: [0x%04X] = 0x%02X", oam_address, value);
+
+    return value;
 }
 
 static void write_oam(bus_t *bus, uint16_t addr, uint8_t value) {
-    (void)bus;
-    (void)addr;
-    (void)value;
-    LOG_WARN("Attempted to write to OAM address: 0x%04X with value: 0x%02X - OAM write not implemented yet", addr, value);
+    uint16_t oam_address = addr - 0xFE00;
+    bus->oam.mem[oam_address] = value;
+    LOG_DEBUG("OAM write: [0x%04X] = 0x%02X", oam_address, value);
 }
 
 static uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
