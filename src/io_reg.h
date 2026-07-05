@@ -5,6 +5,7 @@
 
 #include "interrupts.h"
 #include "joypad.h"
+#include "serial_transfer.h"
 #include "timer.h"
 
 typedef union {
@@ -48,11 +49,6 @@ typedef struct {
     uint8_t wy;         // 0xFF4A — Window Y position
     uint8_t wx;         // 0xFF4B — Window X position plus 7
 } lcd_regs_t;
-
-typedef struct {
-    uint8_t sb;         // 0xFF01 — Serial transfer data
-    uint8_t sc;         // 0xFF02 — Serial transfer control
-} st_regs_t;
 
 typedef struct {
     uint8_t nr52;       // 0xFF26 — Audio master control

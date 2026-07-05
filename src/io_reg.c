@@ -4,20 +4,15 @@
 
 #include "logger.h"
 
-static uint8_t io_joyp_read(joypad_reg_t *joyp);
-static void io_joyp_write(joypad_reg_t *joyp, uint8_t value);
 static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr);
 static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value);
-static uint8_t io_st_read(st_regs_t *serial_transfer, uint16_t addr);
-static void io_st_write(st_regs_t *serial_transfer, uint16_t addr, uint8_t value);
 static uint8_t io_audio_read(audio_regs_t *audio, uint16_t addr);
 static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value);
 
 int io_reg_init(io_reg_t *io_reg) {
     joypad_init(&io_reg->joyp);
 
-    io_reg->serial_transfer.sb = 0x00;
-    io_reg->serial_transfer.sc = 0x7E;
+    serial_transfer_init(&io_reg->serial_transfer);
 
     interrupts_init(&io_reg->interrupts);
 
@@ -66,9 +61,9 @@ uint8_t io_reg_read(io_reg_t *io_reg, uint16_t addr) {
     (void)io_reg; (void)addr;
 
     if (addr == 0xFF00) {
-        return io_joyp_read(&io_reg->joyp);
+        return joypad_read(&io_reg->joyp);
     } else if (addr >= 0xFF01 && addr <= 0xFF02) {
-        return io_st_read(&io_reg->serial_transfer, addr);
+        return serial_transfer_read(&io_reg->serial_transfer, addr);
     } else if (addr >= 0xFF04 && addr <= 0xFF07) {
         return timer_read(&io_reg->timer, addr);
     } else if (addr == 0xFF0F || addr == 0xFFFF) {
@@ -79,17 +74,17 @@ uint8_t io_reg_read(io_reg_t *io_reg, uint16_t addr) {
         return io_lcd_read(&io_reg->lcd, addr);
     }
 
-    LOG_WARN("io_reg_read: unimplemented register 0x%04X", addr);
     assert(0 && "io_reg_read: unimplemented register");
+    return 0xFF;
 }
 
 void io_reg_write(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
     (void)io_reg; (void)addr; (void)value;
 
     if (addr == 0xFF00) {
-        io_joyp_write(&io_reg->joyp, value);
+        joypad_write(&io_reg->joyp, value);
     } else if (addr >= 0xFF01 && addr <= 0xFF02) {
-        io_st_write(&io_reg->serial_transfer, addr, value);
+        serial_transfer_write(&io_reg->serial_transfer, addr, value);
     } else if (addr >= 0xFF04 && addr <= 0xFF07) {
         timer_write(&io_reg->timer, addr, value);
     } else if (addr == 0xFF0F || addr == 0xFFFF) {
@@ -102,14 +97,6 @@ void io_reg_write(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
         LOG_WARN("io_reg_write: unimplemented register 0x%04X", addr);
         assert(0 && "io_reg_write: unimplemented register");
     }
-}
-
-static uint8_t io_joyp_read(joypad_reg_t *joyp) {
-    return joypad_read(joyp);
-}
-
-static void io_joyp_write(joypad_reg_t *joyp, uint8_t value) {
-    joypad_write(joyp, value);
 }
 
 static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr) {
@@ -184,35 +171,6 @@ static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
         default:
             assert(0 && "io_lcd_write: unhandled LCD register");
             break;
-    }
-}
-
-static uint8_t io_st_read(st_regs_t *serial_transfer, uint16_t addr) {
-    if (addr == 0xFF01) {
-        return serial_transfer->sb;
-    } else if (addr == 0xFF02) {
-        return serial_transfer->sc;
-    }
-
-    assert(0 && "io_st_read: unhandled serial register");
-}
-
-static void io_st_write(st_regs_t *serial_transfer, uint16_t addr, uint8_t value) {
-    if (addr == 0xFF01) {
-        serial_transfer->sb = value;
-    } else if (addr == 0xFF02) {
-        serial_transfer->sc = value;
-        if ((value & 0x81) == 0x81) {
-            // Transfer initiated with internal clock — emit the byte
-            log_serial((char)serial_transfer->sb);
-
-            // Clear the transfer-start bit to signal completion
-            serial_transfer->sc &= ~0x80;
-            // Optional: request serial interrupt
-            // request_interrupt(INT_SERIAL);
-        }
-    } else {
-        assert(0 && "io_st_write: unhandled serial register");
     }
 }
 
