@@ -45,9 +45,11 @@ uint8_t lcd_read(lcd_regs_t *lcd, uint16_t addr) {
             return lcd->wy;
         case 0xFF4B:
             return lcd->wx;
+        default:
+            assert(0 && "io_lcd_read: unhandled LCD register");
+            break;
     }
 
-    assert(0 && "io_lcd_read: unhandled LCD register");
 }
 
 void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
