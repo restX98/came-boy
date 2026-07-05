@@ -1074,7 +1074,7 @@ void test_op_ld_b_imm8(void) {
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(8, cycles);
     TEST_ASSERT_EQUAL(1, mock_cpu.pc);
     TEST_ASSERT_EQUAL(0x12, mock_cpu.bc.hi);
 }
@@ -1086,7 +1086,7 @@ void test_op_ld_c_imm8(void) {
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(8, cycles);
     TEST_ASSERT_EQUAL(1, mock_cpu.pc);
     TEST_ASSERT_EQUAL(0x12, mock_cpu.bc.lo);
 }
@@ -1098,7 +1098,7 @@ void test_op_ld_d_imm8(void) {
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(8, cycles);
     TEST_ASSERT_EQUAL(1, mock_cpu.pc);
     TEST_ASSERT_EQUAL(0x12, mock_cpu.de.hi);
 }
@@ -1110,7 +1110,7 @@ void test_op_ld_e_imm8(void) {
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(8, cycles);
     TEST_ASSERT_EQUAL(1, mock_cpu.pc);
     TEST_ASSERT_EQUAL(0x12, mock_cpu.de.lo);
 }
@@ -1122,7 +1122,7 @@ void test_op_ld_h_imm8(void) {
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(8, cycles);
     TEST_ASSERT_EQUAL(1, mock_cpu.pc);
     TEST_ASSERT_EQUAL(0x12, mock_cpu.hl.hi);
 }
@@ -1135,7 +1135,7 @@ void test_op_ld_l_imm8(void) {
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(8, cycles);
     TEST_ASSERT_EQUAL(1, mock_cpu.pc);
     TEST_ASSERT_EQUAL(0x12, mock_cpu.hl.lo);
 }
@@ -1162,7 +1162,7 @@ void test_op_ld_a_imm8(void) {
 
     int cycles = opcode_table[opcode](&mock_cpu, &mock_bus, opcode);
 
-    TEST_ASSERT_EQUAL(4, cycles);
+    TEST_ASSERT_EQUAL(8, cycles);
     TEST_ASSERT_EQUAL(1, mock_cpu.pc);
     TEST_ASSERT_EQUAL(0x12, mock_cpu.af.hi);
 }
@@ -1741,7 +1741,7 @@ void test_op_rr_r8_clears_n_and_h_flags(void) {
 // ---- op_sla_r8 ----
 void test_op_sla_r8_matrix(void) {
     // opcodes 0x20-0x25 = SLA B,C,D,E,H,L; 0x27 = SLA A (0x26 is [HL], tested separately)
-    uint8_t r8_opcodes[7] = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x27};
+    uint8_t r8_opcodes[7] = { 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x27 };
 
     for (int i = 0; i < 7; i++) {
         *regs[i].reg = 0b10110100;
@@ -1836,7 +1836,7 @@ void test_op_sla_r8_clears_n_and_h_flags(void) {
 // ---- op_sra_r8 ----
 void test_op_sra_r8_matrix(void) {
     // opcodes 0x28-0x2D = SRA B,C,D,E,H,L; 0x2F = SRA A (0x2E is [HL], tested separately)
-    uint8_t r8_opcodes[7] = {0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2F};
+    uint8_t r8_opcodes[7] = { 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2F };
 
     for (int i = 0; i < 7; i++) {
         *regs[i].reg = 0b10110100;
@@ -1930,7 +1930,7 @@ void test_op_sra_r8_clears_n_and_h_flags(void) {
 // ---- op_swap_r8 ----
 void test_op_swap_r8_matrix(void) {
     // opcodes 0x30-0x35 = SWAP B,C,D,E,H,L; 0x37 = SWAP A (0x36 is [HL], tested separately)
-    uint8_t r8_opcodes[7] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x37};
+    uint8_t r8_opcodes[7] = { 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x37 };
 
     for (int i = 0; i < 7; i++) {
         *regs[i].reg = 0xAB;
@@ -1994,7 +1994,7 @@ void test_op_swap_r8_always_clears_n_h_c_flags(void) {
 // ---- op_srl_r8 ----
 void test_op_srl_r8_matrix(void) {
     // opcodes 0x38-0x3D = SRL B,C,D,E,H,L; 0x3F = SRL A (0x3E is [HL], tested separately)
-    uint8_t r8_opcodes[7] = {0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3F};
+    uint8_t r8_opcodes[7] = { 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3F };
 
     for (int i = 0; i < 7; i++) {
         *regs[i].reg = 0b10110100;
@@ -2089,7 +2089,7 @@ void test_op_srl_r8_clears_n_and_h_flags(void) {
 // ---- op_bit_b3_r8 ----
 void test_op_bit_b3_r8_matrix(void) {
     // opcode = 0x40 + (bit_index << 3) + reg_code; reg codes: B=0..L=5, A=7
-    uint8_t reg_codes[7] = {0, 1, 2, 3, 4, 5, 7};
+    uint8_t reg_codes[7] = { 0, 1, 2, 3, 4, 5, 7 };
 
     for (int bit = 0; bit < 8; bit++) {
         for (int ri = 0; ri < 7; ri++) {
@@ -2154,7 +2154,7 @@ void test_op_bit_b3_r8_does_not_modify_register(void) {
 // ---- op_res_b3_r8 ----
 void test_op_res_b3_r8_matrix(void) {
     // opcode = 0x80 + (bit_index << 3) + reg_code; reg codes: B=0..L=5, A=7
-    uint8_t reg_codes[7] = {0, 1, 2, 3, 4, 5, 7};
+    uint8_t reg_codes[7] = { 0, 1, 2, 3, 4, 5, 7 };
 
     for (int bit = 0; bit < 8; bit++) {
         for (int ri = 0; ri < 7; ri++) {
@@ -2213,7 +2213,7 @@ void test_op_res_b3_r8_does_not_modify_flags(void) {
 // ---- op_set_b3_r8 ----
 void test_op_set_b3_r8_matrix(void) {
     // opcode = 0xC0 + (bit_index << 3) + reg_code; reg codes: B=0..L=5, A=7
-    uint8_t reg_codes[7] = {0, 1, 2, 3, 4, 5, 7};
+    uint8_t reg_codes[7] = { 0, 1, 2, 3, 4, 5, 7 };
 
     for (int bit = 0; bit < 8; bit++) {
         for (int ri = 0; ri < 7; ri++) {

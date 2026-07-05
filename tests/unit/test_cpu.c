@@ -320,6 +320,7 @@ void test_cpu_step_does_not_service_interrupt_when_ime_disabled(void) {
 void test_cpu_step_acknowledges_pending_interrupt(void) {
     cpu.ime.enabled = true;
     interrupts_pending_stats.calls[0].return_value = 2;
+    interrupts_pending_stats.calls[1].return_value = 2; // re-check after high-byte push
 
     cpu_step(&cpu, &bus);
 
@@ -333,6 +334,7 @@ void test_cpu_step_pushes_pc_to_stack_when_servicing_interrupt(void) {
     cpu.sp = 0xFFFE;
     cpu.pc = 0x1234;
     interrupts_pending_stats.calls[0].return_value = 0;
+    interrupts_pending_stats.calls[1].return_value = 0;
 
     cpu_step(&cpu, &bus);
 
@@ -352,6 +354,7 @@ void test_cpu_step_jumps_to_handler_address_for_pending_interrupt(void) {
         cpu.ime.enabled = true;
         cpu.sp = 0xFFFE;
         interrupts_pending_stats.calls[0].return_value = (int)i;
+        interrupts_pending_stats.calls[1].return_value = (int)i;
 
         cpu_step(&cpu, &bus);
 

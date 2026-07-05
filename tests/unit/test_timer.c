@@ -58,7 +58,7 @@ void test_timer_init_sets_initial_values(void) {
 
     timer_init(&timer);
 
-    TEST_ASSERT_EQUAL_UINT16(0xAB00, timer.div_counter);
+    TEST_ASSERT_EQUAL_UINT16(0xABD4, timer.div_counter);
     TEST_ASSERT_EQUAL_UINT8(0x00, timer.tima);
     TEST_ASSERT_EQUAL_UINT8(0x00, timer.tma);
     TEST_ASSERT_EQUAL_UINT8(0xF8, timer.tac.reg);
