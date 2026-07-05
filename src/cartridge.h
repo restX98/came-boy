@@ -40,6 +40,11 @@ struct cartridge {
             uint8_t bank;
             bool ram_enabled;
         } mbc2;
+        struct {
+            uint8_t rom_bank;
+            uint8_t ram_bank;
+            bool ram_enabled;
+        } mbc5;
     } state;
 
     // header info

@@ -4,7 +4,7 @@
 
 #include "logger.h"
 
-static void mbc_init(cartridge_t *cartridge) {
+static void mbc2_init(cartridge_t *cartridge) {
     LOG_DEBUG("Initializing MBC2 state");
 
     cartridge->state.mbc2.bank = 0x01;
@@ -20,7 +20,6 @@ static uint8_t mbc2_rom_read(cartridge_t *cartridge, uint16_t addr) {
         return cartridge->rom[bank * 0x4000 + addr];
     } else {
         assert(0 && "Address out of range for ROM read");
-        return 0xFF;
     }
 
     return 0xFF;
@@ -57,7 +56,7 @@ static void mbc2_ram_write(cartridge_t *cartridge, uint16_t addr, uint8_t value)
 }
 
 const mbc_interface_t mbc2_ops = {
-    .init = mbc_init,
+    .init = mbc2_init,
     .rom_read = mbc2_rom_read,
     .rom_write = mbc2_rom_write,
     .ram_read = mbc2_ram_read,
