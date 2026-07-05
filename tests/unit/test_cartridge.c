@@ -168,6 +168,7 @@ static void mock_mbc_ram_write(cartridge_t *c, uint16_t a, uint8_t v) {
 const mbc_interface_t no_mbc_ops = MOCK_OPS;
 const mbc_interface_t mbc1_ops = MOCK_OPS;
 const mbc_interface_t mbc2_ops = MOCK_OPS;
+const mbc_interface_t mbc5_ops = MOCK_OPS;
 
 // ---- ROM helpers ----
 

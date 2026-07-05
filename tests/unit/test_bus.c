@@ -67,7 +67,6 @@ void mem_free(mem_t *memory) {
 // Mock io_reg_init
 typedef struct {
     io_reg_t *io_reg;
-    int return_value;
 } io_reg_init_call_t;
 
 typedef struct {
@@ -77,7 +76,7 @@ typedef struct {
 
 static io_reg_init_stats_t io_reg_init_stats;
 
-int io_reg_init(io_reg_t *io_reg) {
+void io_reg_init(io_reg_t *io_reg) {
     if (io_reg_init_stats.call_count == 10) {
         assert(0 && "Exceeded maximum call count for io_reg_init_stats");
     }
@@ -86,8 +85,6 @@ int io_reg_init(io_reg_t *io_reg) {
     call->io_reg = io_reg;
 
     io_reg_init_stats.call_count++;
-
-    return io_reg_init_stats.calls[io_reg_init_stats.call_count - 1].return_value;
 }
 
 // Mock io_reg_read
@@ -278,13 +275,6 @@ void tearDown(void) {
 
 // ---- bus_init ----
 
-void test_bus_init_returns_0_on_success(void) {
-    int result = bus_init(&bus, &cartridge);
-
-    TEST_ASSERT_EQUAL_INT(0, result);
-    TEST_ASSERT_EQUAL_INT(3, mem_init_stats.call_count);
-}
-
 void test_bus_init_sets_cartridge_pointer(void) {
     bus_init(&bus, &cartridge);
     TEST_ASSERT_EQUAL_PTR(&cartridge, bus.cartridge);
@@ -438,9 +428,18 @@ void test_bus_read_echo_ram(void) {
 }
 
 void test_bus_read_oam(void) {
-    // Since OAM is not implemented, it should return 0xFF
-    // TODO: complete later when OAM support is added
-    TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xFE00));
+    uint8_t memory[1] = { 0x99 };
+    bus.oam.mem = memory;
+    TEST_ASSERT_EQUAL_UINT8(0x99, bus_read(&bus, 0xFE00));
+}
+
+void test_bus_write_oam(void) {
+    uint8_t memory[1] = { 0x00 };
+    bus.oam.mem = memory;
+
+    bus_write(&bus, 0xFE00, 0x99);
+
+    TEST_ASSERT_EQUAL_UINT8(0x99, memory[0]);
 }
 
 void test_bus_read_not_usable(void) {
@@ -495,7 +494,6 @@ void test_bus_write_hram(void) {
 int main(void) {
     UNITY_BEGIN();
 
-    RUN_TEST(test_bus_init_returns_0_on_success);
     RUN_TEST(test_bus_init_sets_cartridge_pointer);
     RUN_TEST(test_bus_init_calls_mem_init_to_initialize_wram);
     RUN_TEST(test_bus_init_calls_mem_init_to_initialize_vram);
@@ -523,6 +521,7 @@ int main(void) {
     RUN_TEST(test_bus_read_echo_ram);
 
     RUN_TEST(test_bus_read_oam);
+    RUN_TEST(test_bus_write_oam);
 
     RUN_TEST(test_bus_read_not_usable);
 
