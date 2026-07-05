@@ -158,6 +158,77 @@ void timer_write(timer_regs_t *timer, uint16_t addr, uint8_t value) {
     timer_write_stats.call_count++;
 }
 
+typedef struct {
+    joypad_reg_t *joyp;
+} joypad_init_call_t;
+
+typedef struct {
+    size_t call_count;
+    joypad_init_call_t calls[10];
+} joypad_init_stats_t;
+
+static joypad_init_stats_t joypad_init_stats;
+
+void joypad_init(joypad_reg_t *joyp) {
+    if (joypad_init_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for joypad_init_stats");
+    }
+
+    joypad_init_call_t *call = &joypad_init_stats.calls[joypad_init_stats.call_count];
+    call->joyp = joyp;
+
+    joypad_init_stats.call_count++;
+}
+
+typedef struct {
+    joypad_reg_t *joyp;
+    uint8_t return_value;
+} joypad_read_call_t;
+
+typedef struct {
+    size_t call_count;
+    joypad_read_call_t calls[10];
+} joypad_read_stats_t;
+
+static joypad_read_stats_t joypad_read_stats;
+
+uint8_t joypad_read(joypad_reg_t *joyp) {
+    if (joypad_read_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for joypad_read_stats");
+    }
+
+    joypad_read_call_t *call = &joypad_read_stats.calls[joypad_read_stats.call_count];
+    call->joyp = joyp;
+
+    joypad_read_stats.call_count++;
+
+    return call->return_value;
+}
+
+typedef struct {
+    joypad_reg_t *joyp;
+    uint8_t value;
+} joypad_write_call_t;
+
+typedef struct {
+    size_t call_count;
+    joypad_write_call_t calls[10];
+} joypad_write_stats_t;
+
+static joypad_write_stats_t joypad_write_stats;
+
+void joypad_write(joypad_reg_t *joyp, uint8_t value) {
+    if (joypad_write_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for joypad_write_stats");
+    }
+
+    joypad_write_call_t *call = &joypad_write_stats.calls[joypad_write_stats.call_count];
+    call->joyp = joyp;
+    call->value = value;
+
+    joypad_write_stats.call_count++;
+}
+
 void setUp(void) {
     suppress_logs();
 
@@ -167,6 +238,9 @@ void setUp(void) {
     timer_init_stats = (timer_init_stats_t){ 0 };
     timer_read_stats = (timer_read_stats_t){ 0 };
     timer_write_stats = (timer_write_stats_t){ 0 };
+    joypad_init_stats = (joypad_init_stats_t){ 0 };
+    joypad_read_stats = (joypad_read_stats_t){ 0 };
+    joypad_write_stats = (joypad_write_stats_t){ 0 };
 }
 
 void tearDown(void) {
