@@ -6,8 +6,6 @@
 
 static uint8_t io_lcd_read(lcd_regs_t *lcd, uint16_t addr);
 static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value);
-static uint8_t io_audio_read(audio_regs_t *audio, uint16_t addr);
-static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value);
 
 int io_reg_init(io_reg_t *io_reg) {
     joypad_init(&io_reg->joyp);
@@ -18,27 +16,7 @@ int io_reg_init(io_reg_t *io_reg) {
 
     timer_init(&io_reg->timer);
 
-    io_reg->audio.nr10 = 0x80;
-    io_reg->audio.nr11 = 0xBF;
-    io_reg->audio.nr12 = 0xF3;
-    io_reg->audio.nr13 = 0xFF;
-    io_reg->audio.nr14 = 0xBF;
-    io_reg->audio.nr21 = 0x3F;
-    io_reg->audio.nr22 = 0x00;
-    io_reg->audio.nr23 = 0xFF;
-    io_reg->audio.nr24 = 0xBF;
-    io_reg->audio.nr30 = 0x7F;
-    io_reg->audio.nr31 = 0xFF;
-    io_reg->audio.nr32 = 0x9F;
-    io_reg->audio.nr33 = 0xFF;
-    io_reg->audio.nr34 = 0xBF;
-    io_reg->audio.nr41 = 0xFF;
-    io_reg->audio.nr42 = 0x00;
-    io_reg->audio.nr43 = 0x00;
-    io_reg->audio.nr44 = 0xBF;
-    io_reg->audio.nr50 = 0x77;
-    io_reg->audio.nr51 = 0xF3;
-    io_reg->audio.nr52 = 0xF1;
+    audio_init(&io_reg->audio);
 
     io_reg->lcd.ctrl.reg = 0x91;
     io_reg->lcd.stat.reg = 0x85;
@@ -69,7 +47,7 @@ uint8_t io_reg_read(io_reg_t *io_reg, uint16_t addr) {
     } else if (addr == 0xFF0F || addr == 0xFFFF) {
         return interrupts_read(&io_reg->interrupts, addr);
     } else if (addr >= 0xFF10 && addr <= 0xFF26) {
-        return io_audio_read(&io_reg->audio, addr);
+        return audio_read(&io_reg->audio, addr);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         return io_lcd_read(&io_reg->lcd, addr);
     }
@@ -90,7 +68,7 @@ void io_reg_write(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
     } else if (addr == 0xFF0F || addr == 0xFFFF) {
         interrupts_write(&io_reg->interrupts, addr, value);
     } else if (addr >= 0xFF10 && addr <= 0xFF26) {
-        io_audio_write(&io_reg->audio, addr, value);
+        audio_write(&io_reg->audio, addr, value);
     } else if (addr >= 0xFF40 && addr <= 0xFF4B) {
         io_lcd_write(&io_reg->lcd, addr, value);
     } else {
@@ -171,102 +149,5 @@ static void io_lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
         default:
             assert(0 && "io_lcd_write: unhandled LCD register");
             break;
-    }
-}
-
-static uint8_t io_audio_read(audio_regs_t *audio, uint16_t addr) {
-    if (addr == 0xFF10) {
-        return audio->nr10;
-    } else if (addr == 0xFF11) {
-        return audio->nr11 | 0b00111111;
-    } else if (addr == 0xFF12) {
-        return audio->nr12;
-    } else if (addr == 0xFF13) {
-        return 0xFF; // audio->nr13 | 0b11111111; // read-only, always returns 0xFF
-    } else if (addr == 0xFF14) {
-        return audio->nr14 | 0b10111111;
-    } else if (addr == 0xFF16) {
-        return audio->nr21 | 0b00111111;
-    } else if (addr == 0xFF17) {
-        return audio->nr22;
-    } else if (addr == 0xFF18) {
-        return 0xFF; // audio->nr23 | 0b11111111; // read-only, always returns 0xFF
-    } else if (addr == 0xFF19) {
-        return audio->nr24 | 0b10111111;
-    } else if (addr == 0xFF1A) {
-        return audio->nr30;
-    } else if (addr == 0xFF1B) {
-        return 0xFF; // audio->nr31 | 0b11111111; // read-only, always returns 0xFF
-    } else if (addr == 0xFF1C) {
-        return audio->nr32;
-    } else if (addr == 0xFF1D) {
-        return 0xFF; // audio->nr33 | 0b11111111; // read-only, always returns 0xFF
-    } else if (addr == 0xFF1E) {
-        return audio->nr34 | 0b10111111;
-    } else if (addr == 0xFF20) {
-        return 0xFF; // audio->nr41 | 0b11111111; // read-only, always returns 0xFF
-    } else if (addr == 0xFF21) {
-        return audio->nr42;
-    } else if (addr == 0xFF22) {
-        return audio->nr43;
-    } else if (addr == 0xFF23) {
-        return audio->nr44 | 0b10111111;
-    } else if (addr == 0xFF24) {
-        return audio->nr50;
-    } else if (addr == 0xFF25) {
-        return audio->nr51;
-    } else if (addr == 0xFF26) {
-        return audio->nr52;
-    } else {
-        LOG_WARN("Unhandled audio register 0x%04X", addr);
-        return 0xFF;
-    }
-}
-
-static void io_audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
-    if (addr == 0xFF10) {
-        audio->nr10 = value | 0b10000000;
-    } else if (addr == 0xFF11) {
-        audio->nr11 = value;
-    } else if (addr == 0xFF12) {
-        audio->nr12 = value;
-    } else if (addr == 0xFF13) {
-        audio->nr13 = value;
-    } else if (addr == 0xFF14) {
-        audio->nr14 = value | 0b00111000;
-    } else if (addr == 0xFF16) {
-        audio->nr21 = value;
-    } else if (addr == 0xFF17) {
-        audio->nr22 = value;
-    } else if (addr == 0xFF18) {
-        audio->nr23 = value;
-    } else if (addr == 0xFF19) {
-        audio->nr24 = value | 0b00111000;
-    } else if (addr == 0xFF1A) {
-        audio->nr30 = value | 0b01111111;
-    } else if (addr == 0xFF1B) {
-        audio->nr31 = value;
-    } else if (addr == 0xFF1C) {
-        audio->nr32 = value | 0b10011111;
-    } else if (addr == 0xFF1D) {
-        audio->nr33 = value;
-    } else if (addr == 0xFF1E) {
-        audio->nr34 = value | 0b00111000;
-    } else if (addr == 0xFF20) {
-        audio->nr41 = value | 0b11000000;
-    } else if (addr == 0xFF21) {
-        audio->nr42 = value;
-    } else if (addr == 0xFF22) {
-        audio->nr43 = value;
-    } else if (addr == 0xFF23) {
-        audio->nr44 = value | 0b00111111;
-    } else if (addr == 0xFF24) {
-        audio->nr50 = value;
-    } else if (addr == 0xFF25) {
-        audio->nr51 = value;
-    } else if (addr == 0xFF26) {
-        audio->nr52 = value | 0b01111111;
-    } else {
-        LOG_WARN("Unhandled audio register 0x%04X", addr);
     }
 }
