@@ -56,18 +56,19 @@ void timer_tick(timer_regs_t *timer, interrupt_regs_t *interrupts, int cycles) {
 }
 
 uint8_t timer_read(timer_regs_t *timer, uint16_t addr) {
-    if (addr == 0xFF04) {
-        return timer->div;
-    } else if (addr == 0xFF05) {
-        return timer->tima;
-    } else if (addr == 0xFF06) {
-        return timer->tma;
-    } else if (addr == 0xFF07) {
-        return timer->tac.reg;
+    switch (addr) {
+        case 0xFF04:
+            return timer->div;
+        case 0xFF05:
+            return timer->tima;
+        case 0xFF06:
+            return timer->tma;
+        case 0xFF07:
+            return timer->tac.reg;
+        default:
+            assert(0 && "Unhandled timer address");
+            return 0xFF;
     }
-
-    assert(0 && "Unhandled timer address");
-    return 0xFF;
 }
 
 static bool timer_and_gate(timer_regs_t *timer, uint8_t clock_select) {
@@ -86,35 +87,42 @@ static void timer_apply_falling_edge(timer_regs_t *timer, bool and_before, bool 
 }
 
 void timer_write(timer_regs_t *timer, uint16_t addr, uint8_t value) {
-    if (addr == 0xFF04) {
-        uint8_t old_cs = timer->tac.clock_select;
-        bool and_before = timer_and_gate(timer, old_cs);
+    switch (addr) {
+        case 0xFF04: {
+            uint8_t old_cs = timer->tac.clock_select;
+            bool and_before = timer_and_gate(timer, old_cs);
 
-        // Writing any value to this register resets it to $00.
-        timer->div_counter = 0;
+            // Writing any value to this register resets it to $00.
+            timer->div_counter = 0;
 
-        bool and_after = timer_and_gate(timer, old_cs); // same clock_select, div changed
-        timer_apply_falling_edge(timer, and_before, and_after);
-    } else if (addr == 0xFF05) {
-        if (!timer->tima_just_reloaded) {
-            timer->tima = value;
-            timer->tima_reload_pending = 0;
+            bool and_after = timer_and_gate(timer, old_cs); // same clock_select, div changed
+            timer_apply_falling_edge(timer, and_before, and_after);
+            break;
         }
-    } else if (addr == 0xFF06) {
-        timer->tma = value;
+        case 0xFF05:
+            if (!timer->tima_just_reloaded) {
+                timer->tima = value;
+                timer->tima_reload_pending = 0;
+            }
+            break;
+        case 0xFF06:
+            timer->tma = value;
 
-        if (timer->tima_just_reloaded) {
-            timer->tima = value;
+            if (timer->tima_just_reloaded) {
+                timer->tima = value;
+            }
+            break;
+        case 0xFF07: {
+            uint8_t old_cs = timer->tac.clock_select;
+            bool and_before = timer_and_gate(timer, old_cs);
+
+            timer->tac.reg = value | 0b11111000;
+
+            bool and_after = timer_and_gate(timer, timer->tac.clock_select); // old clock_select, enable may have changed
+            timer_apply_falling_edge(timer, and_before, and_after);
+            break;
         }
-    } else if (addr == 0xFF07) {
-        uint8_t old_cs = timer->tac.clock_select;
-        bool and_before = timer_and_gate(timer, old_cs);
-
-        timer->tac.reg = value | 0b11111000;
-
-        bool and_after = timer_and_gate(timer, timer->tac.clock_select); // old clock_select, enable may have changed
-        timer_apply_falling_edge(timer, and_before, and_after);
-    } else {
-        assert(0 && "Unhandled timer address");
+        default:
+            assert(0 && "Unhandled timer address");
     }
 }
