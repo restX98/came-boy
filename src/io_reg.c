@@ -1,6 +1,6 @@
 #include "io_reg.h"
 
-#include <stdlib.h>
+#include <stddef.h>
 
 #include "logger.h"
 

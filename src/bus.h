@@ -1,9 +1,9 @@
 #ifndef BUS_H
 #define BUS_H
 
-#include "cartridge.h"
+#include "memory/cartridge.h"
 #include "io_reg.h"
-#include "mem.h"
+#include "memory/mem.h"
 
 typedef struct {
     cartridge_t *cartridge;

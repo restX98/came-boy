@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 #include "bus.h"
-#include "cartridge.h"
+#include "memory/cartridge.h"
 #include "cpu.h"
 #include "logger.h"
 

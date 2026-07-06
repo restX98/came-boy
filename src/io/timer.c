@@ -2,7 +2,6 @@
 
 #include <assert.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 void timer_init(timer_regs_t *timer) {
     timer->div_counter = 0xABD4;

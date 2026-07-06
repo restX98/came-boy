@@ -1,7 +1,7 @@
 #include "cpu.h"
 
 #include "logger.h"
-#include "opcodes.h"
+#include "isa/opcodes.h"
 
 static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, int pending);
 

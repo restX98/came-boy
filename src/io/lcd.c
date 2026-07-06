@@ -71,6 +71,7 @@ void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
             break;
         case 0xFF45:
             lcd->lyc = value;
+            lcd_update_stat(lcd, interrupts);
             break;
         case 0xFF46:
             lcd->dma = value;

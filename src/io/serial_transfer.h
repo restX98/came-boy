@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#include "interrupts.h"
-
 typedef struct {
     uint8_t sb;          // 0xFF01 — Serial transfer data
     uint8_t sc;          // 0xFF02 — Serial transfer control

@@ -3,22 +3,22 @@
 
 #include <stdint.h>
 
-#include "audio.h"
-#include "interrupts.h"
-#include "joypad.h"
-#include "lcd.h"
-#include "serial_transfer.h"
-#include "timer.h"
+#include "io/audio.h"
+#include "io/interrupts.h"
+#include "io/joypad.h"
+#include "io/lcd.h"
+#include "io/serial_transfer.h"
+#include "io/timer.h"
 
 typedef struct {
-    joypad_reg_t joyp;        // 0xFF00 — Joypad
+    joypad_reg_t joyp;
     interrupt_regs_t interrupts;
     lcd_regs_t lcd;
     st_regs_t serial_transfer;
     timer_regs_t timer;
     audio_regs_t audio;
-    uint8_t wp_ram[16];       // 0xFF30–0xFF3F — Wave pattern RAM
-    uint8_t boot_rom_disable; // 0xFF50 — Boot ROM mapping control [read-only]
+    uint8_t wp_ram[16];
+    uint8_t boot_rom_disable;
 } io_reg_t;
 
 void io_reg_init(io_reg_t *io_reg);

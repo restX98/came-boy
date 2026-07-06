@@ -1,7 +1,10 @@
 #ifndef LCD_H
 #define LCD_H
 
+#include <stdbool.h>
 #include <stdint.h>
+
+#include "interrupts.h"
 
 typedef union {
     uint8_t reg;
@@ -43,11 +46,15 @@ typedef struct {
     uint8_t obp1;       // 0xFF49 — OBP1 (Non-CGB Mode only): OBJ palette 1 data
     uint8_t wy;         // 0xFF4A — Window Y position
     uint8_t wx;         // 0xFF4B — Window X position plus 7
+
+    bool stat_line;     // internal: true if STAT line is currently high (for edge detection)
 } lcd_regs_t;
 
 void lcd_init(lcd_regs_t *lcd);
 
 uint8_t lcd_read(lcd_regs_t *lcd, uint16_t addr);
-void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value);
+void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *interrupts);
+
+void lcd_update_stat(lcd_regs_t *lcd, interrupt_regs_t *interrupts);
 
 #endif // LCD_H
