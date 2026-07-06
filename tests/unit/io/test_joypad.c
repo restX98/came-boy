@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "log_helpers.h"
 
-#include "joypad.h"
+#include "io/joypad.h"
 
 static joypad_reg_t jp;
 

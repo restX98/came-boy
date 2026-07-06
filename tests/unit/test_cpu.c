@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "cpu.h"
-#include "opcodes.h"
+#include "isa/opcodes.h"
 
 static cpu_t cpu;
 static bus_t bus;

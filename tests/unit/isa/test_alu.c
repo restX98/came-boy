@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "log_helpers.h"
 
-#include "alu.h"
+#include "isa/alu.h"
 
 void setUp(void) {
     suppress_logs();

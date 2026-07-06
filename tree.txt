@@ -1,0 +1,54 @@
+src/
+├── bus.c
+├── bus.h
+├── core
+│   ├── alu.c
+│   ├── alu.h
+│   ├── opcodes
+│   │   ├── opcode_helpers.inl
+│   │   ├── opcodes_alu16.inl
+│   │   ├── opcodes_alu8.inl
+│   │   ├── opcodes_bit_shift.inl
+│   │   ├── opcodes_bitwise.inl
+│   │   ├── opcodes_carry_flag.inl
+│   │   ├── opcodes_interrupt.inl
+│   │   ├── opcodes_jump.inl
+│   │   ├── opcodes_load.inl
+│   │   └── opcodes_misc.inl
+│   ├── opcodes.c
+│   └── opcodes.h
+├── cpu.c
+├── cpu.h
+├── io
+│   ├── audio.c
+│   ├── audio.h
+│   ├── interrupts.c
+│   ├── interrupts.h
+│   ├── joypad.c
+│   ├── joypad.h
+│   ├── lcd.c
+│   ├── lcd.h
+│   ├── serial_transfer.c
+│   ├── serial_transfer.h
+│   ├── timer.c
+│   └── timer.h
+├── io_reg.c
+├── io_reg.h
+├── logger.c
+├── logger.h
+├── main.c
+├── mbc
+│   ├── mbc1.c
+│   ├── mbc2.c
+│   ├── mbc5.c
+│   ├── mbc.h
+│   └── no_mbc.c
+├── memory
+│   ├── cartridge.c
+│   ├── cartridge.h
+│   ├── mem.c
+│   └── mem.h
+├── ppu.c
+└── ppu.h
+
+6 directories, 46 files

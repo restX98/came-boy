@@ -3,7 +3,7 @@
 
 #include <string.h>
 
-#include "audio.h"
+#include "io/audio.h"
 
 static audio_regs_t audio;
 

@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "bus.h"
-#include "mem.h"
+#include "memory/mem.h"
 
 static bus_t       bus;
 static cartridge_t cartridge;

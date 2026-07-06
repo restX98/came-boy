@@ -5,8 +5,8 @@
 
 #include "bus.h"
 #include "cpu.h"
-#include "mem.h"
-#include "opcodes.h"
+#include "memory/mem.h"
+#include "isa/opcodes.h"
 
 static cpu_t   cpu;
 static bus_t   bus;

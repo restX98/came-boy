@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "log_helpers.h"
 
-#include "lcd.h"
+#include "io/lcd.h"
 
 static lcd_regs_t lcd;
 

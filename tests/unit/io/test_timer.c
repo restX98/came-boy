@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "timer.h"
+#include "io/timer.h"
 
 static timer_regs_t timer;
 static interrupt_regs_t interrupts;

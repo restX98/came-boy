@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "log_helpers.h"
 
-#include "mem.h"
+#include "memory/mem.h"
 
 static mem_t memory;
 

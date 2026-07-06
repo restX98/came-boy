@@ -4,8 +4,8 @@
 #include <assert.h>
 #include <string.h>
 
-#include "alu.h"
-#include "opcodes.h"
+#include "isa/alu.h"
+#include "isa/opcodes.h"
 
 static cpu_t mock_cpu = { 0 };
 static bus_t mock_bus = { 0 };

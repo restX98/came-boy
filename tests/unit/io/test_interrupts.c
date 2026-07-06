@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "log_helpers.h"
 
-#include "interrupts.h"
+#include "io/interrupts.h"
 
 static interrupt_regs_t interrupts;
 
