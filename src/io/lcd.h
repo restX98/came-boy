@@ -6,6 +6,13 @@
 
 #include "interrupts.h"
 
+typedef enum : uint8_t {
+    PPU_MODE_HBLANK = 0,
+    PPU_MODE_VBLANK = 1,
+    PPU_MODE_OAM_SCAN = 2,
+    PPU_MODE_DRAWING = 3,
+} ppu_mode_t;
+
 typedef union {
     uint8_t reg;
     struct {
@@ -23,7 +30,7 @@ typedef union {
 typedef union {
     uint8_t reg;
     struct {
-        uint8_t ppu_mode : 2;      // bits 0-1 — current PPU mode (read-only)
+        ppu_mode_t ppu_mode : 2;   // bits 0-1 — current PPU mode (read-only)
         uint8_t lyc_eq_ly : 1;     // bit 2    — LYC == LY flag (read-only, set by PPU)
         uint8_t mode0_int_sel : 1; // bit 3    — Mode 0 (HBlank) STAT interrupt enable
         uint8_t mode1_int_sel : 1; // bit 4    — Mode 1 (VBlank) STAT interrupt enable
@@ -55,6 +62,7 @@ void lcd_init(lcd_regs_t *lcd);
 uint8_t lcd_read(lcd_regs_t *lcd, uint16_t addr);
 void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *interrupts);
 
+bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode, interrupt_regs_t *interrupts);
 void lcd_update_stat(lcd_regs_t *lcd, interrupt_regs_t *interrupts);
 
 #endif // LCD_H

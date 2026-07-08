@@ -135,7 +135,7 @@ static uint8_t read_lcd(io_reg_t *io_reg, uint16_t addr) {
 }
 
 static void write_lcd(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
-    lcd_write(&io_reg->lcd, addr, value);
+    lcd_write(&io_reg->lcd, addr, value, &io_reg->interrupts);
 }
 
 static uint8_t read_oam_dma(io_reg_t *io_reg, uint16_t addr) {

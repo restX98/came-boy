@@ -52,13 +52,14 @@ uint8_t lcd_read(lcd_regs_t *lcd, uint16_t addr) {
 
 }
 
-void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
+void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *interrupts) {
     switch (addr) {
         case 0xFF40:
             lcd->ctrl.reg = value;
             break;
         case 0xFF41:
             lcd->stat.reg = (lcd->stat.reg & 0x07) | (value & 0x78) | 0x80;
+            lcd_update_stat(lcd, interrupts);
             break;
         case 0xFF42:
             lcd->scy = value;
@@ -95,4 +96,32 @@ void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
             assert(0 && "io_lcd_write: unhandled LCD register");
             break;
     }
+}
+
+bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode, interrupt_regs_t *interrupts) {
+    if (lcd->stat.ppu_mode == mode) {
+        return false;
+    }
+    lcd->stat.ppu_mode = mode;
+
+    if (mode == PPU_MODE_VBLANK) {
+        interrupts_request(interrupts, INT_VBLANK);
+    }
+    lcd_update_stat(lcd, interrupts);
+    return true;
+}
+
+void lcd_update_stat(lcd_regs_t *lcd, interrupt_regs_t *interrupts) {
+    lcd->stat.lyc_eq_ly = (lcd->ly == lcd->lyc);
+
+    bool line =
+        (lcd->stat.lyc_int_sel && lcd->stat.lyc_eq_ly) ||
+        (lcd->stat.mode0_int_sel && lcd->stat.ppu_mode == 0) ||
+        (lcd->stat.mode1_int_sel && lcd->stat.ppu_mode == 1) ||
+        (lcd->stat.mode2_int_sel && lcd->stat.ppu_mode == 2);
+
+    if (line && !lcd->stat_line) {
+        interrupts_request(interrupts, INT_LCD);
+    }
+    lcd->stat_line = line;
 }

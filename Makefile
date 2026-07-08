@@ -1,5 +1,5 @@
 CC      = gcc
-CFLAGS  = -Wall -Wextra -g -Isrc
+CFLAGS  = -std=gnu2x -Wall -Wextra -g -Isrc
 LDFLAGS =
 
 SRC     = $(shell find src -name '*.c')

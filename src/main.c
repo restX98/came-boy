@@ -34,6 +34,7 @@ int main(int argc, char *argv[]) {
     cartridge_t cartridge = { 0 };
     bus_t bus = { 0 };
     cpu_t cpu = { 0 };
+    ppu_t ppu = { 0 };
 
     if (cartridge_load(&cartridge, argv[1]) != 0) {
         LOG_ERROR("Could not load cartridge");
@@ -47,6 +48,7 @@ int main(int argc, char *argv[]) {
     }
 
     cpu_init(&cpu);
+    ppu_init(&ppu);
 
     while (running) {
         int cycles = cpu_step(&cpu, &bus);
@@ -55,12 +57,13 @@ int main(int argc, char *argv[]) {
             break;
         }
 
+        ppu_step(&ppu, &bus, cycles);
         timer_tick(&bus.io_reg.timer, &bus.io_reg.interrupts, cycles);
-    }
 
-
-    if (!running) {
-        LOG_INFO("Interrupted, shutting down");
+        if (ppu.frame_ready) {
+            sdl_render_framebuffer(ppu.framebuffer);  // ← actual drawing to screen
+            ppu.frame_ready = false;
+        }
     }
 
     // free resources

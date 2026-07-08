@@ -66,6 +66,9 @@ int bus_init(bus_t *bus, cartridge_t *cartridge) {
         return -1;
     }
 
+    bus->oam_accessible = true;
+    bus->vram_accessible = true;
+
     // TODO: Later add other components like RAM, PPU, APU, etc.
 
     return 0;
@@ -121,7 +124,6 @@ void bus_write(bus_t *bus, uint16_t addr, uint8_t value) {
 static uint8_t read_rom(bus_t *bus, uint16_t addr) {
     uint8_t value = cartridge_rom_read(bus->cartridge, addr);
     LOG_DEBUG("ROM read: [0x%04X] = 0x%02X", addr, value);
-
     return value;
 }
 
@@ -131,14 +133,23 @@ static void write_rom(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_vram(bus_t *bus, uint16_t addr) {
+    if (!bus->vram_accessible) {
+        LOG_WARN("Attempted to read from VRAM while not accessible: 0x%04X", addr);
+        return 0xFF; // Return 0xFF when VRAM is not accessible
+    }
+
     uint16_t vram_address = addr - 0x8000;
     uint8_t value = bus->vram.mem[vram_address];
     LOG_DEBUG("VRAM read: [0x%04X] = 0x%02X", vram_address, value);
-
     return value;
 }
 
 static void write_vram(bus_t *bus, uint16_t addr, uint8_t value) {
+    if (!bus->vram_accessible) {
+        LOG_WARN("Attempted to write to VRAM while not accessible: 0x%04X with value: 0x%02X", addr, value);
+        return; // Ignore writes when VRAM is not accessible
+    }
+
     uint16_t vram_address = addr - 0x8000;
     bus->vram.mem[vram_address] = value;
     LOG_DEBUG("VRAM write: [0x%04X] = 0x%02X", vram_address, value);
@@ -148,8 +159,6 @@ static uint8_t read_ext_ram(bus_t *bus, uint16_t addr) {
     uint16_t ext_ram_address = addr - 0xA000;
     uint8_t value = cartridge_ext_ram_read(bus->cartridge, ext_ram_address);
     LOG_DEBUG("External RAM read: [0x%04X] = 0x%02X", ext_ram_address, value);
-    // TODO: Implement MBC support to read from external RAM (?)
-
     return value;
 }
 
@@ -163,7 +172,6 @@ static uint8_t read_wram(bus_t *bus, uint16_t addr) {
     uint16_t wram_address = addr - 0xC000;
     uint8_t value = bus->wram.mem[wram_address];
     LOG_DEBUG("WRAM read: [0x%04X] = 0x%02X", wram_address, value);
-
     return value;
 }
 
@@ -187,14 +195,23 @@ static void write_echo_ram(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_oam(bus_t *bus, uint16_t addr) {
+    if (!bus->oam_accessible) {
+        LOG_WARN("Attempted to read from OAM while not accessible: 0x%04X", addr);
+        return 0xFF; // Return 0xFF when OAM is not accessible
+    }
+
     uint16_t oam_address = addr - 0xFE00;
     uint8_t value = bus->oam.mem[oam_address];
     LOG_DEBUG("OAM read: [0x%04X] = 0x%02X", oam_address, value);
-
     return value;
 }
 
 static void write_oam(bus_t *bus, uint16_t addr, uint8_t value) {
+    if (!bus->oam_accessible) {
+        LOG_WARN("Attempted to write to OAM while not accessible: 0x%04X with value: 0x%02X", addr, value);
+        return; // Ignore writes when OAM is not accessible
+    }
+
     uint16_t oam_address = addr - 0xFE00;
     bus->oam.mem[oam_address] = value;
     LOG_DEBUG("OAM write: [0x%04X] = 0x%02X", oam_address, value);
@@ -228,7 +245,6 @@ static uint8_t read_hram(bus_t *bus, uint16_t addr) {
     uint16_t hram_address = addr - 0xFF80;
     uint8_t value = bus->hram.mem[hram_address];
     LOG_DEBUG("HRAM read: [0x%04X] = 0x%02X", hram_address, value);
-
     return value;
 }
 
