@@ -434,6 +434,7 @@ typedef struct {
     lcd_regs_t *lcd;
     uint16_t addr;
     uint8_t value;
+    interrupt_regs_t *interrupts;
 } lcd_write_call_t;
 
 typedef struct {
@@ -443,7 +444,7 @@ typedef struct {
 
 static lcd_write_stats_t lcd_write_stats;
 
-void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
+void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *interrupts) {
     if (lcd_write_stats.call_count == 10) {
         assert(0 && "Exceeded maximum call count for lcd_write_stats");
     }
@@ -452,6 +453,7 @@ void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
     call->lcd = lcd;
     call->addr = addr;
     call->value = value;
+    call->interrupts = interrupts;
 
     lcd_write_stats.call_count++;
 }
@@ -674,6 +676,7 @@ void test_io_reg_write_lcd(void) {
     TEST_ASSERT_EQUAL_PTR(&io_reg.lcd, lcd_write_stats.calls[0].lcd);
     TEST_ASSERT_EQUAL_UINT16(0xFF40, lcd_write_stats.calls[0].addr);
     TEST_ASSERT_EQUAL_UINT8(0x3C, lcd_write_stats.calls[0].value);
+    TEST_ASSERT_EQUAL_PTR(&io_reg.interrupts, lcd_write_stats.calls[0].interrupts);
 }
 
 void test_io_reg_write_unimplemented_is_ignored(void) {

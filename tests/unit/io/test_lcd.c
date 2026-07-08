@@ -3,12 +3,21 @@
 
 #include "io/lcd.h"
 
+// lcd_write -> lcd_update_stat calls into interrupts_request; stub it so the
+// unit stays isolated from the interrupts module (same pattern as test_timer).
+void interrupts_request(interrupt_regs_t *interrupts, interrupt_t interrupt) {
+    (void)interrupts;
+    (void)interrupt;
+}
+
 static lcd_regs_t lcd;
+static interrupt_regs_t interrupts;
 
 void setUp(void) {
     suppress_logs();
 
     lcd = (lcd_regs_t){ 0 };
+    interrupts = (interrupt_regs_t){ 0 };
 }
 
 void tearDown(void) {
@@ -68,25 +77,25 @@ void test_lcd_read_returns_registers(void) {
 // ---- lcd_write ----
 
 void test_lcd_write_stores_registers(void) {
-    lcd_write(&lcd, 0xFF40, 0xA5);
+    lcd_write(&lcd, 0xFF40, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.ctrl.reg);
-    lcd_write(&lcd, 0xFF42, 0xA5);
+    lcd_write(&lcd, 0xFF42, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.scy);
-    lcd_write(&lcd, 0xFF43, 0xA5);
+    lcd_write(&lcd, 0xFF43, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.scx);
-    lcd_write(&lcd, 0xFF45, 0xA5);
+    lcd_write(&lcd, 0xFF45, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.lyc);
-    lcd_write(&lcd, 0xFF46, 0xA5);
+    lcd_write(&lcd, 0xFF46, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.dma);
-    lcd_write(&lcd, 0xFF47, 0xA5);
+    lcd_write(&lcd, 0xFF47, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.bgp);
-    lcd_write(&lcd, 0xFF48, 0xA5);
+    lcd_write(&lcd, 0xFF48, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.obp0);
-    lcd_write(&lcd, 0xFF49, 0xA5);
+    lcd_write(&lcd, 0xFF49, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.obp1);
-    lcd_write(&lcd, 0xFF4A, 0xA5);
+    lcd_write(&lcd, 0xFF4A, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.wy);
-    lcd_write(&lcd, 0xFF4B, 0xA5);
+    lcd_write(&lcd, 0xFF4B, 0xA5, &interrupts);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.wx);
 }
 
@@ -95,7 +104,7 @@ void test_lcd_write_stat_preserves_read_only_bits(void) {
     // bits 3-6 come from the write; bit 7 is forced to 1.
     lcd.stat.reg = 0x05; // read-only bits 0 and 2 set
 
-    lcd_write(&lcd, 0xFF41, 0xFF);
+    lcd_write(&lcd, 0xFF41, 0xFF, &interrupts);
 
     // (0x05 & 0x07) | (0xFF & 0x78) | 0x80 == 0x05 | 0x78 | 0x80 == 0xFD
     TEST_ASSERT_EQUAL_HEX8(0xFD, lcd.stat.reg);
@@ -103,8 +112,9 @@ void test_lcd_write_stat_preserves_read_only_bits(void) {
 
 void test_lcd_write_stat_ignores_low_bits_of_value(void) {
     lcd.stat.reg = 0x00;
+    lcd.lyc = 0x01; // ly (0) != lyc so lcd_update_stat leaves the LYC=LY flag (bit 2) clear
 
-    lcd_write(&lcd, 0xFF41, 0x07); // low 3 bits should not be written
+    lcd_write(&lcd, 0xFF41, 0x07, &interrupts); // low 3 bits should not be written
 
     // (0x00 & 0x07) | (0x07 & 0x78) | 0x80 == 0x80
     TEST_ASSERT_EQUAL_HEX8(0x80, lcd.stat.reg);
@@ -113,7 +123,7 @@ void test_lcd_write_stat_ignores_low_bits_of_value(void) {
 void test_lcd_write_ly_is_read_only(void) {
     lcd.ly = 0xAB;
 
-    lcd_write(&lcd, 0xFF44, 0x55);
+    lcd_write(&lcd, 0xFF44, 0x55, &interrupts);
 
     TEST_ASSERT_EQUAL_HEX8(0xAB, lcd.ly);
 }

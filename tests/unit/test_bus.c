@@ -256,6 +256,8 @@ void setUp(void) {
     suppress_logs();
 
     bus = (bus_t){ 0 };
+    bus.vram_accessible = true;
+    bus.oam_accessible = true;
     cartridge = (cartridge_t){ 0 };
 
     mem_init_stats = (mem_init_stats_t){ 0 };
