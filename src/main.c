@@ -6,6 +6,7 @@
 #include "memory/cartridge.h"
 #include "cpu.h"
 #include "logger.h"
+#include "ppu.h"
 
 static volatile sig_atomic_t running = 1;
 
