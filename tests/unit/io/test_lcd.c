@@ -1,13 +1,25 @@
 #include "unity.h"
 #include "log_helpers.h"
 
+#include <assert.h>
+
 #include "io/lcd.h"
 
-// lcd_write -> lcd_update_stat calls into interrupts_request; stub it so the
-// unit stays isolated from the interrupts module (same pattern as test_timer).
+typedef struct {
+    size_t call_count;
+    interrupt_t interrupts[10];
+} interrupts_request_stats_t;
+
+static interrupts_request_stats_t interrupts_request_stats;
+
 void interrupts_request(interrupt_regs_t *interrupts, interrupt_t interrupt) {
     (void)interrupts;
-    (void)interrupt;
+    if (interrupts_request_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for interrupts_request_stats");
+    }
+
+    interrupts_request_stats.interrupts[interrupts_request_stats.call_count] = interrupt;
+    interrupts_request_stats.call_count++;
 }
 
 static lcd_regs_t lcd;
@@ -18,6 +30,7 @@ void setUp(void) {
 
     lcd = (lcd_regs_t){ 0 };
     interrupts = (interrupt_regs_t){ 0 };
+    interrupts_request_stats = (interrupts_request_stats_t){ 0 };
 }
 
 void tearDown(void) {
@@ -128,6 +141,177 @@ void test_lcd_write_ly_is_read_only(void) {
     TEST_ASSERT_EQUAL_HEX8(0xAB, lcd.ly);
 }
 
+// ---- lcd_set_mode ----
+
+void test_lcd_set_mode_changes_mode_and_returns_true(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+
+    bool changed = lcd_set_mode(&lcd, PPU_MODE_OAM_SCAN, &interrupts);
+
+    TEST_ASSERT_TRUE(changed);
+    TEST_ASSERT_EQUAL_UINT8(PPU_MODE_OAM_SCAN, lcd.stat.ppu_mode);
+}
+
+void test_lcd_set_mode_same_mode_returns_false_without_side_effects(void) {
+    lcd.stat.ppu_mode = PPU_MODE_VBLANK;
+
+    bool changed = lcd_set_mode(&lcd, PPU_MODE_VBLANK, &interrupts);
+
+    // Guard should short-circuit before touching the register or interrupts.
+    TEST_ASSERT_FALSE(changed);
+    TEST_ASSERT_EQUAL_UINT8(PPU_MODE_VBLANK, lcd.stat.ppu_mode);
+    TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
+}
+
+void test_lcd_set_mode_entering_vblank_requests_vblank_interrupt(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+
+    lcd_set_mode(&lcd, PPU_MODE_VBLANK, &interrupts);
+
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+    TEST_ASSERT_EQUAL_INT(INT_VBLANK, interrupts_request_stats.interrupts[0]);
+}
+
+void test_lcd_set_mode_entering_non_vblank_requests_no_interrupt(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+
+    lcd_set_mode(&lcd, PPU_MODE_DRAWING, &interrupts);
+
+    // No VBLANK (not mode 1) and no STAT source enabled -> nothing requested.
+    TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
+}
+
+void test_lcd_set_mode_vblank_interrupt_fires_only_on_transition(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+
+    lcd_set_mode(&lcd, PPU_MODE_VBLANK, &interrupts); // transition -> requests
+    lcd_set_mode(&lcd, PPU_MODE_VBLANK, &interrupts); // no-op -> nothing
+
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+}
+
+void test_lcd_set_mode_updates_stat_interrupt_line(void) {
+    // A mode change runs lcd_update_stat: entering OAM scan with the mode-2
+    // STAT source enabled raises the STAT (LCD) interrupt.
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+    lcd.stat.mode2_int_sel = 1;
+
+    lcd_set_mode(&lcd, PPU_MODE_OAM_SCAN, &interrupts);
+
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+    TEST_ASSERT_EQUAL_INT(INT_LCD, interrupts_request_stats.interrupts[0]);
+}
+
+// ---- lcd_update_stat ----
+
+void test_lcd_update_stat_sets_lyc_eq_ly_when_equal(void) {
+    lcd.ly = 0x42;
+    lcd.lyc = 0x42;
+
+    lcd_update_stat(&lcd, &interrupts);
+
+    TEST_ASSERT_TRUE(lcd.stat.lyc_eq_ly);
+}
+
+void test_lcd_update_stat_clears_lyc_eq_ly_when_not_equal(void) {
+    lcd.ly = 0x42;
+    lcd.lyc = 0x43;
+    lcd.stat.lyc_eq_ly = 1; // stale value that must be recomputed to 0
+
+    lcd_update_stat(&lcd, &interrupts);
+
+    TEST_ASSERT_FALSE(lcd.stat.lyc_eq_ly);
+}
+
+void test_lcd_update_stat_requests_interrupt_on_lyc_coincidence(void) {
+    lcd.ly = 0x10;
+    lcd.lyc = 0x10;
+    lcd.stat.lyc_int_sel = 1;
+
+    lcd_update_stat(&lcd, &interrupts);
+
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+    TEST_ASSERT_EQUAL_INT(INT_LCD, interrupts_request_stats.interrupts[0]);
+}
+
+void test_lcd_update_stat_no_lyc_interrupt_without_coincidence(void) {
+    // LYC select enabled but LY != LYC: the LYC STAT source stays low.
+    lcd.ly = 0x10;
+    lcd.lyc = 0x11;
+    lcd.stat.lyc_int_sel = 1;
+
+    lcd_update_stat(&lcd, &interrupts);
+
+    TEST_ASSERT_FALSE(lcd.stat.lyc_eq_ly);
+    TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
+    TEST_ASSERT_FALSE(lcd.stat_line);
+}
+
+void test_lcd_update_stat_requests_interrupt_on_mode_source(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK; // mode 0
+    lcd.stat.mode0_int_sel = 1;
+
+    lcd_update_stat(&lcd, &interrupts);
+
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+    TEST_ASSERT_EQUAL_INT(INT_LCD, interrupts_request_stats.interrupts[0]);
+}
+
+void test_lcd_update_stat_mode1_interrupt_in_vblank(void) {
+    lcd.ly = 0x00;
+    lcd.lyc = 0x01; // avoid LYC coincidence
+    lcd.stat.ppu_mode = PPU_MODE_VBLANK; // mode 1
+    lcd.stat.mode1_int_sel = 1;
+
+    lcd_update_stat(&lcd, &interrupts);
+
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+    TEST_ASSERT_EQUAL_INT(INT_LCD, interrupts_request_stats.interrupts[0]);
+}
+
+void test_lcd_update_stat_no_interrupt_in_drawing_mode(void) {
+    // Mode 3 (drawing) has no STAT source bit, so even with every mode-select
+    // enabled the STAT line stays low.
+    lcd.ly = 0x01;
+    lcd.lyc = 0x02; // avoid LYC coincidence
+    lcd.stat.ppu_mode = PPU_MODE_DRAWING;
+    lcd.stat.mode0_int_sel = 1;
+    lcd.stat.mode1_int_sel = 1;
+    lcd.stat.mode2_int_sel = 1;
+
+    lcd_update_stat(&lcd, &interrupts);
+
+    TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
+    TEST_ASSERT_FALSE(lcd.stat_line);
+}
+
+void test_lcd_update_stat_fires_only_on_rising_edge(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+    lcd.stat.mode0_int_sel = 1;
+
+    lcd_update_stat(&lcd, &interrupts); // low -> high: fires
+    lcd_update_stat(&lcd, &interrupts); // high -> high: no new interrupt
+
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+    TEST_ASSERT_TRUE(lcd.stat_line);
+}
+
+void test_lcd_update_stat_refires_after_line_goes_low(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+    lcd.stat.mode0_int_sel = 1;
+
+    lcd_update_stat(&lcd, &interrupts);   // rising edge: fires (count 1)
+
+    lcd.stat.ppu_mode = PPU_MODE_DRAWING; // condition no longer holds
+    lcd_update_stat(&lcd, &interrupts);   // line falls, no fire
+    TEST_ASSERT_FALSE(lcd.stat_line);
+
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;  // condition holds again
+    lcd_update_stat(&lcd, &interrupts);   // rising edge again: fires (count 2)
+
+    TEST_ASSERT_EQUAL_size_t(2, interrupts_request_stats.call_count);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -139,6 +323,23 @@ int main(void) {
     RUN_TEST(test_lcd_write_stat_preserves_read_only_bits);
     RUN_TEST(test_lcd_write_stat_ignores_low_bits_of_value);
     RUN_TEST(test_lcd_write_ly_is_read_only);
+
+    RUN_TEST(test_lcd_set_mode_changes_mode_and_returns_true);
+    RUN_TEST(test_lcd_set_mode_same_mode_returns_false_without_side_effects);
+    RUN_TEST(test_lcd_set_mode_entering_vblank_requests_vblank_interrupt);
+    RUN_TEST(test_lcd_set_mode_entering_non_vblank_requests_no_interrupt);
+    RUN_TEST(test_lcd_set_mode_vblank_interrupt_fires_only_on_transition);
+    RUN_TEST(test_lcd_set_mode_updates_stat_interrupt_line);
+
+    RUN_TEST(test_lcd_update_stat_sets_lyc_eq_ly_when_equal);
+    RUN_TEST(test_lcd_update_stat_clears_lyc_eq_ly_when_not_equal);
+    RUN_TEST(test_lcd_update_stat_requests_interrupt_on_lyc_coincidence);
+    RUN_TEST(test_lcd_update_stat_no_lyc_interrupt_without_coincidence);
+    RUN_TEST(test_lcd_update_stat_requests_interrupt_on_mode_source);
+    RUN_TEST(test_lcd_update_stat_mode1_interrupt_in_vblank);
+    RUN_TEST(test_lcd_update_stat_no_interrupt_in_drawing_mode);
+    RUN_TEST(test_lcd_update_stat_fires_only_on_rising_edge);
+    RUN_TEST(test_lcd_update_stat_refires_after_line_goes_low);
 
     return UNITY_END();
 }
