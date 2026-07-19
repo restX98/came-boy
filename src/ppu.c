@@ -69,8 +69,95 @@ static uint8_t fetch_bg_window_pixel(bus_t *bus, uint8_t map_x, uint8_t map_y,
     return (((high >> bit) & 1) << 1) | ((low >> bit) & 1);
 }
 
+static int compare_sprites_dmg(const void *a, const void *b) {
+    const sprite_t *sa = a;
+    const sprite_t *sb = b;
+    if (sa->x != sb->x) return sa->x - sb->x;
+    return (int)sa->oam_index - (int)sb->oam_index;
+}
+
+static void render_sprites_scanline(ppu_t *ppu, bus_t *bus, uint8_t ly, const uint8_t *bg_color_id) {
+    lcd_regs_t *lcd = &bus->io_reg.lcd;
+    uint8_t *oam = bus->oam.mem;
+    uint8_t *vram = bus->vram.mem;
+
+    uint8_t sprite_height = lcd->ctrl.obj_size ? 16 : 8;
+
+    // OAM scan: collect up to 10 sprites overlapping this scanline (Y check only).
+    sprite_t visible[MAX_SPRITES_PER_LINE];
+    int num_visible = 0;
+
+    for (int i = 0; i < OAM_ENTRY_COUNT && num_visible < MAX_SPRITES_PER_LINE; i++) {
+        uint8_t y_pos = oam[i * 4];
+        int16_t screen_y = (int16_t)y_pos - 16;
+        if ((int16_t)ly >= screen_y && (int16_t)ly < screen_y + sprite_height) {
+            visible[num_visible].oam_index = (uint8_t)i;
+            visible[num_visible].y = y_pos;
+            visible[num_visible].x = (int16_t)oam[i * 4 + 1] - 8;
+            visible[num_visible].tile = oam[i * 4 + 2];
+            visible[num_visible].flags = oam[i * 4 + 3];
+            num_visible++;
+        }
+    }
+
+    // DMG priority: smaller X wins; OAM index breaks ties. Sort ascending so
+    // iteration is in highest-priority-first order; we then skip pixels that
+    // an earlier (higher priority) sprite already claimed.
+    qsort(visible, num_visible, sizeof(sprite_t), compare_sprites_dmg);
+
+    bool pixel_taken[LCD_WIDTH] = { false };
+
+    for (int i = 0; i < num_visible; i++) {
+        sprite_t *s = &visible[i];
+
+        int line_in_sprite = (int)ly - ((int)s->y - 16);  // 0..sprite_height-1
+        if (s->flags & OAM_FLAG_Y_FLIP) {
+            line_in_sprite = sprite_height - 1 - line_in_sprite;
+        }
+
+        // 8×16 tiles always come in pairs; bit 0 of the tile index is ignored.
+        uint8_t tile = s->tile;
+        if (sprite_height == 16) {
+            tile &= 0xFE;
+            if (line_in_sprite >= 8) {
+                tile |= 0x01;
+                line_in_sprite -= 8;
+            }
+        }
+
+        // Sprites always use $8000 unsigned addressing.
+        uint16_t tile_offset = (uint16_t)tile * 16;
+        uint8_t low = vram[tile_offset + line_in_sprite * 2];
+        uint8_t high = vram[tile_offset + line_in_sprite * 2 + 1];
+
+        uint8_t palette = (s->flags & OAM_FLAG_PALETTE) ? lcd->obp1 : lcd->obp0;
+        bool bg_priority = s->flags & OAM_FLAG_PRIORITY;
+
+        for (int px = 0; px < 8; px++) {
+            int screen_x = (int)s->x + px;
+            if (screen_x < 0 || screen_x >= LCD_WIDTH) continue;
+            if (pixel_taken[screen_x]) continue;
+
+            int bit = (s->flags & OAM_FLAG_X_FLIP) ? px : (7 - px);
+            uint8_t color_id = (((high >> bit) & 1) << 1) | ((low >> bit) & 1);
+            if (color_id == 0) continue;  // sprite color 0 = transparent
+
+            // Mark taken: even when this sprite loses to BG, lower-priority
+            // sprites in this column must not draw over it.
+            pixel_taken[screen_x] = true;
+
+            if (bg_priority && bg_color_id[screen_x] != 0) continue;
+
+            uint8_t shade = (palette >> (color_id * 2)) & 0x03;
+            ppu->framebuffer[ly * LCD_WIDTH + screen_x] = shade;
+        }
+    }
+}
+
 static void pixel_fetcher(ppu_t *ppu, bus_t *bus, uint8_t ly) {
     lcd_regs_t *lcd = &bus->io_reg.lcd;
+
+    uint8_t bg_color_id[LCD_WIDTH] = { 0 };
 
     if (lcd->ctrl.bg_window_enable) {
         bool unsigned_addr = lcd->ctrl.bg_window_tile_data;
@@ -98,12 +185,17 @@ static void pixel_fetcher(ppu_t *ppu, bus_t *bus, uint8_t ly) {
                     bg_map_base, unsigned_addr);
             }
 
+            bg_color_id[x] = color_id;
             uint8_t shade = (lcd->bgp >> (color_id * 2)) & 0x03;
             ppu->framebuffer[ly * LCD_WIDTH + x] = shade;
         }
     } else {
         // BG/Window disabled: blank line, all BG color IDs are 0
         memset(&ppu->framebuffer[ly * LCD_WIDTH], 0, LCD_WIDTH);
+    }
+
+    if (lcd->ctrl.obj_enable) {
+        render_sprites_scanline(ppu, bus, ly, bg_color_id);
     }
 }
 

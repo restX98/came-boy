@@ -10,6 +10,14 @@
 #define SCANLINES_PER_FRAME 154
 #define VBLANK_START_LINE 144
 
+#define OAM_ENTRY_COUNT     40
+#define MAX_SPRITES_PER_LINE 10
+
+#define OAM_FLAG_PRIORITY 0x80  // 0 = sprite over BG, 1 = BG colors 1-3 over sprite
+#define OAM_FLAG_Y_FLIP   0x40
+#define OAM_FLAG_X_FLIP   0x20
+#define OAM_FLAG_PALETTE  0x10  // 0 = OBP0, 1 = OBP1
+
 typedef struct {
     uint16_t dot;
     bool frame_ready;
