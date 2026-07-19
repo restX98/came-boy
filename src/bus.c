@@ -69,8 +69,6 @@ int bus_init(bus_t *bus, cartridge_t *cartridge) {
     bus->oam_accessible = true;
     bus->vram_accessible = true;
 
-    // TODO: Later add other components like RAM, PPU, APU, etc.
-
     return 0;
 }
 

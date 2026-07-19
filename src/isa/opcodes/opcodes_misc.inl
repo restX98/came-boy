@@ -13,8 +13,8 @@ static int op_nop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 static int op_stop(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     (void)opcode;
 
-    // TODO: Understand how STOP actually works
-
+    // TODO: emulate stop mode (halt CPU + freeze DIV until joypad input).
+    // Currently we just skip the operand and reset DIV.
     read_imm8(cpu, bus);
 
     bus->io_reg.timer.div_counter = 0; // STOP resets the entire DIV counter
