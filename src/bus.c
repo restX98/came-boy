@@ -111,6 +111,7 @@ void bus_write(bus_t *bus, uint16_t addr, uint8_t value) {
             if (region.write_fn == NULL) {
                 LOG_WARN("bus_write: address 0x%04X is mapped but has no write function", addr);
                 assert(0 && "Address mapped but no write function in bus_write");
+                return; // Ignore write when no write function is available
             }
             region.write_fn(bus, addr, value);
             return;
@@ -182,16 +183,15 @@ static void write_wram(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_echo_ram(bus_t *bus, uint16_t addr) {
-    (void)bus;
-    (void)addr;
-    // TODO: Implement echo RAM support (?) Understand how it works and whether it's necessary to implement
-    return 0xFF; // Temporary return 0xFF
+    // Echo RAM mirrors WRAM: $E000-$FDFF -> $C000-$DDFF
+    LOG_DEBUG("Echo RAM read: 0x%04X (mirrors 0x%04X)", addr, addr - 0x2000);
+    return read_wram(bus, addr - 0x2000);
 }
+
 static void write_echo_ram(bus_t *bus, uint16_t addr, uint8_t value) {
-    (void)bus;
-    (void)addr;
-    (void)value;
-    LOG_WARN("Attempted to write to Echo RAM address: 0x%04X with value: 0x%02X - Echo RAM write not implemented yet", addr, value);
+    // Echo RAM mirrors WRAM: $E000-$FDFF -> $C000-$DDFF
+    LOG_DEBUG("Echo RAM write: 0x%04X (mirrors 0x%04X) = 0x%02X", addr, addr - 0x2000, value);
+    write_wram(bus, addr - 0x2000, value);
 }
 
 static uint8_t read_oam(bus_t *bus, uint16_t addr) {

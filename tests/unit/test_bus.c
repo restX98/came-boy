@@ -304,6 +304,13 @@ void test_bus_init_calls_mem_init_to_initialize_hram(void) {
     TEST_ASSERT_EQUAL_STRING("HRAM", mem_init_stats.calls[2].name);
 }
 
+void test_bus_init_calls_mem_init_to_initialize_oam(void) {
+    bus_init(&bus, &cartridge);
+    TEST_ASSERT_EQUAL_PTR(&bus.oam, mem_init_stats.calls[3].memory);
+    TEST_ASSERT_EQUAL_size_t(OAM_SIZE, mem_init_stats.calls[3].size);
+    TEST_ASSERT_EQUAL_STRING("OAM", mem_init_stats.calls[3].name);
+}
+
 void test_bus_init_returns_minus1_on_wram_allocation_failure(void) {
     mem_init_stats.calls[0].return_value = -1;
 
@@ -336,6 +343,20 @@ void test_bus_init_returns_minus1_on_hram_allocation_failure(void) {
     TEST_ASSERT_EQUAL_size_t(2, mem_free_stats.call_count);
     TEST_ASSERT_EQUAL_PTR(&bus.wram, mem_free_stats.calls[0].memory);
     TEST_ASSERT_EQUAL_PTR(&bus.vram, mem_free_stats.calls[1].memory);
+}
+
+void test_bus_init_returns_minus1_on_oam_allocation_failure(void) {
+    mem_init_stats.calls[3].return_value = -1;
+
+    int result = bus_init(&bus, &cartridge);
+
+    TEST_ASSERT_EQUAL_size_t(4, mem_init_stats.call_count);
+    TEST_ASSERT_EQUAL_INT(-1, result);
+
+    TEST_ASSERT_EQUAL_size_t(3, mem_free_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&bus.wram, mem_free_stats.calls[0].memory);
+    TEST_ASSERT_EQUAL_PTR(&bus.vram, mem_free_stats.calls[1].memory);
+    TEST_ASSERT_EQUAL_PTR(&bus.hram, mem_free_stats.calls[2].memory);
 }
 
 // ---- bus_free ----
@@ -394,6 +415,24 @@ void test_bus_write_vram(void) {
     TEST_ASSERT_EQUAL_UINT8(0x55, memory[0]);
 }
 
+void test_bus_read_vram_not_accessible_returns_0xFF(void) {
+    uint8_t memory[1] = { 0x55 };
+    bus.vram.mem = memory;
+    bus.vram_accessible = false;
+
+    TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0x8000));
+}
+
+void test_bus_write_vram_not_accessible_is_ignored(void) {
+    uint8_t memory[1] = { 0x00 };
+    bus.vram.mem = memory;
+    bus.vram_accessible = false;
+
+    bus_write(&bus, 0x8000, 0x55);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, memory[0]);
+}
+
 void test_bus_read_ext_ram(void) {
     bus.cartridge = &cartridge;
     cartridge_ext_ram_read_stats.calls[0].return_value = 0xCD;
@@ -424,9 +463,20 @@ void test_bus_read_wram(void) {
 }
 
 void test_bus_read_echo_ram(void) {
-    // Since echo RAM is not implemented, it should return 0xFF
-    // TODO: complete later when echo RAM support is added
-    TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xE000));
+    // Echo RAM mirrors WRAM: 0xE000 -> 0xC000
+    uint8_t memory[1] = { 0x42 };
+    bus.wram.mem = memory;
+    TEST_ASSERT_EQUAL_UINT8(0x42, bus_read(&bus, 0xE000));
+}
+
+void test_bus_write_echo_ram(void) {
+    // Echo RAM mirrors WRAM: 0xE000 -> 0xC000
+    uint8_t memory[1] = { 0x00 };
+    bus.wram.mem = memory;
+
+    bus_write(&bus, 0xE000, 0x42);
+
+    TEST_ASSERT_EQUAL_UINT8(0x42, memory[0]);
 }
 
 void test_bus_read_oam(void) {
@@ -442,6 +492,24 @@ void test_bus_write_oam(void) {
     bus_write(&bus, 0xFE00, 0x99);
 
     TEST_ASSERT_EQUAL_UINT8(0x99, memory[0]);
+}
+
+void test_bus_read_oam_not_accessible_returns_0xFF(void) {
+    uint8_t memory[1] = { 0x99 };
+    bus.oam.mem = memory;
+    bus.oam_accessible = false;
+
+    TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xFE00));
+}
+
+void test_bus_write_oam_not_accessible_is_ignored(void) {
+    uint8_t memory[1] = { 0x00 };
+    bus.oam.mem = memory;
+    bus.oam_accessible = false;
+
+    bus_write(&bus, 0xFE00, 0x99);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, memory[0]);
 }
 
 void test_bus_read_not_usable(void) {
@@ -500,9 +568,11 @@ int main(void) {
     RUN_TEST(test_bus_init_calls_mem_init_to_initialize_wram);
     RUN_TEST(test_bus_init_calls_mem_init_to_initialize_vram);
     RUN_TEST(test_bus_init_calls_mem_init_to_initialize_hram);
+    RUN_TEST(test_bus_init_calls_mem_init_to_initialize_oam);
     RUN_TEST(test_bus_init_returns_minus1_on_wram_allocation_failure);
     RUN_TEST(test_bus_init_returns_minus1_on_vram_allocation_failure);
     RUN_TEST(test_bus_init_returns_minus1_on_hram_allocation_failure);
+    RUN_TEST(test_bus_init_returns_minus1_on_oam_allocation_failure);
 
     RUN_TEST(test_bus_free_calls_mem_free_for_wram);
     RUN_TEST(test_bus_free_calls_mem_free_for_vram);
@@ -513,6 +583,8 @@ int main(void) {
 
     RUN_TEST(test_bus_read_vram);
     RUN_TEST(test_bus_write_vram);
+    RUN_TEST(test_bus_read_vram_not_accessible_returns_0xFF);
+    RUN_TEST(test_bus_write_vram_not_accessible_is_ignored);
 
     RUN_TEST(test_bus_read_ext_ram);
     RUN_TEST(test_bus_write_ext_ram);
@@ -521,9 +593,12 @@ int main(void) {
     RUN_TEST(test_bus_write_wram);
 
     RUN_TEST(test_bus_read_echo_ram);
+    RUN_TEST(test_bus_write_echo_ram);
 
     RUN_TEST(test_bus_read_oam);
     RUN_TEST(test_bus_write_oam);
+    RUN_TEST(test_bus_read_oam_not_accessible_returns_0xFF);
+    RUN_TEST(test_bus_write_oam_not_accessible_is_ignored);
 
     RUN_TEST(test_bus_read_not_usable);
 

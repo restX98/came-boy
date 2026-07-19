@@ -16,10 +16,6 @@ uint8_t oam_dma_read(oam_dma_reg_t *dma) {
 }
 
 void oam_dma_write(oam_dma_reg_t *dma, uint8_t value) {
-    if (value > 0xDF) {
-        assert(0 && "oam_dma_write: invalid source");
-        return;
-    }
     dma->active = true;
     dma->source = value << 8;
     dma->index = 0;
