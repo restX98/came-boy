@@ -5,6 +5,7 @@
 
 #include "bus.h"
 #include "cpu.h"
+#include "memory/mbc/mbc.h"
 #include "memory/mem.h"
 #include "isa/opcodes.h"
 
@@ -17,7 +18,7 @@ void setUp(void) {
     suppress_logs();
 
     memset(fake_rom, 0, sizeof(fake_rom));
-    cartridge = (cartridge_t){ .rom = fake_rom, .size = sizeof(fake_rom), .bank = 1 };
+    cartridge = (cartridge_t){ .rom = fake_rom, .size = sizeof(fake_rom), .mbc = &no_mbc_ops };
     bus_init(&bus, &cartridge);
     cpu_init(&cpu);
 }

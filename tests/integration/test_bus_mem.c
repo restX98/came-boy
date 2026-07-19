@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "bus.h"
+#include "memory/mbc/mbc.h"
 #include "memory/mem.h"
 
 static bus_t       bus;
@@ -14,7 +15,7 @@ void setUp(void) {
     suppress_logs();
 
     memset(fake_rom, 0, sizeof(fake_rom));
-    cartridge = (cartridge_t){ .rom = fake_rom, .size = sizeof(fake_rom), .bank = 1 };
+    cartridge = (cartridge_t){ .rom = fake_rom, .size = sizeof(fake_rom), .mbc = &no_mbc_ops };
     bus_init(&bus, &cartridge);
 }
 
@@ -43,32 +44,27 @@ void test_bus_init_allocates_hram(void) {
 // ---- bus_read reads from real allocated memory ----
 
 void test_bus_read_returns_value_written_to_wram(void) {
-    // TODO: replace with bus_write once implemented
-    bus.wram.mem[0x0000] = 0x42;
+    bus_write(&bus, 0xC000, 0x42);
     TEST_ASSERT_EQUAL_UINT8(0x42, bus_read(&bus, 0xC000));
 }
 
 void test_bus_read_returns_value_written_to_vram(void) {
-    // TODO: replace with bus_write once implemented
-    bus.vram.mem[0x0000] = 0xAB;
+    bus_write(&bus, 0x8000, 0xAB);
     TEST_ASSERT_EQUAL_UINT8(0xAB, bus_read(&bus, 0x8000));
 }
 
 void test_bus_read_returns_value_written_to_hram(void) {
-    // TODO: replace with bus_write once implemented
-    bus.hram.mem[0x0000] = 0x77;
+    bus_write(&bus, 0xFF80, 0x77);
     TEST_ASSERT_EQUAL_UINT8(0x77, bus_read(&bus, 0xFF80));
 }
 
 void test_bus_read_wram_last_byte(void) {
-    // TODO: replace with bus_write once implemented
-    bus.wram.mem[WRAM_SIZE - 1] = 0xFF;
+    bus_write(&bus, 0xDFFF, 0xFF);
     TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xDFFF));
 }
 
 void test_bus_read_hram_last_byte(void) {
-    // TODO: replace with bus_write once implemented
-    bus.hram.mem[HRAM_SIZE - 1] = 0xBB;
+    bus_write(&bus, 0xFFFE, 0xBB);
     TEST_ASSERT_EQUAL_UINT8(0xBB, bus_read(&bus, 0xFFFE));
 }
 
@@ -83,9 +79,8 @@ void test_bus_read_rom_bank1(void) {
 }
 
 void test_bus_read_correct_offset_mapping(void) {
-    // TODO: replace with bus_write once implemented
-    bus.wram.mem[1] = 0x11;
-    bus.vram.mem[1] = 0x22;
+    bus_write(&bus, 0xC001, 0x11);
+    bus_write(&bus, 0x8001, 0x22);
 
     TEST_ASSERT_EQUAL_UINT8(0x11, bus_read(&bus, 0xC001));
     TEST_ASSERT_EQUAL_UINT8(0x22, bus_read(&bus, 0x8001));
