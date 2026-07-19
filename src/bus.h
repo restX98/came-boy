@@ -1,11 +1,11 @@
 #ifndef BUS_H
 #define BUS_H
 
-#include "memory/cartridge.h"
 #include "io_reg.h"
+#include "memory/cartridge.h"
 #include "memory/mem.h"
 
-typedef struct {
+typedef struct bus_s {
     cartridge_t *cartridge;
     mem_t wram;
     mem_t vram;
@@ -17,7 +17,6 @@ typedef struct {
     bool oam_accessible;
 
     io_reg_t io_reg;
-    // TODO: Later add other components like RAM, PPU, APU, etc.
 } bus_t;
 
 typedef struct {

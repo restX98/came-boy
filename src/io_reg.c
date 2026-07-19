@@ -38,8 +38,8 @@ static const io_reg_region_t register_map[] = {
     {"Interrupt Flag", 0xFF0F, 0xFF0F, read_interrupts, write_interrupts},                       // 0xFF0F — Interrupt flag (IF)
     {"Audio", 0xFF10, 0xFF26, read_audio, write_audio},                                          // 0xFF10–0xFF26 — Audio
     {"Wave Pattern", 0xFF30, 0xFF3F, read_wave_pattern, write_wave_pattern},                     // 0xFF30–0xFF3F — Wave pattern
+    {"OAM DMA transfer", 0xFF46, 0xFF46, read_oam_dma, write_oam_dma},                           // 0xFF46 — OAM DMA transfer (defined before LCD because this address live between LCD registers)
     {"LCD", 0xFF40, 0xFF4B, read_lcd, write_lcd},                                                // 0xFF40–0xFF4B — LCD
-    {"OAM DMA transfer", 0xFF46, 0xFF46, read_oam_dma, write_oam_dma},                           // 0xFF46 — OAM DMA transfer
     {"Boot ROM mapping control", 0xFF50, 0xFF50, read_boot_rom_disable, write_boot_rom_disable}, // 0xFF50 — Boot ROM mapping control
     {"Interrupt Enable", 0xFFFF, 0xFFFF, read_interrupts, write_interrupts}                      // 0xFFFF — Interrupt enable (IE)
 };
@@ -47,9 +47,10 @@ static const io_reg_region_t register_map[] = {
 void io_reg_init(io_reg_t *io_reg) {
     joypad_init(&io_reg->joyp);
     serial_transfer_init(&io_reg->serial_transfer);
-    interrupts_init(&io_reg->interrupts);
     timer_init(&io_reg->timer);
+    interrupts_init(&io_reg->interrupts);
     audio_init(&io_reg->audio);
+    oam_dma_init(&io_reg->oam_dma);
     lcd_init(&io_reg->lcd);
 }
 
@@ -139,15 +140,13 @@ static void write_lcd(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_oam_dma(io_reg_t *io_reg, uint16_t addr) {
-    (void)io_reg;
-    LOG_WARN("io_reg_read: unimplemented OAM DMA register 0x%04X", addr);
-    return 0xFF;
+    (void)addr;
+    return oam_dma_read(&io_reg->oam_dma);
 }
 
 static void write_oam_dma(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
-    (void)io_reg;
-    (void)value;
-    LOG_WARN("io_reg_write: unimplemented OAM DMA register 0x%04X", addr);
+    (void)addr;
+    return oam_dma_write(&io_reg->oam_dma, value);
 }
 
 static uint8_t read_boot_rom_disable(io_reg_t *io_reg, uint16_t addr) {

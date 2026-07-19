@@ -59,6 +59,7 @@ int main(int argc, char *argv[]) {
         }
 
         ppu_step(&ppu, &bus, cycles);
+        oam_dma_tick(&bus, cycles);
         timer_tick(&bus.io_reg.timer, &bus.io_reg.interrupts, cycles);
 
         if (ppu.frame_ready) {

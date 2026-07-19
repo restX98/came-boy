@@ -7,6 +7,7 @@
 #include "io/interrupts.h"
 #include "io/joypad.h"
 #include "io/lcd.h"
+#include "io/oam_dma.h"
 #include "io/serial_transfer.h"
 #include "io/timer.h"
 
@@ -14,6 +15,7 @@ typedef struct {
     joypad_reg_t joyp;
     interrupt_regs_t interrupts;
     lcd_regs_t lcd;
+    oam_dma_reg_t oam_dma;
     st_regs_t serial_transfer;
     timer_regs_t timer;
     audio_regs_t audio;
