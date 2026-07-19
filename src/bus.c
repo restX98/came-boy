@@ -218,19 +218,20 @@ static void write_oam(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
-    (void)bus;
-    (void)addr;
-    LOG_WARN("Attempted to read from not usable address: 0x%04X", addr);
-    // TODO: Implement proper handling for not usable addresses (e.g., return 0xFF, log a warning, etc.)
-    // something about OAM corruption, to understand how it works and whether it's necessary to implement
-    return 0xFF; // Return 0xFF for not usable addresses
+    if (!bus->oam_accessible) {
+        LOG_WARN("Read from not usable address 0x%04X while OAM blocked", addr);
+        return 0xFF; // OAM blocked: bus returns 0xFF
+    }
+    // DMG behavior: returns 0x00 when OAM is accessible.
+    // Note: real DMG hardware can trigger the OAM corruption bug here;
+    // intentionally not emulated.
+    LOG_WARN("Read from not usable address: 0x%04X", addr);
+    return 0x00;
 }
 
 static void write_not_usable(bus_t *bus, uint16_t addr, uint8_t value) {
     (void)bus;
-    (void)addr;
-    (void)value;
-    LOG_WARN("Attempted to write to not usable address: 0x%04X", addr);
+    LOG_WARN("Ignored write to not usable address: 0x%04X (value 0x%02X)", addr, value);
 }
 
 static uint8_t read_io_reg(bus_t *bus, uint16_t addr) {

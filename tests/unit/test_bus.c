@@ -512,11 +512,31 @@ void test_bus_write_oam_not_accessible_is_ignored(void) {
     TEST_ASSERT_EQUAL_UINT8(0x00, memory[0]);
 }
 
-void test_bus_read_not_usable(void) {
-    // Since not usable area is not implemented, it should return 0xFF
-    // TODO: complete later when not usable area support is added
+void test_bus_read_not_usable_returns_00_when_oam_accessible(void) {
+    bus.oam_accessible = true;
+    TEST_ASSERT_EQUAL_UINT8(0x00, bus_read(&bus, 0xFEA0));
+}
+
+void test_bus_read_not_usable_returns_ff_when_oam_blocked(void) {
+    bus.oam_accessible = false;
     TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xFEA0));
 }
+
+void test_bus_write_not_usable_is_ignored(void) {
+    uint8_t memory[OAM_SIZE]; // 0xA0 bytes
+    memset(memory, 0x99, sizeof(memory));
+    bus.oam.mem = memory;
+
+    // Writes to the not usable region must be silently ignored and must not
+    // be misrouted into OAM (e.g. via an off-by-one in the memory map).
+    bus_write(&bus, 0xFEA0, 0x55); // first byte of the region
+    bus_write(&bus, 0xFEFF, 0x55); // last byte of the region
+
+    for (size_t i = 0; i < sizeof(memory); i++) {
+        TEST_ASSERT_EQUAL_UINT8(0x99, memory[i]);
+    }
+}
+
 
 void test_bus_read_io_reg(void) {
     io_reg_read_stats.calls[0].return_value = 0x3C;
@@ -600,7 +620,9 @@ int main(void) {
     RUN_TEST(test_bus_read_oam_not_accessible_returns_0xFF);
     RUN_TEST(test_bus_write_oam_not_accessible_is_ignored);
 
-    RUN_TEST(test_bus_read_not_usable);
+    RUN_TEST(test_bus_read_not_usable_returns_00_when_oam_accessible);
+    RUN_TEST(test_bus_read_not_usable_returns_ff_when_oam_blocked);
+    RUN_TEST(test_bus_write_not_usable_is_ignored);
 
     RUN_TEST(test_bus_read_io_reg);
     RUN_TEST(test_bus_write_io_reg);
