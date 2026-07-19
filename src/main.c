@@ -3,10 +3,12 @@
 #include <unistd.h>
 
 #include "bus.h"
-#include "memory/cartridge.h"
 #include "cpu.h"
 #include "logger.h"
+#include "memory/cartridge.h"
 #include "ppu.h"
+#include "renderer/renderer.h"
+#include "renderer/renderer_ascii.h"
 
 static volatile sig_atomic_t running = 1;
 
@@ -28,9 +30,11 @@ int main(int argc, char *argv[]) {
     setup_signals();
 
     if (argc < 2) {
-        LOG_ERROR("Usage: %s <rom>", argv[0]);
+        LOG_ERROR("Usage: %s <rom> [screen-tty]", argv[0]);
         return -1;
     }
+
+    const char *screen_tty = (argc >= 3) ? argv[2] : NULL;
 
     cartridge_t cartridge = { 0 };
     bus_t bus = { 0 };
@@ -51,6 +55,9 @@ int main(int argc, char *argv[]) {
     cpu_init(&cpu);
     ppu_init(&ppu);
 
+    renderer_t renderer = renderer_ascii(screen_tty);
+    renderer_init(&renderer);
+
     while (running) {
         int cycles = cpu_step(&cpu, &bus);
         if (cycles < 0) {
@@ -63,12 +70,13 @@ int main(int argc, char *argv[]) {
         timer_tick(&bus.io_reg.timer, &bus.io_reg.interrupts, cycles);
 
         if (ppu.frame_ready) {
-            sdl_render_framebuffer(ppu.framebuffer);  // ← actual drawing to screen
+            renderer_render(&renderer, ppu.framebuffer);
             ppu.frame_ready = false;
         }
     }
 
     // free resources
+    renderer_deinit(&renderer);
     cartridge_unload(&cartridge);
     bus_free(&bus);
 
