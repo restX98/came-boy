@@ -17,6 +17,9 @@ typedef struct {
 void ppu_init(ppu_t *ppu) {
     ppu->dot = 0;
     ppu->frame_ready = false;
+    ppu->window_line = 0;
+    ppu->wy_condition = false;
+
     memset(ppu->framebuffer, 0, sizeof(ppu->framebuffer));
 }
 
@@ -159,25 +162,34 @@ static void pixel_fetcher(ppu_t *ppu, bus_t *bus, uint8_t ly) {
 
     uint8_t bg_color_id[LCD_WIDTH] = { 0 };
 
+    // Y condition latches on exact equality, checked every scanline,
+    // independent of LCDC bits.
+    if (ly == lcd->wy) {
+        ppu->wy_condition = true;
+    }
+
     if (lcd->ctrl.bg_window_enable) {
         bool unsigned_addr = lcd->ctrl.bg_window_tile_data;
         uint16_t bg_map_base = lcd->ctrl.bg_tile_map ? 0x9C00 : 0x9800;
         uint16_t win_map_base = lcd->ctrl.window_tile_map ? 0x9C00 : 0x9800;
 
-        bool window_on_this_line = lcd->ctrl.window_enable && (ly >= lcd->wy);
+        bool window_active = lcd->ctrl.window_enable
+            && ppu->wy_condition
+            && lcd->wx <= 166;
+        bool window_drawn = false;
 
         for (int x = 0; x < LCD_WIDTH; x++) {
             uint8_t color_id;
 
             // Window covers this pixel if enabled AND we're past WY AND past WX-7.
             // WX = 7 means the window starts at screen x=0.
-            bool in_window = window_on_this_line && (x + 7 >= lcd->wx);
+            bool in_window = window_active && (x + 7 >= lcd->wx);
 
             if (in_window) {
                 uint8_t win_x = x + 7 - lcd->wx;
-                uint8_t win_y = ly - lcd->wy;
-                color_id = fetch_bg_window_pixel(bus, win_x, win_y,
-                    win_map_base, unsigned_addr);
+                uint8_t win_y = ppu->window_line;
+                color_id = fetch_bg_window_pixel(bus, win_x, win_y, win_map_base, unsigned_addr);
+                window_drawn = true;
             } else {
                 uint8_t bg_x = x + lcd->scx;
                 uint8_t bg_y = ly + lcd->scy;
@@ -188,6 +200,10 @@ static void pixel_fetcher(ppu_t *ppu, bus_t *bus, uint8_t ly) {
             bg_color_id[x] = color_id;
             uint8_t shade = (lcd->bgp >> (color_id * 2)) & 0x03;
             ppu->framebuffer[ly * LCD_WIDTH + x] = shade;
+        }
+
+        if (window_drawn) {
+            ppu->window_line++;
         }
     } else {
         // BG/Window disabled: blank line, all BG color IDs are 0
@@ -204,6 +220,7 @@ void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
 
     if (!lcd->ctrl.lcd_enable) {
         ppu->dot = 0;
+        ppu->window_line = 0;
         lcd->ly = 0;
 
         set_ppu_mode(bus, PPU_MODE_HBLANK);
@@ -231,6 +248,7 @@ void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
 
             if (lcd->ly >= SCANLINES_PER_FRAME) {
                 lcd->ly = 0;
+                ppu->window_line = 0;
             }
 
             lcd_update_stat(lcd, &bus->io_reg.interrupts);
@@ -238,6 +256,8 @@ void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
             if (lcd->ly == VBLANK_START_LINE) {
                 set_ppu_mode(bus, PPU_MODE_VBLANK);
 
+                ppu->window_line = 0;
+                ppu->wy_condition = false;
                 ppu->frame_ready = true;
             } else if (lcd->ly < VBLANK_START_LINE) {
                 set_ppu_mode(bus, PPU_MODE_OAM_SCAN);

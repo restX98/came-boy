@@ -193,7 +193,7 @@ static void write_echo_ram(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_oam(bus_t *bus, uint16_t addr) {
-    if (!bus->oam_accessible) {
+    if (bus->io_reg.oam_dma.active || !bus->oam_accessible) {
         LOG_WARN("Attempted to read from OAM while not accessible: 0x%04X", addr);
         return 0xFF; // Return 0xFF when OAM is not accessible
     }
@@ -205,7 +205,7 @@ static uint8_t read_oam(bus_t *bus, uint16_t addr) {
 }
 
 static void write_oam(bus_t *bus, uint16_t addr, uint8_t value) {
-    if (!bus->oam_accessible) {
+    if (bus->io_reg.oam_dma.active || !bus->oam_accessible) {
         LOG_WARN("Attempted to write to OAM while not accessible: 0x%04X with value: 0x%02X", addr, value);
         return; // Ignore writes when OAM is not accessible
     }

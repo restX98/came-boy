@@ -20,6 +20,8 @@
 
 typedef struct {
     uint16_t dot;
+    uint8_t window_line;
+    bool wy_condition;
     bool frame_ready;
 
     uint8_t framebuffer[LCD_WIDTH * LCD_HEIGHT];
