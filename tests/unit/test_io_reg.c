@@ -458,6 +458,77 @@ void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *
     lcd_write_stats.call_count++;
 }
 
+typedef struct {
+    oam_dma_reg_t *oam_dma;
+} oam_dma_init_call_t;
+
+typedef struct {
+    size_t call_count;
+    oam_dma_init_call_t calls[10];
+} oam_dma_init_stats_t;
+
+static oam_dma_init_stats_t oam_dma_init_stats;
+
+void oam_dma_init(oam_dma_reg_t *oam_dma) {
+    if (oam_dma_init_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for oam_dma_init_stats");
+    }
+
+    oam_dma_init_call_t *call = &oam_dma_init_stats.calls[oam_dma_init_stats.call_count];
+    call->oam_dma = oam_dma;
+
+    oam_dma_init_stats.call_count++;
+}
+
+typedef struct {
+    oam_dma_reg_t *oam_dma;
+    uint8_t return_value;
+} oam_dma_read_call_t;
+
+typedef struct {
+    size_t call_count;
+    oam_dma_read_call_t calls[10];
+} oam_dma_read_stats_t;
+
+static oam_dma_read_stats_t oam_dma_read_stats;
+
+uint8_t oam_dma_read(oam_dma_reg_t *oam_dma) {
+    if (oam_dma_read_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for oam_dma_read_stats");
+    }
+
+    oam_dma_read_call_t *call = &oam_dma_read_stats.calls[oam_dma_read_stats.call_count];
+    call->oam_dma = oam_dma;
+
+    oam_dma_read_stats.call_count++;
+
+    return call->return_value;
+}
+
+typedef struct {
+    oam_dma_reg_t *oam_dma;
+    uint8_t value;
+} oam_dma_write_call_t;
+
+typedef struct {
+    size_t call_count;
+    oam_dma_write_call_t calls[10];
+} oam_dma_write_stats_t;
+
+static oam_dma_write_stats_t oam_dma_write_stats;
+
+void oam_dma_write(oam_dma_reg_t *oam_dma, uint8_t value) {
+    if (oam_dma_write_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for oam_dma_write_stats");
+    }
+
+    oam_dma_write_call_t *call = &oam_dma_write_stats.calls[oam_dma_write_stats.call_count];
+    call->oam_dma = oam_dma;
+    call->value = value;
+
+    oam_dma_write_stats.call_count++;
+}
+
 void setUp(void) {
     suppress_logs();
 
@@ -481,6 +552,9 @@ void setUp(void) {
     lcd_init_stats = (lcd_init_stats_t){ 0 };
     lcd_read_stats = (lcd_read_stats_t){ 0 };
     lcd_write_stats = (lcd_write_stats_t){ 0 };
+    oam_dma_init_stats = (oam_dma_init_stats_t){ 0 };
+    oam_dma_read_stats = (oam_dma_read_stats_t){ 0 };
+    oam_dma_write_stats = (oam_dma_write_stats_t){ 0 };
 }
 
 void tearDown(void) {
@@ -529,6 +603,13 @@ void test_io_reg_init_initializes_lcd(void) {
 
     TEST_ASSERT_EQUAL_size_t(1, lcd_init_stats.call_count);
     TEST_ASSERT_EQUAL_PTR(&io_reg.lcd, lcd_init_stats.calls[0].lcd);
+}
+
+void test_io_reg_init_initializes_oam_dma(void) {
+    io_reg_init(&io_reg);
+
+    TEST_ASSERT_EQUAL_size_t(1, oam_dma_init_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&io_reg.oam_dma, oam_dma_init_stats.calls[0].oam_dma);
 }
 
 // ---- io_reg_read ----
@@ -602,6 +683,15 @@ void test_io_reg_read_lcd(void) {
     TEST_ASSERT_EQUAL_UINT16(0xFF40, lcd_read_stats.calls[0].addr);
 }
 
+void test_io_reg_read_oam_dma(void) {
+    oam_dma_read_stats.calls[0].return_value = 0x3C;
+
+    TEST_ASSERT_EQUAL_UINT8(0x3C, io_reg_read(&io_reg, 0xFF46));
+
+    TEST_ASSERT_EQUAL_size_t(1, oam_dma_read_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&io_reg.oam_dma, oam_dma_read_stats.calls[0].oam_dma);
+}
+
 void test_io_reg_read_unimplemented_returns_0xFF(void) {
     // 0xFF03 is not mapped to any component
     TEST_ASSERT_EQUAL_UINT8(0xFF, io_reg_read(&io_reg, 0xFF03));
@@ -612,6 +702,7 @@ void test_io_reg_read_unimplemented_returns_0xFF(void) {
     TEST_ASSERT_EQUAL_size_t(0, interrupts_read_stats.call_count);
     TEST_ASSERT_EQUAL_size_t(0, audio_read_stats.call_count);
     TEST_ASSERT_EQUAL_size_t(0, lcd_read_stats.call_count);
+    TEST_ASSERT_EQUAL_size_t(0, oam_dma_read_stats.call_count);
 }
 
 // ---- io_reg_write ----
@@ -679,6 +770,14 @@ void test_io_reg_write_lcd(void) {
     TEST_ASSERT_EQUAL_PTR(&io_reg.interrupts, lcd_write_stats.calls[0].interrupts);
 }
 
+void test_io_reg_write_oam_dma(void) {
+    io_reg_write(&io_reg, 0xFF46, 0x3C);
+
+    TEST_ASSERT_EQUAL_size_t(1, oam_dma_write_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&io_reg.oam_dma, oam_dma_write_stats.calls[0].oam_dma);
+    TEST_ASSERT_EQUAL_UINT8(0x3C, oam_dma_write_stats.calls[0].value);
+}
+
 void test_io_reg_write_unimplemented_is_ignored(void) {
     // 0xFF03 is not mapped to any component
     io_reg_write(&io_reg, 0xFF03, 0x3C);
@@ -689,6 +788,7 @@ void test_io_reg_write_unimplemented_is_ignored(void) {
     TEST_ASSERT_EQUAL_size_t(0, interrupts_write_stats.call_count);
     TEST_ASSERT_EQUAL_size_t(0, audio_write_stats.call_count);
     TEST_ASSERT_EQUAL_size_t(0, lcd_write_stats.call_count);
+    TEST_ASSERT_EQUAL_size_t(0, oam_dma_write_stats.call_count);
 }
 
 int main(void) {
@@ -700,6 +800,7 @@ int main(void) {
     RUN_TEST(test_io_reg_init_initializes_timer);
     RUN_TEST(test_io_reg_init_initializes_audio);
     RUN_TEST(test_io_reg_init_initializes_lcd);
+    RUN_TEST(test_io_reg_init_initializes_oam_dma);
 
     RUN_TEST(test_io_reg_read_joypad);
     RUN_TEST(test_io_reg_read_serial_transfer);
@@ -708,6 +809,7 @@ int main(void) {
     RUN_TEST(test_io_reg_read_interrupt_enable);
     RUN_TEST(test_io_reg_read_audio);
     RUN_TEST(test_io_reg_read_lcd);
+    RUN_TEST(test_io_reg_read_oam_dma);
     RUN_TEST(test_io_reg_read_unimplemented_returns_0xFF);
 
     RUN_TEST(test_io_reg_write_joypad);
@@ -717,6 +819,7 @@ int main(void) {
     RUN_TEST(test_io_reg_write_interrupt_enable);
     RUN_TEST(test_io_reg_write_audio);
     RUN_TEST(test_io_reg_write_lcd);
+    RUN_TEST(test_io_reg_write_oam_dma);
     RUN_TEST(test_io_reg_write_unimplemented_is_ignored);
 
     return UNITY_END();
