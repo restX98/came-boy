@@ -86,6 +86,24 @@ void test_bus_read_correct_offset_mapping(void) {
     TEST_ASSERT_EQUAL_UINT8(0x22, bus_read(&bus, 0x8001));
 }
 
+// ---- Echo RAM mirrors WRAM ($E000-$FDFF -> $C000-$DDFF) ----
+
+void test_bus_echo_ram_reflects_wram_write(void) {
+    bus_write(&bus, 0xC000, 0x5A);
+    TEST_ASSERT_EQUAL_UINT8(0x5A, bus_read(&bus, 0xE000));
+}
+
+void test_bus_wram_reflects_echo_ram_write(void) {
+    bus_write(&bus, 0xE000, 0xA5);
+    TEST_ASSERT_EQUAL_UINT8(0xA5, bus_read(&bus, 0xC000));
+}
+
+void test_bus_echo_ram_last_byte_mirrors_wram(void) {
+    // $FDFF is the last Echo RAM byte; it mirrors WRAM $DDFF.
+    bus_write(&bus, 0xFDFF, 0x3C);
+    TEST_ASSERT_EQUAL_UINT8(0x3C, bus_read(&bus, 0xDDFF));
+}
+
 // ---- bus_free releases memory ----
 
 void test_bus_free_sets_wram_mem_to_null(void) {
@@ -117,6 +135,9 @@ int main(void) {
     RUN_TEST(test_bus_read_rom_bank0);
     RUN_TEST(test_bus_read_rom_bank1);
     RUN_TEST(test_bus_read_correct_offset_mapping);
+    RUN_TEST(test_bus_echo_ram_reflects_wram_write);
+    RUN_TEST(test_bus_wram_reflects_echo_ram_write);
+    RUN_TEST(test_bus_echo_ram_last_byte_mirrors_wram);
     RUN_TEST(test_bus_free_sets_wram_mem_to_null);
     RUN_TEST(test_bus_free_sets_vram_mem_to_null);
     RUN_TEST(test_bus_free_sets_hram_mem_to_null);
