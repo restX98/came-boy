@@ -19,9 +19,3 @@ void log_msg(log_level_t level, const char *file, int line, const char *fmt, ...
     va_end(args);
     fprintf(stderr, "\n");
 }
-
-// Serial output
-void log_serial(char c) {
-    fputc(c, stdout);
-    fflush(stdout);
-}

@@ -14,6 +14,5 @@ typedef enum {
 #define LOG_ERROR(fmt, ...) log_msg(LOG_LEVEL_ERROR, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 void log_msg(log_level_t level, const char *file, int line, const char *fmt, ...);
-void log_serial(char c);
 
 #endif // LOGGER_H
