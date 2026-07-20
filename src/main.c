@@ -4,6 +4,8 @@
 
 #include "bus.h"
 #include "cpu.h"
+#include "input/input.h"
+#include "input/input_tty.h"
 #include "logger.h"
 #include "memory/cartridge.h"
 #include "ppu.h"
@@ -58,6 +60,9 @@ int main(int argc, char *argv[]) {
     renderer_t renderer = renderer_ascii(screen_tty);
     renderer_init(&renderer);
 
+    input_t input = input_tty(screen_tty);
+    input_init(&input);
+
     while (running) {
         int cycles = cpu_step(&cpu, &bus);
         if (cycles < 0) {
@@ -70,12 +75,14 @@ int main(int argc, char *argv[]) {
         timer_tick(&bus.io_reg.timer, &bus.io_reg.interrupts, cycles);
 
         if (ppu.frame_ready) {
+            input_poll(&input, &bus.io_reg.joyp, &bus.io_reg.interrupts);
             renderer_render(&renderer, ppu.framebuffer);
             ppu.frame_ready = false;
         }
     }
 
     // free resources
+    input_deinit(&input);
     renderer_deinit(&renderer);
     cartridge_unload(&cartridge);
     bus_free(&bus);
