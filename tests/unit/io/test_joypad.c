@@ -1,14 +1,36 @@
 #include "unity.h"
 #include "log_helpers.h"
 
+#include <assert.h>
+
 #include "io/joypad.h"
 
+typedef struct {
+    size_t call_count;
+    interrupt_t interrupts[10];
+} interrupts_request_stats_t;
+
+static interrupts_request_stats_t interrupts_request_stats;
+
+void interrupts_request(interrupt_regs_t *interrupts, interrupt_t interrupt) {
+    (void)interrupts;
+    if (interrupts_request_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for interrupts_request_stats");
+    }
+
+    interrupts_request_stats.interrupts[interrupts_request_stats.call_count] = interrupt;
+    interrupts_request_stats.call_count++;
+}
+
 static joypad_reg_t jp;
+static interrupt_regs_t interrupts;
 
 void setUp(void) {
     suppress_logs();
 
     jp = (joypad_reg_t){ 0 };
+    interrupts = (interrupt_regs_t){ 0 };
+    interrupts_request_stats = (interrupts_request_stats_t){ 0 };
 }
 
 void tearDown(void) {
@@ -85,9 +107,10 @@ void test_joypad_press_dpad_selected_fires_interrupt(void) {
     jp.select_bits = 0x00; // D-Pad selected
     jp.dpad_state = 0x0F;  // Right released
 
-    bool interrupt = joypad_press_dpad(&jp, JOYPAD_RIGHT);
+    joypad_press(&jp, &interrupts, JOYPAD_RIGHT);
 
-    TEST_ASSERT_TRUE(interrupt);
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+    TEST_ASSERT_EQUAL(INT_JOYPAD, interrupts_request_stats.interrupts[0]);
     TEST_ASSERT_EQUAL_HEX8(0x0E, jp.dpad_state); // press clears the bit
 }
 
@@ -95,9 +118,9 @@ void test_joypad_press_dpad_not_selected_no_interrupt_but_updates_state(void) {
     jp.select_bits = JOYP_SELECT_DPAD; // 0x10: D-Pad NOT selected
     jp.dpad_state = 0x0F;
 
-    bool interrupt = joypad_press_dpad(&jp, JOYPAD_RIGHT);
+    joypad_press(&jp, &interrupts, JOYPAD_RIGHT);
 
-    TEST_ASSERT_FALSE(interrupt);
+    TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_HEX8(0x0E, jp.dpad_state); // still recorded
 }
 
@@ -105,9 +128,9 @@ void test_joypad_press_dpad_already_pressed_no_interrupt(void) {
     jp.select_bits = 0x00;
     jp.dpad_state = 0x0E; // Right already pressed
 
-    bool interrupt = joypad_press_dpad(&jp, JOYPAD_RIGHT);
+    joypad_press(&jp, &interrupts, JOYPAD_RIGHT);
 
-    TEST_ASSERT_FALSE(interrupt); // no high->low transition
+    TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count); // no high->low transition
     TEST_ASSERT_EQUAL_HEX8(0x0E, jp.dpad_state);
 }
 
@@ -117,9 +140,10 @@ void test_joypad_press_button_selected_fires_interrupt(void) {
     jp.select_bits = 0x00; // Buttons selected
     jp.button_state = 0x0F;
 
-    bool interrupt = joypad_press_button(&jp, JOYPAD_A);
+    joypad_press(&jp, &interrupts, JOYPAD_A);
 
-    TEST_ASSERT_TRUE(interrupt);
+    TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
+    TEST_ASSERT_EQUAL(INT_JOYPAD, interrupts_request_stats.interrupts[0]);
     TEST_ASSERT_EQUAL_HEX8(0x0E, jp.button_state);
 }
 
@@ -127,9 +151,9 @@ void test_joypad_press_button_not_selected_no_interrupt(void) {
     jp.select_bits = JOYP_SELECT_BUTTONS; // 0x20: Buttons NOT selected
     jp.button_state = 0x0F;
 
-    bool interrupt = joypad_press_button(&jp, JOYPAD_A);
+    joypad_press(&jp, &interrupts, JOYPAD_A);
 
-    TEST_ASSERT_FALSE(interrupt);
+    TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_HEX8(0x0E, jp.button_state);
 }
 
@@ -138,7 +162,7 @@ void test_joypad_press_button_not_selected_no_interrupt(void) {
 void test_joypad_release_dpad_sets_bit(void) {
     jp.dpad_state = 0x0E; // Right pressed
 
-    joypad_release_dpad(&jp, JOYPAD_RIGHT);
+    joypad_release(&jp, JOYPAD_RIGHT);
 
     TEST_ASSERT_EQUAL_HEX8(0x0F, jp.dpad_state);
 }
@@ -146,7 +170,7 @@ void test_joypad_release_dpad_sets_bit(void) {
 void test_joypad_release_button_sets_bit(void) {
     jp.button_state = 0x0E; // A pressed
 
-    joypad_release_button(&jp, JOYPAD_A);
+    joypad_release(&jp, JOYPAD_A);
 
     TEST_ASSERT_EQUAL_HEX8(0x0F, jp.button_state);
 }
