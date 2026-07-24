@@ -14,7 +14,11 @@ typedef struct {
     uint8_t flags;
 } sprite_t;
 
-void ppu_init(ppu_t *ppu) {
+void ppu_init(ppu_t *ppu, lcd_regs_t *lcd, mem_t *vram, mem_t *oam) {
+    ppu->lcd = lcd;
+    ppu->vram = vram;
+    ppu->oam = oam;
+
     ppu->dot = 0;
     ppu->frame_ready = false;
     ppu->window_line = 0;
@@ -23,9 +27,8 @@ void ppu_init(ppu_t *ppu) {
     memset(ppu->framebuffer, 0, sizeof(ppu->framebuffer));
 }
 
-static uint8_t fetch_bg_window_pixel(bus_t *bus, uint8_t map_x, uint8_t map_y,
+static uint8_t fetch_bg_window_pixel(const uint8_t *vram, uint8_t map_x, uint8_t map_y,
     uint16_t map_base, bool unsigned_addressing) {
-    uint8_t *vram = bus->vram.mem;
     uint16_t map_offset = map_base - 0x8000;
 
     uint8_t tile_row = map_y / 8;
@@ -57,10 +60,10 @@ static int compare_sprites_dmg(const void *a, const void *b) {
     return (int)sa->oam_index - (int)sb->oam_index;
 }
 
-static void render_sprites_scanline(ppu_t *ppu, bus_t *bus, uint8_t ly, const uint8_t *bg_color_id) {
-    lcd_regs_t *lcd = &bus->io_reg.lcd;
-    uint8_t *oam = bus->oam.mem;
-    uint8_t *vram = bus->vram.mem;
+static void render_sprites_scanline(ppu_t *ppu, uint8_t ly, const uint8_t *bg_color_id) {
+    lcd_regs_t *lcd = ppu->lcd;
+    uint8_t *oam = ppu->oam->mem;
+    uint8_t *vram = ppu->vram->mem;
 
     uint8_t sprite_height = lcd->ctrl.obj_size ? 16 : 8;
 
@@ -135,8 +138,9 @@ static void render_sprites_scanline(ppu_t *ppu, bus_t *bus, uint8_t ly, const ui
     }
 }
 
-static void pixel_fetcher(ppu_t *ppu, bus_t *bus, uint8_t ly) {
-    lcd_regs_t *lcd = &bus->io_reg.lcd;
+static void pixel_fetcher(ppu_t *ppu, uint8_t ly) {
+    lcd_regs_t *lcd = ppu->lcd;
+    const uint8_t *vram = ppu->vram->mem;
 
     uint8_t bg_color_id[LCD_WIDTH] = { 0 };
 
@@ -166,12 +170,12 @@ static void pixel_fetcher(ppu_t *ppu, bus_t *bus, uint8_t ly) {
             if (in_window) {
                 uint8_t win_x = x + 7 - lcd->wx;
                 uint8_t win_y = ppu->window_line;
-                color_id = fetch_bg_window_pixel(bus, win_x, win_y, win_map_base, unsigned_addr);
+                color_id = fetch_bg_window_pixel(vram, win_x, win_y, win_map_base, unsigned_addr);
                 window_drawn = true;
             } else {
                 uint8_t bg_x = x + lcd->scx;
                 uint8_t bg_y = ly + lcd->scy;
-                color_id = fetch_bg_window_pixel(bus, bg_x, bg_y,
+                color_id = fetch_bg_window_pixel(vram, bg_x, bg_y,
                     bg_map_base, unsigned_addr);
             }
 
@@ -189,12 +193,12 @@ static void pixel_fetcher(ppu_t *ppu, bus_t *bus, uint8_t ly) {
     }
 
     if (lcd->ctrl.obj_enable) {
-        render_sprites_scanline(ppu, bus, ly, bg_color_id);
+        render_sprites_scanline(ppu, ly, bg_color_id);
     }
 }
 
-void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
-    lcd_regs_t *lcd = &bus->io_reg.lcd;
+void ppu_step(ppu_t *ppu, int t_cycles) {
+    lcd_regs_t *lcd = ppu->lcd;
 
     if (!lcd->ctrl.lcd_enable) {
         ppu->dot = 0;
@@ -216,7 +220,7 @@ void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
             } else if (ppu->dot == 80 + 172) {     // simplified: drawing is constant 172
                 lcd_set_mode(lcd, PPU_MODE_HBLANK);
 
-                pixel_fetcher(ppu, bus, lcd->ly); // draw the whole line at HBlank entry
+                pixel_fetcher(ppu, lcd->ly); // draw the whole line at HBlank entry
             }
         }
 

@@ -15,7 +15,6 @@ static bus_t bus;
 
 typedef struct {
     ppu_t *ppu;
-    bus_t *bus;
     int t_cycles;
 } ppu_step_call_t;
 
@@ -26,13 +25,12 @@ typedef struct {
 
 static ppu_step_stats_t ppu_step_stats;
 
-void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
+void ppu_step(ppu_t *ppu, int t_cycles) {
     if (ppu_step_stats.call_count == 10) {
         assert(0 && "Exceeded maximum call count for ppu_step_stats");
     }
     ppu_step_call_t *call = &ppu_step_stats.calls[ppu_step_stats.call_count];
     call->ppu = ppu;
-    call->bus = bus;
     call->t_cycles = t_cycles;
     ppu_step_stats.call_count++;
 }
@@ -108,14 +106,13 @@ void test_clock_init_stores_references(void) {
 
 // ---- clock_tick ----
 
-void test_clock_tick_advances_ppu_with_bus_and_cycles(void) {
+void test_clock_tick_advances_ppu_with_cycles(void) {
     clock_init(&clk, &ppu, &bus);
 
     clock_tick(&clk, 20);
 
     TEST_ASSERT_EQUAL_size_t(1, ppu_step_stats.call_count);
     TEST_ASSERT_EQUAL_PTR(&ppu, ppu_step_stats.calls[0].ppu);
-    TEST_ASSERT_EQUAL_PTR(&bus, ppu_step_stats.calls[0].bus);
     TEST_ASSERT_EQUAL_INT(20, ppu_step_stats.calls[0].t_cycles);
 }
 
@@ -144,7 +141,7 @@ int main(void) {
 
     RUN_TEST(test_clock_init_stores_references);
 
-    RUN_TEST(test_clock_tick_advances_ppu_with_bus_and_cycles);
+    RUN_TEST(test_clock_tick_advances_ppu_with_cycles);
     RUN_TEST(test_clock_tick_advances_oam_dma_with_bus_and_cycles);
     RUN_TEST(test_clock_tick_advances_timer_with_bus_timer_and_cycles);
 

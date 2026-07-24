@@ -8,7 +8,9 @@
 #include "io/lcd.h"
 
 static ppu_t ppu;
-static bus_t bus;
+static lcd_regs_t lcd_regs;
+static mem_t vram;
+static mem_t oam;
 static uint8_t vram_buf[VRAM_SIZE];
 static uint8_t oam_buf[OAM_SIZE];
 
@@ -67,15 +69,16 @@ void lcd_update_stat(lcd_regs_t *lcd) {
 void setUp(void) {
     suppress_logs();
 
-    ppu = (ppu_t){ 0 };
-    bus = (bus_t){ 0 };
-
+    lcd_regs = (lcd_regs_t){ 0 };
     memset(vram_buf, 0, sizeof(vram_buf));
     memset(oam_buf, 0, sizeof(oam_buf));
-    bus.vram.mem = vram_buf;
-    bus.vram.size = VRAM_SIZE;
-    bus.oam.mem = oam_buf;
-    bus.oam.size = OAM_SIZE;
+    vram = (mem_t){ .mem = vram_buf, .size = VRAM_SIZE };
+    oam = (mem_t){ .mem = oam_buf, .size = OAM_SIZE };
+
+    ppu = (ppu_t){ 0 };
+    ppu.lcd = &lcd_regs;
+    ppu.vram = &vram;
+    ppu.oam = &oam;
 
     lcd_set_mode_stats = (lcd_set_mode_stats_t){ 0 };
     lcd_set_mode_stats.return_value = true; // by default the mode change "takes"
@@ -99,8 +102,11 @@ void test_ppu_init_resets_state(void) {
     ppu.frame_ready = true;
     memset(ppu.framebuffer, 0xAB, sizeof(ppu.framebuffer));
 
-    ppu_init(&ppu);
+    ppu_init(&ppu, &lcd_regs, &vram, &oam);
 
+    TEST_ASSERT_EQUAL_PTR(&lcd_regs, ppu.lcd);
+    TEST_ASSERT_EQUAL_PTR(&vram, ppu.vram);
+    TEST_ASSERT_EQUAL_PTR(&oam, ppu.oam);
     TEST_ASSERT_EQUAL_UINT16(0, ppu.dot);
     TEST_ASSERT_FALSE(ppu.frame_ready);
     TEST_ASSERT_EACH_EQUAL_UINT8(0, ppu.framebuffer, sizeof(ppu.framebuffer));
@@ -109,32 +115,32 @@ void test_ppu_init_resets_state(void) {
 // ---- ppu_step: LCD disabled ----
 
 void test_ppu_step_disabled_resets_dot_and_ly(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 0;
+    lcd_regs.ctrl.lcd_enable = 0;
     ppu.dot = 200;
-    bus.io_reg.lcd.ly = 42;
+    lcd_regs.ly = 42;
 
-    ppu_step(&ppu, &bus, 8);
+    ppu_step(&ppu, 8);
 
     TEST_ASSERT_EQUAL_UINT16(0, ppu.dot);
-    TEST_ASSERT_EQUAL_UINT8(0, bus.io_reg.lcd.ly);
+    TEST_ASSERT_EQUAL_UINT8(0, lcd_regs.ly);
 }
 
 void test_ppu_step_disabled_forces_hblank_mode(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 0;
+    lcd_regs.ctrl.lcd_enable = 0;
 
-    ppu_step(&ppu, &bus, 1);
+    ppu_step(&ppu, 1);
 
     TEST_ASSERT_EQUAL_size_t(1, lcd_set_mode_stats.call_count);
     TEST_ASSERT_EQUAL_UINT8(PPU_MODE_HBLANK, lcd_set_mode_stats.calls[0].mode);
-    TEST_ASSERT_EQUAL_PTR(&bus.io_reg.lcd, lcd_set_mode_stats.calls[0].lcd);
+    TEST_ASSERT_EQUAL_PTR(&lcd_regs, lcd_set_mode_stats.calls[0].lcd);
 }
 
 // ---- ppu_step: visible-line mode machine ----
 
 void test_ppu_step_enters_drawing_at_dot_80(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
+    lcd_regs.ctrl.lcd_enable = 1;
 
-    ppu_step(&ppu, &bus, 80);
+    ppu_step(&ppu, 80);
 
     TEST_ASSERT_EQUAL_UINT16(80, ppu.dot);
     TEST_ASSERT_EQUAL_size_t(1, lcd_set_mode_stats.call_count);
@@ -142,9 +148,9 @@ void test_ppu_step_enters_drawing_at_dot_80(void) {
 }
 
 void test_ppu_step_enters_hblank_after_drawing(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
+    lcd_regs.ctrl.lcd_enable = 1;
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT16(252, ppu.dot);
     TEST_ASSERT_EQUAL_size_t(2, lcd_set_mode_stats.call_count);
@@ -155,38 +161,38 @@ void test_ppu_step_enters_hblank_after_drawing(void) {
 // ---- ppu_step: scanline advance ----
 
 void test_ppu_step_advances_ly_and_updates_stat_after_scanline(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
+    lcd_regs.ctrl.lcd_enable = 1;
 
-    ppu_step(&ppu, &bus, DOTS_PER_SCANLINE);
+    ppu_step(&ppu, DOTS_PER_SCANLINE);
 
     TEST_ASSERT_EQUAL_UINT16(0, ppu.dot);
-    TEST_ASSERT_EQUAL_UINT8(1, bus.io_reg.lcd.ly);
+    TEST_ASSERT_EQUAL_UINT8(1, lcd_regs.ly);
     TEST_ASSERT_EQUAL_size_t(1, lcd_update_stat_stats.call_count);
-    TEST_ASSERT_EQUAL_PTR(&bus.io_reg.lcd, lcd_update_stat_stats.calls[0].lcd);
+    TEST_ASSERT_EQUAL_PTR(&lcd_regs, lcd_update_stat_stats.calls[0].lcd);
     // A new visible line begins with OAM scan.
     TEST_ASSERT_EQUAL_UINT8(PPU_MODE_OAM_SCAN, last_mode());
 }
 
 void test_ppu_step_enters_vblank_and_sets_frame_ready(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
-    bus.io_reg.lcd.ly = VBLANK_START_LINE - 1; // 143
+    lcd_regs.ctrl.lcd_enable = 1;
+    lcd_regs.ly = VBLANK_START_LINE - 1; // 143
     ppu.dot = DOTS_PER_SCANLINE - 1;
 
-    ppu_step(&ppu, &bus, 1); // roll over into line 144
+    ppu_step(&ppu, 1); // roll over into line 144
 
-    TEST_ASSERT_EQUAL_UINT8(VBLANK_START_LINE, bus.io_reg.lcd.ly);
+    TEST_ASSERT_EQUAL_UINT8(VBLANK_START_LINE, lcd_regs.ly);
     TEST_ASSERT_TRUE(ppu.frame_ready);
     TEST_ASSERT_EQUAL_UINT8(PPU_MODE_VBLANK, last_mode());
 }
 
 void test_ppu_step_ly_wraps_at_frame_end(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
-    bus.io_reg.lcd.ly = SCANLINES_PER_FRAME - 1; // 153
+    lcd_regs.ctrl.lcd_enable = 1;
+    lcd_regs.ly = SCANLINES_PER_FRAME - 1; // 153
     ppu.dot = DOTS_PER_SCANLINE - 1;
 
-    ppu_step(&ppu, &bus, 1);
+    ppu_step(&ppu, 1);
 
-    TEST_ASSERT_EQUAL_UINT8(0, bus.io_reg.lcd.ly);
+    TEST_ASSERT_EQUAL_UINT8(0, lcd_regs.ly);
 }
 
 // ---- ppu_step: background rendering ----
@@ -194,7 +200,7 @@ void test_ppu_step_ly_wraps_at_frame_end(void) {
 // Configure a minimal, fully-visible BG: unsigned $8000 tile data, tile map at
 // $9800, identity palette, no scroll, sprites off.
 static void setup_bg_only(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 1;
     lcd->ctrl.bg_window_tile_data = 1; // unsigned addressing from $8000
@@ -214,7 +220,7 @@ void test_ppu_renders_bg_tile_to_framebuffer(void) {
     vram_buf[0] = 0xA0; // low plane, row 0
     vram_buf[1] = 0xC0; // high plane, row 0
 
-    ppu_step(&ppu, &bus, 80 + 172); // render line 0 at HBlank entry
+    ppu_step(&ppu, 80 + 172); // render line 0 at HBlank entry
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);
     TEST_ASSERT_EQUAL_UINT8(2, ppu.framebuffer[1]);
@@ -225,23 +231,23 @@ void test_ppu_renders_bg_tile_to_framebuffer(void) {
 void test_ppu_renders_bg_through_palette(void) {
     setup_bg_only();
     // Palette maps color id 3 -> shade 1 (bits 7:6 = 01).
-    bus.io_reg.lcd.bgp = 0x40; // 01 00 00 00
+    lcd_regs.bgp = 0x40; // 01 00 00 00
 
     vram_buf[0] = 0x80; // low: bit7 set
     vram_buf[1] = 0x80; // high: bit7 set -> pixel 0 color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(1, ppu.framebuffer[0]);
 }
 
 void test_ppu_blanks_line_when_bg_disabled(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
-    bus.io_reg.lcd.ctrl.bg_window_enable = 0;
-    bus.io_reg.lcd.ctrl.obj_enable = 0;
+    lcd_regs.ctrl.lcd_enable = 1;
+    lcd_regs.ctrl.bg_window_enable = 0;
+    lcd_regs.ctrl.obj_enable = 0;
     ppu.framebuffer[5] = 0xAA; // pre-existing garbage on line 0
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(0, ppu.framebuffer[5]);
 }
@@ -249,7 +255,7 @@ void test_ppu_blanks_line_when_bg_disabled(void) {
 // ---- ppu_step: sprite rendering ----
 
 void test_ppu_renders_sprite_over_blank_bg(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0; // blank BG so the sprite draws freely
     lcd->ctrl.obj_enable = 1;
@@ -266,14 +272,14 @@ void test_ppu_renders_sprite_over_blank_bg(void) {
     vram_buf[16] = 0x80;
     vram_buf[17] = 0x80;
 
-    ppu_step(&ppu, &bus, 80 + 172); // render line 0
+    ppu_step(&ppu, 80 + 172); // render line 0
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]); // sprite pixel
     TEST_ASSERT_EQUAL_UINT8(0, ppu.framebuffer[1]); // transparent -> blank BG
 }
 
 void test_ppu_sprite_transparent_color0_leaves_bg(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -289,42 +295,42 @@ void test_ppu_sprite_transparent_color0_leaves_bg(void) {
     vram_buf[16] = 0x00;
     vram_buf[17] = 0x00;
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(0, ppu.framebuffer[0]);
 }
 
 void test_ppu_renders_bg_signed_tile_addressing(void) {
     setup_bg_only();
-    bus.io_reg.lcd.ctrl.bg_window_tile_data = 0; // signed addressing from $9000
+    lcd_regs.ctrl.bg_window_tile_data = 0; // signed addressing from $9000
 
     // Tile index 0 -> $9000 (vram offset 0x1000). Row 0: low=0x80 gives color id 1.
     vram_buf[0x1000] = 0x80;
     vram_buf[0x1001] = 0x00;
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(1, ppu.framebuffer[0]);
 }
 
 void test_ppu_renders_window(void) {
     setup_bg_only();
-    bus.io_reg.lcd.ctrl.window_enable = 1;
-    bus.io_reg.lcd.ctrl.window_tile_map = 0; // $9800
-    bus.io_reg.lcd.wy = 0;
-    bus.io_reg.lcd.wx = 7; // window starts at screen x = 0
+    lcd_regs.ctrl.window_enable = 1;
+    lcd_regs.ctrl.window_tile_map = 0; // $9800
+    lcd_regs.wy = 0;
+    lcd_regs.wx = 7; // window starts at screen x = 0
 
     // Window map is all zeroes -> tile 0; give tile 0 an opaque pixel 0.
     vram_buf[0] = 0x80;
     vram_buf[1] = 0x80; // color id 3 -> shade 3 (identity palette)
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);
 }
 
 void test_ppu_sprite_y_flip(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -343,13 +349,13 @@ void test_ppu_sprite_y_flip(void) {
     vram_buf[16 + 14] = 0x80; // row 7 low
     vram_buf[16 + 15] = 0x80; // row 7 high -> color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);
 }
 
 void test_ppu_sprite_8x16_lower_tile(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -367,13 +373,13 @@ void test_ppu_sprite_8x16_lower_tile(void) {
     vram_buf[48] = 0x80; // tile 3, row 0 low
     vram_buf[49] = 0x80; // tile 3, row 0 high -> color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172); // render line 8
+    ppu_step(&ppu, 80 + 172); // render line 8
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[8 * LCD_WIDTH + 0]);
 }
 
 void test_ppu_sprite_x_priority_lower_x_wins(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -388,14 +394,14 @@ void test_ppu_sprite_x_priority_lower_x_wins(void) {
     vram_buf[16] = 0xFF; vram_buf[17] = 0xFF; // tile 1: all color id 3
     vram_buf[32] = 0x00; vram_buf[33] = 0xFF; // tile 2: all color id 2
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[1]); // overlap -> sprite 0 wins
     TEST_ASSERT_EQUAL_UINT8(2, ppu.framebuffer[8]); // only sprite 1 reaches here
 }
 
 void test_ppu_sprite_equal_x_lower_oam_index_wins(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -409,13 +415,13 @@ void test_ppu_sprite_equal_x_lower_oam_index_wins(void) {
     vram_buf[16] = 0xFF; vram_buf[17] = 0xFF; // tile 1: color id 3
     vram_buf[32] = 0x00; vram_buf[33] = 0xFF; // tile 2: color id 2
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]); // sprite 0 wins the tie
 }
 
 void test_ppu_sprite_behind_bg_when_priority_set(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 1;
     lcd->ctrl.bg_window_tile_data = 1;
@@ -438,13 +444,13 @@ void test_ppu_sprite_behind_bg_when_priority_set(void) {
     vram_buf[16] = 0x80;
     vram_buf[17] = 0x80; // sprite color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(1, ppu.framebuffer[0]); // BG shows through
 }
 
 void test_ppu_sprite_uses_obp1_palette(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -459,13 +465,13 @@ void test_ppu_sprite_uses_obp1_palette(void) {
     vram_buf[16] = 0x80;
     vram_buf[17] = 0x80; // color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(1, ppu.framebuffer[0]);
 }
 
 void test_ppu_sprite_x_flip(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -480,14 +486,14 @@ void test_ppu_sprite_x_flip(void) {
     vram_buf[16] = 0x80;
     vram_buf[17] = 0x80;
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(0, ppu.framebuffer[0]); // pixel 0 now transparent
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[7]); // opaque pixel mirrored here
 }
 
 void test_ppu_sprite_clipped_at_screen_edges(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -500,7 +506,7 @@ void test_ppu_sprite_clipped_at_screen_edges(void) {
     oam_buf[4] = 16; oam_buf[5] = 164; oam_buf[6] = 1; oam_buf[7] = 0; // screen 156
     vram_buf[16] = 0xFF; vram_buf[17] = 0xFF; // tile 1: all color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);   // A, first on-screen pixel
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[156]); // B, first pixel
@@ -508,7 +514,7 @@ void test_ppu_sprite_clipped_at_screen_edges(void) {
 }
 
 void test_ppu_sprite_priority_draws_over_bg_color0(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 1;
     lcd->ctrl.bg_window_tile_data = 1;
@@ -529,13 +535,13 @@ void test_ppu_sprite_priority_draws_over_bg_color0(void) {
     vram_buf[16] = 0x80;
     vram_buf[17] = 0x80; // sprite color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);
 }
 
 void test_ppu_sprite_8x16_upper_tile(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -550,13 +556,13 @@ void test_ppu_sprite_8x16_upper_tile(void) {
     vram_buf[32] = 0x80;
     vram_buf[33] = 0x80; // color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);
 }
 
 void test_ppu_limits_to_ten_sprites_per_line(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -574,14 +580,14 @@ void test_ppu_limits_to_ten_sprites_per_line(void) {
     vram_buf[16] = 0xFF;
     vram_buf[17] = 0xFF; // tile 1: color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[72]); // sprite 9 (10th) drawn
     TEST_ASSERT_EQUAL_UINT8(0, ppu.framebuffer[80]); // sprite 10 (11th) dropped
 }
 
 void test_ppu_sprite_off_scanline_is_skipped(void) {
-    lcd_regs_t *lcd = &bus.io_reg.lcd;
+    lcd_regs_t *lcd = &lcd_regs;
     lcd->ctrl.lcd_enable = 1;
     lcd->ctrl.bg_window_enable = 0;
     lcd->ctrl.obj_enable = 1;
@@ -594,78 +600,78 @@ void test_ppu_sprite_off_scanline_is_skipped(void) {
     vram_buf[16] = 0x80;
     vram_buf[17] = 0x80;
 
-    ppu_step(&ppu, &bus, 80 + 172); // render line 0
+    ppu_step(&ppu, 80 + 172); // render line 0
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);
 }
 
 void test_ppu_bg_uses_alternate_tile_map(void) {
     setup_bg_only();
-    bus.io_reg.lcd.ctrl.bg_tile_map = 1; // $9C00
+    lcd_regs.ctrl.bg_tile_map = 1; // $9C00
 
     // $9800 (unused map) stays 0 -> blank tile 0. $9C00 map cell 0 -> tile 5.
     vram_buf[0x1C00] = 5;
     vram_buf[5 * 16 + 0] = 0x80;
     vram_buf[5 * 16 + 1] = 0x80; // tile 5 pixel 0 -> color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);
 }
 
 void test_ppu_window_uses_alternate_tile_map(void) {
     setup_bg_only();
-    bus.io_reg.lcd.ctrl.window_enable = 1;
-    bus.io_reg.lcd.ctrl.window_tile_map = 1; // $9C00
-    bus.io_reg.lcd.wy = 0;
-    bus.io_reg.lcd.wx = 7;
+    lcd_regs.ctrl.window_enable = 1;
+    lcd_regs.ctrl.window_tile_map = 1; // $9C00
+    lcd_regs.wy = 0;
+    lcd_regs.wx = 7;
 
     vram_buf[0x1C00] = 7;
     vram_buf[7 * 16 + 0] = 0x80;
     vram_buf[7 * 16 + 1] = 0x80; // tile 7 pixel 0 -> color id 3
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(3, ppu.framebuffer[0]);
 }
 
 void test_ppu_window_skipped_when_ly_below_wy(void) {
     setup_bg_only();
-    bus.io_reg.lcd.ctrl.window_enable = 1;
-    bus.io_reg.lcd.wy = 10; // window starts below line 0
-    bus.io_reg.lcd.wx = 7;
+    lcd_regs.ctrl.window_enable = 1;
+    lcd_regs.wy = 10; // window starts below line 0
+    lcd_regs.wx = 7;
 
     // BG tile 0 pixel 0 -> color id 1; window would differ, but is inactive here.
     vram_buf[0] = 0x80;
     vram_buf[1] = 0x00;
 
-    ppu_step(&ppu, &bus, 80 + 172); // line 0, below WY
+    ppu_step(&ppu, 80 + 172); // line 0, below WY
 
     TEST_ASSERT_EQUAL_UINT8(1, ppu.framebuffer[0]); // BG, not window
 }
 
 void test_ppu_pixels_left_of_wx_use_bg(void) {
     setup_bg_only();
-    bus.io_reg.lcd.ctrl.window_enable = 1;
-    bus.io_reg.lcd.wy = 0;
-    bus.io_reg.lcd.wx = 80; // window covers screen x >= 73
+    lcd_regs.ctrl.window_enable = 1;
+    lcd_regs.wy = 0;
+    lcd_regs.wx = 80; // window covers screen x >= 73
 
     vram_buf[0] = 0x80;
     vram_buf[1] = 0x00; // tile 0 pixel 0 -> color id 1
 
-    ppu_step(&ppu, &bus, 80 + 172);
+    ppu_step(&ppu, 80 + 172);
 
     TEST_ASSERT_EQUAL_UINT8(1, ppu.framebuffer[0]); // left of window -> BG
 }
 
 void test_ppu_vblank_lines_do_not_reenter_oam_scan(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
-    bus.io_reg.lcd.ly = 150; // mid-VBlank
+    lcd_regs.ctrl.lcd_enable = 1;
+    lcd_regs.ly = 150; // mid-VBlank
     ppu.dot = DOTS_PER_SCANLINE - 1;
 
-    ppu_step(&ppu, &bus, 1); // advance to line 151
+    ppu_step(&ppu, 1); // advance to line 151
 
-    TEST_ASSERT_EQUAL_UINT8(151, bus.io_reg.lcd.ly);
+    TEST_ASSERT_EQUAL_UINT8(151, lcd_regs.ly);
     TEST_ASSERT_EQUAL_size_t(1, lcd_update_stat_stats.call_count);
     // Lines 145..153 neither re-enter VBlank nor start an OAM scan.
     TEST_ASSERT_EQUAL_size_t(0, lcd_set_mode_stats.call_count);

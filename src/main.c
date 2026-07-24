@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
     }
 
     cpu_init(&cpu);
-    ppu_init(&ppu);
+    ppu_init(&ppu, &bus.io_reg.lcd, &bus.vram, &bus.oam);
 
     gb_clock_t clock;
     clock_init(&clock, &ppu, &bus);

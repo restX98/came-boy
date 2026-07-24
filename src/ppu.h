@@ -1,7 +1,8 @@
 #ifndef PPU_H
 #define PPU_H
 
-#include "bus.h"
+#include "io/lcd.h"
+#include "memory/mem.h"
 
 #define LCD_WIDTH  160
 #define LCD_HEIGHT 144
@@ -19,6 +20,10 @@
 #define OAM_FLAG_PALETTE  0x10  // 0 = OBP0, 1 = OBP1
 
 typedef struct {
+    lcd_regs_t *lcd;
+    mem_t *vram;
+    mem_t *oam;
+
     uint16_t dot;
     uint8_t window_line;
     bool wy_condition;
@@ -27,7 +32,7 @@ typedef struct {
     uint8_t framebuffer[LCD_WIDTH * LCD_HEIGHT];
 } ppu_t;
 
-void ppu_init(ppu_t *ppu);
-void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles);
+void ppu_init(ppu_t *ppu, lcd_regs_t *lcd, mem_t *vram, mem_t *oam);
+void ppu_step(ppu_t *ppu, int t_cycles);
 
 #endif // PPU_H
