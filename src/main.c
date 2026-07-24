@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include "bus.h"
+#include "clock.h"
 #include "cpu.h"
 #include "input/input.h"
 #include "input/input_tty.h"
@@ -57,6 +58,9 @@ int main(int argc, char *argv[]) {
     cpu_init(&cpu);
     ppu_init(&ppu);
 
+    gb_clock_t clock;
+    clock_init(&clock, &ppu, &bus);
+
     renderer_t renderer = renderer_ascii(screen_tty);
     renderer_init(&renderer);
 
@@ -70,9 +74,7 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        ppu_step(&ppu, &bus, cycles);
-        oam_dma_tick(&bus, cycles);
-        timer_tick(&bus.io_reg.timer, cycles);
+        clock_tick(&clock, cycles);
 
         if (ppu.frame_ready) {
             input_poll(&input, &bus.io_reg.joyp);
