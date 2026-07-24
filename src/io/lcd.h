@@ -67,4 +67,7 @@ void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value);
 bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode);
 void lcd_update_stat(lcd_regs_t *lcd);
 
+bool lcd_vram_accessible(const lcd_regs_t *lcd);
+bool lcd_oam_accessible(const lcd_regs_t *lcd);
+
 #endif // LCD_H

@@ -66,9 +66,6 @@ int bus_init(bus_t *bus, cartridge_t *cartridge) {
         return -1;
     }
 
-    bus->oam_accessible = true;
-    bus->vram_accessible = true;
-
     return 0;
 }
 
@@ -132,7 +129,7 @@ static void write_rom(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_vram(bus_t *bus, uint16_t addr) {
-    if (!bus->vram_accessible) {
+    if (!lcd_vram_accessible(&bus->io_reg.lcd)) {
         LOG_WARN("Attempted to read from VRAM while not accessible: 0x%04X", addr);
         return 0xFF; // Return 0xFF when VRAM is not accessible
     }
@@ -144,7 +141,7 @@ static uint8_t read_vram(bus_t *bus, uint16_t addr) {
 }
 
 static void write_vram(bus_t *bus, uint16_t addr, uint8_t value) {
-    if (!bus->vram_accessible) {
+    if (!lcd_vram_accessible(&bus->io_reg.lcd)) {
         LOG_WARN("Attempted to write to VRAM while not accessible: 0x%04X with value: 0x%02X", addr, value);
         return; // Ignore writes when VRAM is not accessible
     }
@@ -197,7 +194,7 @@ static uint8_t read_oam(bus_t *bus, uint16_t addr) {
         LOG_DEBUG("OAM read blocked by active DMA: 0x%04X", addr);
         return 0xFF; // Return 0xFF while DMA is transferring
     }
-    if (!bus->oam_accessible) {
+    if (!lcd_oam_accessible(&bus->io_reg.lcd)) {
         LOG_WARN("Attempted to read from OAM while not accessible: 0x%04X", addr);
         return 0xFF; // Return 0xFF when OAM is not accessible
     }
@@ -213,7 +210,7 @@ static void write_oam(bus_t *bus, uint16_t addr, uint8_t value) {
         LOG_DEBUG("OAM write blocked by active DMA: 0x%04X (value 0x%02X)", addr, value);
         return; // Ignore writes while DMA is transferring
     }
-    if (!bus->oam_accessible) {
+    if (!lcd_oam_accessible(&bus->io_reg.lcd)) {
         LOG_WARN("Attempted to write to OAM while not accessible: 0x%04X with value: 0x%02X", addr, value);
         return; // Ignore writes when OAM is not accessible
     }
@@ -224,7 +221,7 @@ static void write_oam(bus_t *bus, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
-    if (!bus->oam_accessible) {
+    if (!lcd_oam_accessible(&bus->io_reg.lcd)) {
         LOG_WARN("Read from not usable address 0x%04X while OAM blocked", addr);
         return 0xFF; // OAM blocked: bus returns 0xFF
     }

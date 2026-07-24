@@ -23,28 +23,6 @@ void ppu_init(ppu_t *ppu) {
     memset(ppu->framebuffer, 0, sizeof(ppu->framebuffer));
 }
 
-static void set_ppu_mode(bus_t *bus, ppu_mode_t mode) {
-    if (!lcd_set_mode(&bus->io_reg.lcd, mode)) {
-        return;
-    }
-
-    switch (mode) {
-        case PPU_MODE_HBLANK:
-        case PPU_MODE_VBLANK:
-            bus->oam_accessible = true;
-            bus->vram_accessible = true;
-            break;
-        case PPU_MODE_OAM_SCAN:
-            bus->oam_accessible = false;
-            bus->vram_accessible = true;
-            break;
-        case PPU_MODE_DRAWING:
-            bus->oam_accessible = false;
-            bus->vram_accessible = false;
-            break;
-    }
-}
-
 static uint8_t fetch_bg_window_pixel(bus_t *bus, uint8_t map_x, uint8_t map_y,
     uint16_t map_base, bool unsigned_addressing) {
     uint8_t *vram = bus->vram.mem;
@@ -223,7 +201,7 @@ void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
         ppu->window_line = 0;
         lcd->ly = 0;
 
-        set_ppu_mode(bus, PPU_MODE_HBLANK);
+        lcd_set_mode(lcd, PPU_MODE_HBLANK);
 
         return;
     }
@@ -234,9 +212,9 @@ void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
         if (lcd->ly < VBLANK_START_LINE) {
             // Visible scanlines: cycle through OAM_SCAN -> DRAWING -> HBLANK
             if (ppu->dot == 80) {
-                set_ppu_mode(bus, PPU_MODE_DRAWING);
+                lcd_set_mode(lcd, PPU_MODE_DRAWING);
             } else if (ppu->dot == 80 + 172) {     // simplified: drawing is constant 172
-                set_ppu_mode(bus, PPU_MODE_HBLANK);
+                lcd_set_mode(lcd, PPU_MODE_HBLANK);
 
                 pixel_fetcher(ppu, bus, lcd->ly); // draw the whole line at HBlank entry
             }
@@ -254,13 +232,13 @@ void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
             lcd_update_stat(lcd);
 
             if (lcd->ly == VBLANK_START_LINE) {
-                set_ppu_mode(bus, PPU_MODE_VBLANK);
+                lcd_set_mode(lcd, PPU_MODE_VBLANK);
 
                 ppu->window_line = 0;
                 ppu->wy_condition = false;
                 ppu->frame_ready = true;
             } else if (lcd->ly < VBLANK_START_LINE) {
-                set_ppu_mode(bus, PPU_MODE_OAM_SCAN);
+                lcd_set_mode(lcd, PPU_MODE_OAM_SCAN);
             }
         }
     }

@@ -315,6 +315,30 @@ void test_lcd_update_stat_refires_after_line_goes_low(void) {
     TEST_ASSERT_EQUAL_size_t(2, interrupts_request_stats.call_count);
 }
 
+// ---- lcd_vram_accessible / lcd_oam_accessible ----
+
+void test_lcd_vram_accessible_only_blocked_during_drawing(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+    TEST_ASSERT_TRUE(lcd_vram_accessible(&lcd));
+    lcd.stat.ppu_mode = PPU_MODE_VBLANK;
+    TEST_ASSERT_TRUE(lcd_vram_accessible(&lcd));
+    lcd.stat.ppu_mode = PPU_MODE_OAM_SCAN;
+    TEST_ASSERT_TRUE(lcd_vram_accessible(&lcd));
+    lcd.stat.ppu_mode = PPU_MODE_DRAWING;
+    TEST_ASSERT_FALSE(lcd_vram_accessible(&lcd));
+}
+
+void test_lcd_oam_accessible_blocked_during_oam_scan_and_drawing(void) {
+    lcd.stat.ppu_mode = PPU_MODE_HBLANK;
+    TEST_ASSERT_TRUE(lcd_oam_accessible(&lcd));
+    lcd.stat.ppu_mode = PPU_MODE_VBLANK;
+    TEST_ASSERT_TRUE(lcd_oam_accessible(&lcd));
+    lcd.stat.ppu_mode = PPU_MODE_OAM_SCAN;
+    TEST_ASSERT_FALSE(lcd_oam_accessible(&lcd));
+    lcd.stat.ppu_mode = PPU_MODE_DRAWING;
+    TEST_ASSERT_FALSE(lcd_oam_accessible(&lcd));
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -343,6 +367,9 @@ int main(void) {
     RUN_TEST(test_lcd_update_stat_no_interrupt_in_drawing_mode);
     RUN_TEST(test_lcd_update_stat_fires_only_on_rising_edge);
     RUN_TEST(test_lcd_update_stat_refires_after_line_goes_low);
+
+    RUN_TEST(test_lcd_vram_accessible_only_blocked_during_drawing);
+    RUN_TEST(test_lcd_oam_accessible_blocked_during_oam_scan_and_drawing);
 
     return UNITY_END();
 }

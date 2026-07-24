@@ -152,42 +152,6 @@ void test_ppu_step_enters_hblank_after_drawing(void) {
     TEST_ASSERT_EQUAL_UINT8(PPU_MODE_HBLANK, lcd_set_mode_stats.calls[1].mode);
 }
 
-void test_ppu_step_drawing_blocks_oam_and_vram(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
-    bus.oam_accessible = true;
-    bus.vram_accessible = true;
-
-    ppu_step(&ppu, &bus, 80); // enter DRAWING
-
-    TEST_ASSERT_FALSE(bus.oam_accessible);
-    TEST_ASSERT_FALSE(bus.vram_accessible);
-}
-
-void test_ppu_step_hblank_restores_oam_and_vram(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
-    bus.oam_accessible = false;
-    bus.vram_accessible = false;
-
-    ppu_step(&ppu, &bus, 80 + 172); // through DRAWING into HBLANK
-
-    TEST_ASSERT_EQUAL_UINT8(PPU_MODE_HBLANK, last_mode());
-    TEST_ASSERT_TRUE(bus.oam_accessible);
-    TEST_ASSERT_TRUE(bus.vram_accessible);
-}
-
-void test_ppu_step_mode_change_ignored_when_lcd_set_mode_returns_false(void) {
-    bus.io_reg.lcd.ctrl.lcd_enable = 1;
-    bus.oam_accessible = true;
-    bus.vram_accessible = true;
-    lcd_set_mode_stats.return_value = false; // mode change does not take effect
-
-    ppu_step(&ppu, &bus, 80); // would enter DRAWING, but rejected
-
-    // Accessibility flags must be left untouched when the mode change is rejected.
-    TEST_ASSERT_TRUE(bus.oam_accessible);
-    TEST_ASSERT_TRUE(bus.vram_accessible);
-}
-
 // ---- ppu_step: scanline advance ----
 
 void test_ppu_step_advances_ly_and_updates_stat_after_scanline(void) {
@@ -717,9 +681,6 @@ int main(void) {
 
     RUN_TEST(test_ppu_step_enters_drawing_at_dot_80);
     RUN_TEST(test_ppu_step_enters_hblank_after_drawing);
-    RUN_TEST(test_ppu_step_drawing_blocks_oam_and_vram);
-    RUN_TEST(test_ppu_step_hblank_restores_oam_and_vram);
-    RUN_TEST(test_ppu_step_mode_change_ignored_when_lcd_set_mode_returns_false);
 
     RUN_TEST(test_ppu_step_advances_ly_and_updates_stat_after_scanline);
     RUN_TEST(test_ppu_step_enters_vblank_and_sets_frame_ready);

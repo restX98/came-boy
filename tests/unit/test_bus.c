@@ -142,6 +142,20 @@ void io_reg_write(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
     io_reg_write_stats.call_count++;
 }
 
+// Mock the LCD accessibility predicates: the bus queries these to gate VRAM/OAM.
+static bool lcd_vram_accessible_return;
+static bool lcd_oam_accessible_return;
+
+bool lcd_vram_accessible(const lcd_regs_t *lcd) {
+    (void)lcd;
+    return lcd_vram_accessible_return;
+}
+
+bool lcd_oam_accessible(const lcd_regs_t *lcd) {
+    (void)lcd;
+    return lcd_oam_accessible_return;
+}
+
 // Mock cartridge_rom_read
 typedef struct {
     cartridge_t *cartridge;
@@ -256,8 +270,8 @@ void setUp(void) {
     suppress_logs();
 
     bus = (bus_t){ 0 };
-    bus.vram_accessible = true;
-    bus.oam_accessible = true;
+    lcd_vram_accessible_return = true;
+    lcd_oam_accessible_return = true;
     cartridge = (cartridge_t){ 0 };
 
     mem_init_stats = (mem_init_stats_t){ 0 };
@@ -418,7 +432,7 @@ void test_bus_write_vram(void) {
 void test_bus_read_vram_not_accessible_returns_0xFF(void) {
     uint8_t memory[1] = { 0x55 };
     bus.vram.mem = memory;
-    bus.vram_accessible = false;
+    lcd_vram_accessible_return = false;
 
     TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0x8000));
 }
@@ -426,7 +440,7 @@ void test_bus_read_vram_not_accessible_returns_0xFF(void) {
 void test_bus_write_vram_not_accessible_is_ignored(void) {
     uint8_t memory[1] = { 0x00 };
     bus.vram.mem = memory;
-    bus.vram_accessible = false;
+    lcd_vram_accessible_return = false;
 
     bus_write(&bus, 0x8000, 0x55);
 
@@ -497,7 +511,7 @@ void test_bus_write_oam(void) {
 void test_bus_read_oam_not_accessible_returns_0xFF(void) {
     uint8_t memory[1] = { 0x99 };
     bus.oam.mem = memory;
-    bus.oam_accessible = false;
+    lcd_oam_accessible_return = false;
 
     TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xFE00));
 }
@@ -505,7 +519,7 @@ void test_bus_read_oam_not_accessible_returns_0xFF(void) {
 void test_bus_write_oam_not_accessible_is_ignored(void) {
     uint8_t memory[1] = { 0x00 };
     bus.oam.mem = memory;
-    bus.oam_accessible = false;
+    lcd_oam_accessible_return = false;
 
     bus_write(&bus, 0xFE00, 0x99);
 
@@ -513,12 +527,12 @@ void test_bus_write_oam_not_accessible_is_ignored(void) {
 }
 
 void test_bus_read_not_usable_returns_00_when_oam_accessible(void) {
-    bus.oam_accessible = true;
+    lcd_oam_accessible_return = true;
     TEST_ASSERT_EQUAL_UINT8(0x00, bus_read(&bus, 0xFEA0));
 }
 
 void test_bus_read_not_usable_returns_ff_when_oam_blocked(void) {
-    bus.oam_accessible = false;
+    lcd_oam_accessible_return = false;
     TEST_ASSERT_EQUAL_UINT8(0xFF, bus_read(&bus, 0xFEA0));
 }
 

@@ -13,9 +13,6 @@ typedef struct bus_s {
 
     mem_t oam; // Object Attribute Memory (OAM) for sprite data
 
-    bool vram_accessible;
-    bool oam_accessible;
-
     io_reg_t io_reg;
 } bus_t;
 

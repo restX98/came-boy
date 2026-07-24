@@ -126,3 +126,12 @@ void lcd_update_stat(lcd_regs_t *lcd) {
     }
     lcd->stat_line = line;
 }
+
+bool lcd_vram_accessible(const lcd_regs_t *lcd) {
+    return lcd->stat.ppu_mode != PPU_MODE_DRAWING;
+}
+
+bool lcd_oam_accessible(const lcd_regs_t *lcd) {
+    return lcd->stat.ppu_mode != PPU_MODE_OAM_SCAN &&
+           lcd->stat.ppu_mode != PPU_MODE_DRAWING;
+}
