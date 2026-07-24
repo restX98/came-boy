@@ -121,6 +121,7 @@ void setUp(void) {
 
     cpu = (cpu_t){ 0 };
     bus = (bus_t){ 0 };
+    cpu.interrupts = &bus.io_reg.interrupts; // injected leaf
     memset(opcode_table, 0, sizeof(opcode_table));
 
     bus_read_stats = (bus_read_stats_t){ 0 };
@@ -140,7 +141,7 @@ void tearDown(void) {
 // ---- cpu_init ----
 
 void test_cpu_init_sets_registers_to_initial_values(void) {
-    cpu_init(&cpu);
+    cpu_init(&cpu, &bus.io_reg.interrupts);
 
     TEST_ASSERT_EQUAL_UINT16(0x01B0, cpu.af.reg);
     TEST_ASSERT_EQUAL_UINT16(0x0013, cpu.bc.reg);

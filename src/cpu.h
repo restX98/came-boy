@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "bus.h"
+#include "io/interrupts.h"
 
 #define FLAG_Z (1 << 7) // 10000000
 #define FLAG_N (1 << 6) // 01000000
@@ -34,9 +35,12 @@ typedef struct {
 
     bool halted;
     bool halt_bug;
+
+    // Injected at init: the interrupt controller the CPU polls and dispatches.
+    interrupt_regs_t *interrupts;
 } cpu_t;
 
-void cpu_init(cpu_t *cpu);
+void cpu_init(cpu_t *cpu, interrupt_regs_t *interrupts);
 
 int cpu_step(cpu_t *cpu, bus_t *bus);
 

@@ -16,7 +16,7 @@ int gameboy_init(gameboy_t *gb, const char *rom_path) {
         return -1;
     }
 
-    cpu_init(&gb->cpu);
+    cpu_init(&gb->cpu, &gb->bus.io_reg.interrupts);
     ppu_init(&gb->ppu, &gb->bus.io_reg.lcd, &gb->bus.vram, &gb->bus.oam);
     clock_init(&gb->clock, &gb->ppu, &gb->bus);
 

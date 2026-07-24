@@ -5,8 +5,10 @@
 
 static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, int pending);
 
-void cpu_init(cpu_t *cpu) {
+void cpu_init(cpu_t *cpu, interrupt_regs_t *interrupts) {
     LOG_INFO("Initializing CPU");
+
+    cpu->interrupts = interrupts;
 
     cpu->af.hi = 0x01;
     cpu->af.lo = 0xB0; // Z=1, N=0, H=1, C=1
@@ -36,7 +38,7 @@ void cpu_init(cpu_t *cpu) {
 }
 
 int cpu_step(cpu_t *cpu, bus_t *bus) {
-    int pending = interrupts_pending(&bus->io_reg.interrupts);
+    int pending = interrupts_pending(cpu->interrupts);
     if (pending >= 0 && cpu->ime.enabled) {
         return interrupt_service_routine(cpu, bus, pending);
     }
@@ -88,7 +90,7 @@ static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, int pending) {
     bus_write(bus, cpu->sp - 1, cpu->pc >> 8);
 
     // Re-check pending AFTER high byte push, since IE may have changed
-    pending = interrupts_pending(&bus->io_reg.interrupts);
+    pending = interrupts_pending(cpu->interrupts);
     if (pending < 0) {
         // IE was cleared by the push — corrupted dispatch
         bus_write(bus, cpu->sp - 2, 0x00);
@@ -97,7 +99,7 @@ static int interrupt_service_routine(cpu_t *cpu, bus_t *bus, int pending) {
     } else {
         bus_write(bus, cpu->sp - 2, cpu->pc & 0xFF);
         cpu->sp -= 2;
-        interrupts_acknowledge(&bus->io_reg.interrupts, pending);
+        interrupts_acknowledge(cpu->interrupts, pending);
         cpu->pc = handlers[pending];
     }
 

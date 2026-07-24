@@ -65,11 +65,13 @@ void bus_free(bus_t *bus) {
 static struct {
     size_t call_count;
     cpu_t *cpu;
+    interrupt_regs_t *interrupts;
 } cpu_init_mock;
 
-void cpu_init(cpu_t *cpu) {
+void cpu_init(cpu_t *cpu, interrupt_regs_t *interrupts) {
     cpu_init_mock.call_count++;
     cpu_init_mock.cpu = cpu;
+    cpu_init_mock.interrupts = interrupts;
 }
 
 // cpu_step

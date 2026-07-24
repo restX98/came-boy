@@ -20,7 +20,7 @@ void setUp(void) {
     memset(fake_rom, 0, sizeof(fake_rom));
     cartridge = (cartridge_t){ .rom = fake_rom, .size = sizeof(fake_rom), .mbc = &no_mbc_ops };
     bus_init(&bus, &cartridge);
-    cpu_init(&cpu);
+    cpu_init(&cpu, &bus.io_reg.interrupts);
 }
 
 void tearDown(void) {
