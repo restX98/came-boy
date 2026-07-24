@@ -2,14 +2,10 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "bus.h"
-#include "clock.h"
-#include "cpu.h"
+#include "gameboy.h"
 #include "input/input.h"
 #include "input/input_tty.h"
 #include "logger.h"
-#include "memory/cartridge.h"
-#include "ppu.h"
 #include "renderer/renderer.h"
 #include "renderer/renderer_ascii.h"
 
@@ -39,27 +35,10 @@ int main(int argc, char *argv[]) {
 
     const char *screen_tty = (argc >= 3) ? argv[2] : NULL;
 
-    cartridge_t cartridge = { 0 };
-    bus_t bus = { 0 };
-    cpu_t cpu = { 0 };
-    ppu_t ppu = { 0 };
-
-    if (cartridge_load(&cartridge, argv[1]) != 0) {
-        LOG_ERROR("Could not load cartridge");
+    gameboy_t gb;
+    if (gameboy_init(&gb, argv[1]) != 0) {
         return -1;
     }
-
-    if (bus_init(&bus, &cartridge) != 0) {
-        cartridge_unload(&cartridge);
-        LOG_ERROR("Could not initialize bus");
-        return -1;
-    }
-
-    cpu_init(&cpu);
-    ppu_init(&ppu, &bus.io_reg.lcd, &bus.vram, &bus.oam);
-
-    gb_clock_t clock;
-    clock_init(&clock, &ppu, &bus);
 
     renderer_t renderer = renderer_ascii(screen_tty);
     renderer_init(&renderer);
@@ -68,26 +47,21 @@ int main(int argc, char *argv[]) {
     input_init(&input);
 
     while (running) {
-        int cycles = cpu_step(&cpu, &bus);
-        if (cycles < 0) {
+        if (gameboy_step(&gb) < 0) {
             LOG_ERROR("CPU halted, exiting");
             break;
         }
 
-        clock_tick(&clock, cycles);
-
-        if (ppu.frame_ready) {
-            input_poll(&input, &bus.io_reg.joyp);
-            renderer_render(&renderer, ppu.framebuffer);
-            ppu.frame_ready = false;
+        if (gb.ppu.frame_ready) {
+            input_poll(&input, &gb.bus.io_reg.joyp);
+            renderer_render(&renderer, gb.ppu.framebuffer);
+            gb.ppu.frame_ready = false;
         }
     }
 
-    // free resources
     input_deinit(&input);
     renderer_deinit(&renderer);
-    cartridge_unload(&cartridge);
-    bus_free(&bus);
+    gameboy_free(&gb);
 
     return 0;
 }
