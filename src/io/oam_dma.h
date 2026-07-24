@@ -14,6 +14,13 @@ typedef struct {
     uint16_t source;
     uint8_t index;
     uint8_t start_delay;
+
+    // A restart requested via $FF46 while a transfer is already copying. The
+    // old transfer keeps running (and keeps OAM blocked) while this delay
+    // counts down; on expiry the new source takes over from index 0.
+    bool pending;
+    uint16_t pending_source;
+    uint8_t pending_delay;
 } oam_dma_reg_t;
 
 void oam_dma_init(oam_dma_reg_t *dma);
