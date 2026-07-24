@@ -3,14 +3,14 @@
  *-------------------------------------------------------*/
 
 static uint8_t read_imm8(cpu_t *cpu, bus_t *bus) {
-    uint8_t immediate_value = bus_read(bus, cpu->pc);
+    uint8_t immediate_value = cpu_read(cpu, bus, cpu->pc);
     cpu->pc += 1;
     return immediate_value;
 }
 
 static uint16_t read_imm16(cpu_t *cpu, bus_t *bus) {
-    uint8_t lo = bus_read(bus, cpu->pc);
-    uint8_t hi = bus_read(bus, cpu->pc + 1);
+    uint8_t lo = cpu_read(cpu, bus, cpu->pc);
+    uint8_t hi = cpu_read(cpu, bus, cpu->pc + 1);
     cpu->pc += 2;
     return (hi << 8) | lo;
 }
@@ -23,7 +23,7 @@ static uint8_t read_r8(cpu_t *cpu, bus_t *bus, r8_operand_t r8_op) {
         case OP_REG_E: return cpu->de.lo;
         case OP_REG_H: return cpu->hl.hi;
         case OP_REG_L: return cpu->hl.lo;
-        case OP_MEM_HL: return bus_read(bus, cpu->hl.reg); // [HL]
+        case OP_MEM_HL: return cpu_read(cpu, bus, cpu->hl.reg); // [HL]
         case OP_REG_A: return cpu->af.hi;
         default: assert(0 && "Invalid r8 operand");
     }
@@ -37,7 +37,7 @@ static void write_r8(cpu_t *cpu, bus_t *bus, r8_operand_t r8_op, uint8_t value) 
         case OP_REG_E: cpu->de.lo = value; break;
         case OP_REG_H: cpu->hl.hi = value; break;
         case OP_REG_L: cpu->hl.lo = value; break;
-        case OP_MEM_HL: bus_write(bus, cpu->hl.reg, value); break; // [HL]
+        case OP_MEM_HL: cpu_write(cpu, bus, cpu->hl.reg, value); break; // [HL]
         case OP_REG_A: cpu->af.hi = value; break;
         default: assert(0 && "Invalid r8 operand");
     }

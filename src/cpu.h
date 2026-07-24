@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "bus.h"
+#include "clock.h"
 #include "io/interrupts.h"
 
 #define FLAG_Z (1 << 7) // 10000000
@@ -36,11 +37,13 @@ typedef struct {
     bool halted;
     bool halt_bug;
 
-    // Injected at init: the interrupt controller the CPU polls and dispatches.
+    int cycles_ticked;
+
+    gb_clock_t *clock;
     interrupt_regs_t *interrupts;
 } cpu_t;
 
-void cpu_init(cpu_t *cpu, interrupt_regs_t *interrupts);
+void cpu_init(cpu_t *cpu, interrupt_regs_t *interrupts, gb_clock_t *clock);
 
 int cpu_step(cpu_t *cpu, bus_t *bus);
 
@@ -54,6 +57,22 @@ static inline void flag_clear(cpu_t *cpu, uint8_t flag) {
 
 static inline bool flag_get(cpu_t *cpu, uint8_t flag) {
     return cpu->af.lo & flag;
+}
+
+static inline void cpu_tick(cpu_t *cpu) {
+    clock_tick(cpu->clock, 4);
+    cpu->cycles_ticked += 4;
+}
+
+static inline uint8_t cpu_read(cpu_t *cpu, bus_t *bus, uint16_t addr) {
+    uint8_t value = bus_read(bus, addr);
+    cpu_tick(cpu);
+    return value;
+}
+
+static inline void cpu_write(cpu_t *cpu, bus_t *bus, uint16_t addr, uint8_t value) {
+    bus_write(bus, addr, value);
+    cpu_tick(cpu);
 }
 
 #endif // CPU_H

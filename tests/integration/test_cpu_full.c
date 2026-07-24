@@ -4,13 +4,17 @@
 #include <string.h>
 
 #include "bus.h"
+#include "clock.h"
 #include "cpu.h"
 #include "memory/mbc/mbc.h"
 #include "memory/mem.h"
+#include "ppu.h"
 #include "isa/opcodes.h"
 
 static cpu_t   cpu;
 static bus_t   bus;
+static ppu_t   ppu;
+static gb_clock_t clk;
 static cartridge_t cartridge;
 static uint8_t fake_rom[0x8000];
 
@@ -20,7 +24,14 @@ void setUp(void) {
     memset(fake_rom, 0, sizeof(fake_rom));
     cartridge = (cartridge_t){ .rom = fake_rom, .size = sizeof(fake_rom), .mbc = &no_mbc_ops };
     bus_init(&bus, &cartridge);
-    cpu_init(&cpu, &bus.io_reg.interrupts);
+
+    // Wire a real clock so cpu_read/cpu_write can tick it. Keep the LCD off so
+    // the PPU stays idle and never gates VRAM/OAM or raises interrupts under the
+    // CPU tests.
+    bus.io_reg.lcd.ctrl.lcd_enable = 0;
+    ppu_init(&ppu, &bus.io_reg.lcd, &bus.vram, &bus.oam);
+    clock_init(&clk, &ppu, &bus);
+    cpu_init(&cpu, &bus.io_reg.interrupts, &clk);
 }
 
 void tearDown(void) {

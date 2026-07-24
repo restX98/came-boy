@@ -85,8 +85,10 @@ static int op_call_cond_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     if (condition) {
         uint16_t return_addr = cpu->pc;
-        bus_write(bus, cpu->sp - 1, return_addr >> 8);
-        bus_write(bus, cpu->sp - 2, return_addr & 0xFF);
+        // Taken CALL: fetch, read lo, read hi, INTERNAL, write hi, write lo.
+        cpu_tick(cpu);
+        cpu_write(cpu, bus, cpu->sp - 1, return_addr >> 8);
+        cpu_write(cpu, bus, cpu->sp - 2, return_addr & 0xFF);
         cpu->sp -= 2;
         cpu->pc = address;
     }
@@ -103,8 +105,10 @@ static int op_call_imm16(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t address = read_imm16(cpu, bus);
 
     uint16_t return_addr = cpu->pc;
-    bus_write(bus, cpu->sp - 1, return_addr >> 8);
-    bus_write(bus, cpu->sp - 2, return_addr & 0xFF);
+    // CALL: fetch, read lo, read hi, INTERNAL, write hi, write lo.
+    cpu_tick(cpu);
+    cpu_write(cpu, bus, cpu->sp - 1, return_addr >> 8);
+    cpu_write(cpu, bus, cpu->sp - 2, return_addr & 0xFF);
     cpu->sp -= 2;
     cpu->pc = address;
 
@@ -120,8 +124,10 @@ static int op_rst_tgt3(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t address = opcode & 0b111000; // Extract vec address from opcode
 
     uint16_t return_addr = cpu->pc;
-    bus_write(bus, cpu->sp - 1, return_addr >> 8);
-    bus_write(bus, cpu->sp - 2, return_addr & 0xFF);
+    // RST: fetch, INTERNAL, write hi, write lo.
+    cpu_tick(cpu);
+    cpu_write(cpu, bus, cpu->sp - 1, return_addr >> 8);
+    cpu_write(cpu, bus, cpu->sp - 2, return_addr & 0xFF);
     cpu->sp -= 2;
     cpu->pc = address;
 
@@ -137,8 +143,8 @@ static int op_pop_r16stk(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     r16stk_operand_t register_code = (opcode >> 4) & 0b11; // Extract the register code from the opcode
 
     uint16_t sp = cpu->sp;
-    uint8_t lo = bus_read(bus, cpu->sp);
-    uint8_t hi = bus_read(bus, cpu->sp + 1);
+    uint8_t lo = cpu_read(cpu, bus, cpu->sp);
+    uint8_t hi = cpu_read(cpu, bus, cpu->sp + 1);
     uint16_t value = ((uint16_t)hi << 8) | lo;
 
     // The lower 4 bits of F are always 0 on the Game Boy
@@ -168,8 +174,10 @@ static int op_push_r16stk(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     }
 
     uint16_t sp = cpu->sp;
-    bus_write(bus, cpu->sp - 1, (uint8_t)(value >> 8));
-    bus_write(bus, cpu->sp - 2, (uint8_t)(value & 0xFF));
+    // PUSH: fetch, INTERNAL, write hi, write lo.
+    cpu_tick(cpu);
+    cpu_write(cpu, bus, cpu->sp - 1, (uint8_t)(value >> 8));
+    cpu_write(cpu, bus, cpu->sp - 2, (uint8_t)(value & 0xFF));
     cpu->sp -= 2;
 
     LOG_DEBUG("PUSH %s val=0x%04X SP=0x%04X->0x%04X at PC=0x%04X (opcode=0x%02X)",
@@ -181,13 +189,17 @@ static int op_push_r16stk(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 static int op_ret_cond(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t instr_pc = cpu->pc - 1;
 
+    // RET cc: fetch, INTERNAL (condition check), then on the taken branch
+    // pop lo, pop hi, and a trailing internal (covered by the remainder).
+    cpu_tick(cpu);
+
     cond_operand_t cond_op = (opcode >> 3) & 0b11; // Extract condition code from opcode
     bool condition = check_condition(cpu, cond_op);
 
     uint16_t sp = cpu->sp;
     if (condition) {
-        uint8_t lo = bus_read(bus, cpu->sp);
-        uint8_t hi = bus_read(bus, cpu->sp + 1);
+        uint8_t lo = cpu_read(cpu, bus, cpu->sp);
+        uint8_t hi = cpu_read(cpu, bus, cpu->sp + 1);
         cpu->pc = ((uint16_t)hi << 8) | lo;
         cpu->sp += 2;
     }
@@ -203,8 +215,8 @@ static int op_ret(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t instr_pc = cpu->pc - 1;
 
     uint16_t sp = cpu->sp;
-    uint8_t lo = bus_read(bus, cpu->sp);
-    uint8_t hi = bus_read(bus, cpu->sp + 1);
+    uint8_t lo = cpu_read(cpu, bus, cpu->sp);
+    uint8_t hi = cpu_read(cpu, bus, cpu->sp + 1);
     cpu->pc = ((uint16_t)hi << 8) | lo;
     cpu->sp += 2;
 
@@ -218,8 +230,8 @@ static int op_reti(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t instr_pc = cpu->pc - 1;
 
     uint16_t sp = cpu->sp;
-    uint8_t lo = bus_read(bus, cpu->sp);
-    uint8_t hi = bus_read(bus, cpu->sp + 1);
+    uint8_t lo = cpu_read(cpu, bus, cpu->sp);
+    uint8_t hi = cpu_read(cpu, bus, cpu->sp + 1);
     cpu->pc = ((uint16_t)hi << 8) | lo;
     cpu->sp += 2;
 

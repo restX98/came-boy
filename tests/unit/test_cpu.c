@@ -9,6 +9,7 @@
 
 static cpu_t cpu;
 static bus_t bus;
+static gb_clock_t clock_mock;
 opcode_fn opcode_table[256];
 
 // ---- Mock functions ----
@@ -116,12 +117,20 @@ void interrupts_acknowledge(interrupt_regs_t *interrupts, interrupt_t interrupt)
     interrupts_acknowledge_stats.call_count++;
 }
 
+// Mock clock: cpu_read/cpu_write tick the clock on every CPU memory access, so
+// cpu.clock is wired to clock_mock and clock_tick is stubbed to a no-op.
+void clock_tick(gb_clock_t *clock, int cycles) {
+    (void)clock;
+    (void)cycles;
+}
+
 void setUp(void) {
     suppress_logs();
 
     cpu = (cpu_t){ 0 };
     bus = (bus_t){ 0 };
     cpu.interrupts = &bus.io_reg.interrupts; // injected leaf
+    cpu.clock = &clock_mock;                 // injected mock clock
     memset(opcode_table, 0, sizeof(opcode_table));
 
     bus_read_stats = (bus_read_stats_t){ 0 };
@@ -141,7 +150,7 @@ void tearDown(void) {
 // ---- cpu_init ----
 
 void test_cpu_init_sets_registers_to_initial_values(void) {
-    cpu_init(&cpu, &bus.io_reg.interrupts);
+    cpu_init(&cpu, &bus.io_reg.interrupts, NULL);
 
     TEST_ASSERT_EQUAL_UINT16(0x01B0, cpu.af.reg);
     TEST_ASSERT_EQUAL_UINT16(0x0013, cpu.bc.reg);
@@ -254,7 +263,8 @@ void test_cpu_step_returns_4_and_stays_halted_when_no_pending_interrupt(void) {
 void test_cpu_step_wakes_from_halt_when_pending_interrupt_and_ime_disabled(void) {
     cpu.halted = true;
     cpu.ime.enabled = false;
-    interrupts_pending_stats.calls[0].return_value = 0;
+    interrupts_pending_stats.calls[0].return_value = 0; // sampled at step start
+    interrupts_pending_stats.calls[1].return_value = 0; // re-checked after the halted M-cycle tick
 
     int cycles = cpu_step(&cpu, &bus);
 

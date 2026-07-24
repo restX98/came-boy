@@ -54,7 +54,7 @@ static int op_ld_r16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t reg_value = read_r16mem(cpu, register_code);
     const char *reg_name = get_r16mem_name(register_code);
 
-    bus_write(bus, reg_value, cpu->af.hi);
+    cpu_write(cpu, bus, reg_value, cpu->af.hi);
 
     LOG_DEBUG("LD [%s],A %s=0x%04X A=%u at PC=0x%04X (opcode=0x%02X)",
         reg_name, reg_name, reg_value, cpu->af.hi, instr_pc, opcode);
@@ -70,7 +70,7 @@ static int op_ld_a_r16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t reg_value = read_r16mem(cpu, register_code);
     const char *reg_name = get_r16mem_name(register_code);
 
-    cpu->af.hi = bus_read(bus, reg_value);
+    cpu->af.hi = cpu_read(cpu, bus, reg_value);
 
     LOG_DEBUG("LD A,[%s] %s=0x%04X [%s]=%u at PC=0x%04X (opcode=0x%02X)",
         reg_name, reg_name, reg_value, reg_name, cpu->af.hi, instr_pc, opcode);
@@ -85,7 +85,7 @@ static int op_ldh_imm8mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t address = 0xFF00 | immediate_value;
     uint8_t a = cpu->af.hi;
 
-    bus_write(bus, address, a);
+    cpu_write(cpu, bus, address, a);
 
     LOG_DEBUG("LDH [0x%02X],A address=0x%04X A=0x%02X at PC=0x%04X (opcode=0x%02X)",
         immediate_value, address, a, instr_pc, opcode);
@@ -99,7 +99,7 @@ static int op_ldh_c_mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t address = 0xFF00 | cpu->bc.lo;
     uint8_t a = cpu->af.hi;
 
-    bus_write(bus, address, a);
+    cpu_write(cpu, bus, address, a);
 
     LOG_DEBUG("LDH [C],A C=0x%02X address=0x%04X A=0x%02X at PC=0x%04X (opcode=0x%02X)",
         cpu->bc.lo, address, a, instr_pc, opcode);
@@ -113,7 +113,7 @@ static int op_ld_imm16mem_a(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint16_t address = read_imm16(cpu, bus);
     uint8_t a = cpu->af.hi;
 
-    bus_write(bus, address, a);
+    cpu_write(cpu, bus, address, a);
 
     LOG_DEBUG("LD [imm16],A address=0x%04X A=0x%02X at PC=0x%04X (opcode=0x%02X)",
         address, a, instr_pc, opcode);
@@ -127,7 +127,7 @@ static int op_ldh_a_imm8mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
     uint8_t immediate_value = read_imm8(cpu, bus);
     uint16_t address = 0xFF00 | immediate_value;
 
-    cpu->af.hi = bus_read(bus, address);
+    cpu->af.hi = cpu_read(cpu, bus, address);
 
     LOG_DEBUG("LDH A, [0x%02X] address=0x%04X value=0x%02X at PC=0x%04X (opcode=0x%02X)",
         immediate_value, address, cpu->af.hi, instr_pc, opcode);
@@ -140,7 +140,7 @@ static int op_ldh_a_c_mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     uint16_t address = 0xFF00 | cpu->bc.lo;
 
-    cpu->af.hi = bus_read(bus, address);
+    cpu->af.hi = cpu_read(cpu, bus, address);
 
     LOG_DEBUG("LDH A, [C] address=0x%04X value=0x%02X at PC=0x%04X (opcode=0x%02X)",
         address, cpu->af.hi, instr_pc, opcode);
@@ -153,7 +153,7 @@ static int op_ld_a_imm16mem(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     uint16_t address = read_imm16(cpu, bus);
 
-    cpu->af.hi = bus_read(bus, address);
+    cpu->af.hi = cpu_read(cpu, bus, address);
 
     LOG_DEBUG("LD A, [imm16] address=0x%04X value=0x%02X at PC=0x%04X (opcode=0x%02X)",
         address, cpu->af.hi, instr_pc, opcode);
@@ -166,8 +166,8 @@ static int op_ld_imm16mem_sp(cpu_t *cpu, bus_t *bus, uint8_t opcode) {
 
     uint16_t address = read_imm16(cpu, bus);
 
-    bus_write(bus, address, cpu->sp & 0xFF);
-    bus_write(bus, address + 1, cpu->sp >> 8);
+    cpu_write(cpu, bus, address, cpu->sp & 0xFF);
+    cpu_write(cpu, bus, address + 1, cpu->sp >> 8);
 
     LOG_DEBUG("LD [0x%04X],SP SP=0x%04X at PC=0x%04X (opcode=0x%02X)",
         address, cpu->sp, instr_pc, opcode);

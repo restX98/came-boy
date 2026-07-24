@@ -16,9 +16,9 @@ int gameboy_init(gameboy_t *gb, const char *rom_path) {
         return -1;
     }
 
-    cpu_init(&gb->cpu, &gb->bus.io_reg.interrupts);
     ppu_init(&gb->ppu, &gb->bus.io_reg.lcd, &gb->bus.vram, &gb->bus.oam);
     clock_init(&gb->clock, &gb->ppu, &gb->bus);
+    cpu_init(&gb->cpu, &gb->bus.io_reg.interrupts, &gb->clock);
 
     return 0;
 }
@@ -29,11 +29,7 @@ void gameboy_free(gameboy_t *gb) {
 }
 
 int gameboy_step(gameboy_t *gb) {
-    int cycles = cpu_step(&gb->cpu, &gb->bus);
-    if (cycles < 0) {
-        return -1;
-    }
-
-    clock_tick(&gb->clock, cycles);
-    return cycles;
+    // cpu_step advances the whole machine by one instruction: it drives the clock
+    // for every M-cycle (memory accesses, internal cycles, and the remainder).
+    return cpu_step(&gb->cpu, &gb->bus);
 }

@@ -9,6 +9,7 @@
 
 static cpu_t mock_cpu = { 0 };
 static bus_t mock_bus = { 0 };
+static gb_clock_t clock_mock = { 0 };
 static uint8_t mock_memory[0x10000] = { 0 };
 
 // ---- Mock functions ----
@@ -267,6 +268,7 @@ alu16_result_t alu_add16_s8(uint16_t base, int8_t offset) {
 
 void setUp(void) {
     suppress_logs();
+    mock_cpu.clock = &clock_mock; // injected mock clock (tearDown zeroes mock_cpu)
     alu_add8_stats = (alu_add8_stats_t){ 0 };
     alu_sub8_stats = (alu_sub8_stats_t){ 0 };
     alu_inc8_stats = (alu_inc8_stats_t){ 0 };
@@ -295,6 +297,13 @@ uint8_t bus_read(bus_t *bus, uint16_t addr) {
 void bus_write(bus_t *bus, uint16_t addr, uint8_t value) {
     (void)bus; (void)addr; (void)value;
     mock_memory[addr] = value;
+}
+
+// Mock clock: cpu_read/cpu_write tick the clock on every CPU memory access, so
+// mock_cpu.clock is wired to clock_mock and clock_tick is stubbed to a no-op.
+void clock_tick(gb_clock_t *clock, int cycles) {
+    (void)clock;
+    (void)cycles;
 }
 
 struct reg_entry_t {

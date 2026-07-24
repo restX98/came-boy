@@ -66,12 +66,14 @@ static struct {
     size_t call_count;
     cpu_t *cpu;
     interrupt_regs_t *interrupts;
+    gb_clock_t *clock;
 } cpu_init_mock;
 
-void cpu_init(cpu_t *cpu, interrupt_regs_t *interrupts) {
+void cpu_init(cpu_t *cpu, interrupt_regs_t *interrupts, gb_clock_t *clock) {
     cpu_init_mock.call_count++;
     cpu_init_mock.cpu = cpu;
     cpu_init_mock.interrupts = interrupts;
+    cpu_init_mock.clock = clock;
 }
 
 // cpu_step
@@ -214,19 +216,17 @@ void test_gameboy_init_unloads_cartridge_when_bus_init_fails(void) {
 
 // ---- gameboy_step ----
 
-void test_gameboy_step_advances_clock_by_cpu_cycles(void) {
+void test_gameboy_step_runs_cpu_step_and_returns_its_cycles(void) {
     cpu_step_mock.return_value = 12;
 
     int cycles = gameboy_step(&gb);
 
+    // gameboy_step delegates a whole instruction to cpu_step (which now drives
+    // the clock for every M-cycle, including the trailing remainder).
     TEST_ASSERT_EQUAL_INT(12, cycles);
     TEST_ASSERT_EQUAL_size_t(1, cpu_step_mock.call_count);
     TEST_ASSERT_EQUAL_PTR(&gb.cpu, cpu_step_mock.cpu);
     TEST_ASSERT_EQUAL_PTR(&gb.bus, cpu_step_mock.bus);
-
-    TEST_ASSERT_EQUAL_size_t(1, clock_tick_mock.call_count);
-    TEST_ASSERT_EQUAL_PTR(&gb.clock, clock_tick_mock.clock);
-    TEST_ASSERT_EQUAL_INT(12, clock_tick_mock.cycles);
 }
 
 void test_gameboy_step_halt_returns_minus1_without_ticking_clock(void) {
@@ -256,7 +256,7 @@ int main(void) {
     RUN_TEST(test_gameboy_init_fails_when_cartridge_load_fails);
     RUN_TEST(test_gameboy_init_unloads_cartridge_when_bus_init_fails);
 
-    RUN_TEST(test_gameboy_step_advances_clock_by_cpu_cycles);
+    RUN_TEST(test_gameboy_step_runs_cpu_step_and_returns_its_cycles);
     RUN_TEST(test_gameboy_step_halt_returns_minus1_without_ticking_clock);
 
     RUN_TEST(test_gameboy_free_releases_cartridge_and_bus);
