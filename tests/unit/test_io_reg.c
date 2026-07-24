@@ -96,7 +96,8 @@ typedef struct {
 
 static timer_init_stats_t timer_init_stats;
 
-void timer_init(timer_regs_t *timer) {
+void timer_init(timer_regs_t *timer, interrupt_regs_t *interrupts) {
+    (void)interrupts;
     if (timer_init_stats.call_count == 10) {
         assert(0 && "Exceeded maximum call count for timer_init_stats");
     }

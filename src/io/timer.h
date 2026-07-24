@@ -34,10 +34,11 @@ typedef struct {
     uint8_t tima_reload_pending; // pending reload for TIMA
     bool tima_just_reloaded;
 
+    interrupt_regs_t *interrupts;
 } timer_regs_t;
 
-void timer_init(timer_regs_t *timer);
-void timer_tick(timer_regs_t *timer, interrupt_regs_t *interrupts, int cycles);
+void timer_init(timer_regs_t *timer, interrupt_regs_t *interrupts);
+void timer_tick(timer_regs_t *timer, int cycles);
 
 uint8_t timer_read(timer_regs_t *timer, uint16_t addr);
 void timer_write(timer_regs_t *timer, uint16_t addr, uint8_t value);

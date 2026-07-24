@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <stdbool.h>
 
-void timer_init(timer_regs_t *timer) {
+void timer_init(timer_regs_t *timer, interrupt_regs_t *interrupts) {
     timer->div_counter = 0xABD4;
     timer->tima = 0x00;
     timer->tma = 0x00;
@@ -11,9 +11,11 @@ void timer_init(timer_regs_t *timer) {
 
     timer->tima_reload_pending = 0;
     timer->tima_just_reloaded = false;
+
+    timer->interrupts = interrupts;
 }
 
-void timer_tick(timer_regs_t *timer, interrupt_regs_t *interrupts, int cycles) {
+void timer_tick(timer_regs_t *timer, int cycles) {
     uint16_t old_div = timer->div_counter;
     timer->div_counter += cycles;
 
@@ -23,7 +25,7 @@ void timer_tick(timer_regs_t *timer, interrupt_regs_t *interrupts, int cycles) {
     if (timer->tima_reload_pending > 0) {
         if (cycles >= timer->tima_reload_pending) {
             timer->tima = timer->tma;
-            interrupts_request(interrupts, INT_TIMER);
+            interrupts_request(timer->interrupts, INT_TIMER);
             timer->tima_reload_pending = 0;
             timer->tima_just_reloaded = true;
         } else {

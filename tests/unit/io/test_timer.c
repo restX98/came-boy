@@ -40,6 +40,7 @@ void setUp(void) {
 
     timer = (timer_regs_t){ 0 };
     interrupts = (interrupt_regs_t){ 0 };
+    timer.interrupts = &interrupts; // injected leaf
     interrupts_request_stats = (interrupts_request_stats_t){ 0 };
 }
 
@@ -56,7 +57,7 @@ void test_timer_init_sets_initial_values(void) {
     timer.tac.reg = 0x07;
     timer.tima_reload_pending = 3;
 
-    timer_init(&timer);
+    timer_init(&timer, &interrupts);
 
     TEST_ASSERT_EQUAL_UINT16(0xABD4, timer.div_counter);
     TEST_ASSERT_EQUAL_UINT8(0x00, timer.tima);
@@ -70,7 +71,7 @@ void test_timer_init_sets_initial_values(void) {
 void test_timer_tick_increments_div_counter_by_cycles(void) {
     timer.div_counter = 0x0100;
 
-    timer_tick(&timer, &interrupts, 16);
+    timer_tick(&timer, 16);
 
     TEST_ASSERT_EQUAL_UINT16(0x0110, timer.div_counter);
 }
@@ -78,7 +79,7 @@ void test_timer_tick_increments_div_counter_by_cycles(void) {
 void test_timer_tick_div_register_reflects_upper_byte_of_div_counter(void) {
     timer.div_counter = 0x00FF;
 
-    timer_tick(&timer, &interrupts, 1);
+    timer_tick(&timer, 1);
 
     TEST_ASSERT_EQUAL_UINT16(0x0100, timer.div_counter);
     TEST_ASSERT_EQUAL_UINT8(0x01, timer.div);
@@ -88,7 +89,7 @@ void test_timer_tick_advances_div_even_when_timer_disabled(void) {
     timer.tac.enable = 0;
     timer.div_counter = 0;
 
-    timer_tick(&timer, &interrupts, 256);
+    timer_tick(&timer, 256);
 
     TEST_ASSERT_EQUAL_UINT16(256, timer.div_counter);
 }
@@ -100,7 +101,7 @@ void test_timer_tick_does_not_advance_tima_when_disabled(void) {
     timer.tac.clock_select = 1; // 16 cycles
     timer.tima = 0;
 
-    timer_tick(&timer, &interrupts, 1024);
+    timer_tick(&timer, 1024);
 
     TEST_ASSERT_EQUAL_UINT8(0, timer.tima);
 }
@@ -115,10 +116,10 @@ void test_timer_tick_increments_tima_at_correct_cycle_count_per_clock_select(voi
         timer.tac.enable = 1;
         timer.tac.clock_select = clock_select;
 
-        timer_tick(&timer, &interrupts, freq_cycles[clock_select] - 1);
+        timer_tick(&timer, freq_cycles[clock_select] - 1);
         TEST_ASSERT_EQUAL_UINT8(0, timer.tima);
 
-        timer_tick(&timer, &interrupts, 1);
+        timer_tick(&timer, 1);
         TEST_ASSERT_EQUAL_UINT8(1, timer.tima);
     }
 }
@@ -130,7 +131,7 @@ void test_timer_tick_sets_reload_pending_on_tima_overflow(void) {
     timer.tac.clock_select = 1; // 16 cycles
     timer.tima = 0xFF;
 
-    timer_tick(&timer, &interrupts, 16);
+    timer_tick(&timer, 16);
 
     TEST_ASSERT_EQUAL_UINT8(0x00, timer.tima);
     TEST_ASSERT_EQUAL_UINT8(4, timer.tima_reload_pending);
@@ -141,7 +142,7 @@ void test_timer_tick_does_not_request_interrupt_immediately_on_overflow(void) {
     timer.tac.clock_select = 1;
     timer.tima = 0xFF;
 
-    timer_tick(&timer, &interrupts, 16);
+    timer_tick(&timer, 16);
 
     TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
 }
@@ -151,7 +152,7 @@ void test_timer_tick_decrements_reload_pending_when_cycles_below_threshold(void)
     timer.tima = 0;
     timer.tma = 0x42;
 
-    timer_tick(&timer, &interrupts, 2);
+    timer_tick(&timer, 2);
 
     TEST_ASSERT_EQUAL_UINT8(2, timer.tima_reload_pending);
     TEST_ASSERT_EQUAL_UINT8(0, timer.tima);
@@ -163,7 +164,7 @@ void test_timer_tick_reloads_tima_and_requests_interrupt_when_pending_expires(vo
     timer.tima = 0;
     timer.tma = 0x42;
 
-    timer_tick(&timer, &interrupts, 4);
+    timer_tick(&timer, 4);
 
     TEST_ASSERT_EQUAL_UINT8(0x42, timer.tima);
     TEST_ASSERT_EQUAL_UINT8(0, timer.tima_reload_pending);
@@ -226,7 +227,7 @@ void test_timer_write_tma_updates_tima_when_just_reloaded(void) {
     timer.tima_reload_pending = 4;
     timer.tima = 0;
     timer.tma = 0x42;
-    timer_tick(&timer, &interrupts, 4);
+    timer_tick(&timer, 4);
     TEST_ASSERT_TRUE(timer.tima_just_reloaded);
 
     // Writing TMA on the same cycle also overwrites the freshly reloaded TIMA.

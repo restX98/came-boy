@@ -45,10 +45,10 @@ static const io_reg_region_t register_map[] = {
 };
 
 void io_reg_init(io_reg_t *io_reg) {
+    interrupts_init(&io_reg->interrupts);
     joypad_init(&io_reg->joyp);
     serial_transfer_init(&io_reg->serial_transfer);
-    timer_init(&io_reg->timer);
-    interrupts_init(&io_reg->interrupts);
+    timer_init(&io_reg->timer, &io_reg->interrupts);
     audio_init(&io_reg->audio);
     oam_dma_init(&io_reg->oam_dma);
     lcd_init(&io_reg->lcd);
