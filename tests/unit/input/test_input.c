@@ -18,13 +18,11 @@ static int fake_init(input_t *self) {
 static size_t poll_calls;
 static input_t *poll_self;
 static joypad_reg_t *poll_jp;
-static interrupt_regs_t *poll_interrupts;
 
-static void fake_poll(input_t *self, joypad_reg_t *jp, interrupt_regs_t *interrupts) {
+static void fake_poll(input_t *self, joypad_reg_t *jp) {
     poll_calls++;
     poll_self = self;
     poll_jp = jp;
-    poll_interrupts = interrupts;
 }
 
 static size_t deinit_calls;
@@ -53,7 +51,6 @@ void setUp(void) {
     poll_calls = 0;
     poll_self = NULL;
     poll_jp = NULL;
-    poll_interrupts = NULL;
     deinit_calls = 0;
     deinit_self = NULL;
 }
@@ -90,9 +87,8 @@ void test_input_init_calls_hook_and_returns_value(void) {
 
 void test_input_poll_null_input_is_noop(void) {
     joypad_reg_t jp = { 0 };
-    interrupt_regs_t interrupts = { 0 };
 
-    input_poll(NULL, &jp, &interrupts);
+    input_poll(NULL, &jp);
 
     TEST_ASSERT_EQUAL_size_t(0, poll_calls);
 }
@@ -100,9 +96,8 @@ void test_input_poll_null_input_is_noop(void) {
 void test_input_poll_null_hook_is_noop(void) {
     input_t in = { 0 }; // poll hook is NULL
     joypad_reg_t jp = { 0 };
-    interrupt_regs_t interrupts = { 0 };
 
-    input_poll(&in, &jp, &interrupts);
+    input_poll(&in, &jp);
 
     TEST_ASSERT_EQUAL_size_t(0, poll_calls);
 }
@@ -110,14 +105,12 @@ void test_input_poll_null_hook_is_noop(void) {
 void test_input_poll_calls_hook_with_args(void) {
     input_t in = make_full_input();
     joypad_reg_t jp = { 0 };
-    interrupt_regs_t interrupts = { 0 };
 
-    input_poll(&in, &jp, &interrupts);
+    input_poll(&in, &jp);
 
     TEST_ASSERT_EQUAL_size_t(1, poll_calls);
     TEST_ASSERT_EQUAL_PTR(&in, poll_self);
     TEST_ASSERT_EQUAL_PTR(&jp, poll_jp);
-    TEST_ASSERT_EQUAL_PTR(&interrupts, poll_interrupts);
 }
 
 // ---- input_deinit ----

@@ -30,6 +30,7 @@ void setUp(void) {
 
     jp = (joypad_reg_t){ 0 };
     interrupts = (interrupt_regs_t){ 0 };
+    jp.interrupts = &interrupts; // injected leaf
     interrupts_request_stats = (interrupts_request_stats_t){ 0 };
 }
 
@@ -40,7 +41,7 @@ void tearDown(void) {
 // ---- joypad_init ----
 
 void test_joypad_init_sets_power_on_state(void) {
-    joypad_init(&jp);
+    joypad_init(&jp, &interrupts);
 
     TEST_ASSERT_EQUAL_HEX8(0x00, jp.select_bits);
     TEST_ASSERT_EQUAL_HEX8(0x0F, jp.dpad_state);
@@ -107,7 +108,7 @@ void test_joypad_press_dpad_selected_fires_interrupt(void) {
     jp.select_bits = 0x00; // D-Pad selected
     jp.dpad_state = 0x0F;  // Right released
 
-    joypad_press(&jp, &interrupts, JOYPAD_RIGHT);
+    joypad_press(&jp, JOYPAD_RIGHT);
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL(INT_JOYPAD, interrupts_request_stats.interrupts[0]);
@@ -118,7 +119,7 @@ void test_joypad_press_dpad_not_selected_no_interrupt_but_updates_state(void) {
     jp.select_bits = JOYP_SELECT_DPAD; // 0x10: D-Pad NOT selected
     jp.dpad_state = 0x0F;
 
-    joypad_press(&jp, &interrupts, JOYPAD_RIGHT);
+    joypad_press(&jp, JOYPAD_RIGHT);
 
     TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_HEX8(0x0E, jp.dpad_state); // still recorded
@@ -128,7 +129,7 @@ void test_joypad_press_dpad_already_pressed_no_interrupt(void) {
     jp.select_bits = 0x00;
     jp.dpad_state = 0x0E; // Right already pressed
 
-    joypad_press(&jp, &interrupts, JOYPAD_RIGHT);
+    joypad_press(&jp, JOYPAD_RIGHT);
 
     TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count); // no high->low transition
     TEST_ASSERT_EQUAL_HEX8(0x0E, jp.dpad_state);
@@ -140,7 +141,7 @@ void test_joypad_press_button_selected_fires_interrupt(void) {
     jp.select_bits = 0x00; // Buttons selected
     jp.button_state = 0x0F;
 
-    joypad_press(&jp, &interrupts, JOYPAD_A);
+    joypad_press(&jp, JOYPAD_A);
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL(INT_JOYPAD, interrupts_request_stats.interrupts[0]);
@@ -151,7 +152,7 @@ void test_joypad_press_button_not_selected_no_interrupt(void) {
     jp.select_bits = JOYP_SELECT_BUTTONS; // 0x20: Buttons NOT selected
     jp.button_state = 0x0F;
 
-    joypad_press(&jp, &interrupts, JOYPAD_A);
+    joypad_press(&jp, JOYPAD_A);
 
     TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_HEX8(0x0E, jp.button_state);

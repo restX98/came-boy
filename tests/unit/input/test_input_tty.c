@@ -21,9 +21,8 @@
 static joypad_key_t pressed[MAX_EVENTS];
 static size_t press_calls;
 
-void joypad_press(joypad_reg_t *jp, interrupt_regs_t *interrupts, joypad_key_t key) {
+void joypad_press(joypad_reg_t *jp, joypad_key_t key) {
     (void)jp;
-    (void)interrupts;
     if (press_calls < MAX_EVENTS) pressed[press_calls] = key;
     press_calls++;
 }
@@ -144,8 +143,7 @@ void test_input_tty_poll_decodes_keys(void) {
     msleep(5); // let the line discipline hand the bytes to the slave
 
     joypad_reg_t jp = { 0 };
-    interrupt_regs_t interrupts = { 0 };
-    in.poll(&in, &jp, &interrupts);
+    in.poll(&in, &jp);
 
     TEST_ASSERT_EQUAL_size_t(8, press_calls); // 'z' ignored
     TEST_ASSERT_EQUAL(JOYPAD_UP, pressed[0]);
@@ -168,22 +166,21 @@ void test_input_tty_poll_auto_releases_after_timeout(void) {
     in.init(&in);
 
     joypad_reg_t jp = { 0 };
-    interrupt_regs_t interrupts = { 0 };
 
     TEST_ASSERT_EQUAL_INT(1, (int)write(pty_master, "w", 1));
     msleep(5);
-    in.poll(&in, &jp, &interrupts); // press UP
+    in.poll(&in, &jp); // press UP
     TEST_ASSERT_TRUE(pressed_contains(JOYPAD_UP));
 
     // Still within RELEASE_MS: UP must NOT be released yet.
     reset_spies();
-    in.poll(&in, &jp, &interrupts);
+    in.poll(&in, &jp);
     TEST_ASSERT_FALSE(released_contains(JOYPAD_UP));
 
     // After the quiet window (RELEASE_MS is 120ms in the backend): UP released.
     reset_spies();
     msleep(200);
-    in.poll(&in, &jp, &interrupts);
+    in.poll(&in, &jp);
     TEST_ASSERT_TRUE(released_contains(JOYPAD_UP));
 
     in.deinit(&in);

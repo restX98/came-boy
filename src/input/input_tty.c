@@ -56,7 +56,7 @@ static int input_tty_init(input_t *self) {
     return 0;
 }
 
-static void input_tty_poll(input_t *self, joypad_reg_t *jp, interrupt_regs_t *interrupts) {
+static void input_tty_poll(input_t *self, joypad_reg_t *jp) {
     tty_ctx_t *ctx = self->ctx;
     long t = now_ms();
 
@@ -74,7 +74,7 @@ static void input_tty_poll(input_t *self, joypad_reg_t *jp, interrupt_regs_t *in
             case 'b': key = JOYPAD_START;  break;
             default: continue;
         }
-        joypad_press(jp, interrupts, key);
+        joypad_press(jp, key);
         ctx->last_seen[key] = t;
     }
 

@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
         timer_tick(&bus.io_reg.timer, cycles);
 
         if (ppu.frame_ready) {
-            input_poll(&input, &bus.io_reg.joyp, &bus.io_reg.interrupts);
+            input_poll(&input, &bus.io_reg.joyp);
             renderer_render(&renderer, ppu.framebuffer);
             ppu.frame_ready = false;
         }

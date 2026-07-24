@@ -172,7 +172,8 @@ typedef struct {
 
 static joypad_init_stats_t joypad_init_stats;
 
-void joypad_init(joypad_reg_t *joyp) {
+void joypad_init(joypad_reg_t *joyp, interrupt_regs_t *interrupts) {
+    (void)interrupts;
     if (joypad_init_stats.call_count == 10) {
         assert(0 && "Exceeded maximum call count for joypad_init_stats");
     }

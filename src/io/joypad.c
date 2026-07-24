@@ -1,6 +1,6 @@
 #include "joypad.h"
 
-void joypad_init(joypad_reg_t *jp) {
+void joypad_init(joypad_reg_t *jp, interrupt_regs_t *interrupts) {
     // Power-on: reads of $FF00 must return $CF = 1100 1111
     //   bits 6-7 = 11 -> unused, always 1
     //   bits 4-5 = 00 -> both rows selected (active-LOW)
@@ -8,6 +8,8 @@ void joypad_init(joypad_reg_t *jp) {
     jp->select_bits = 0x00;
     jp->dpad_state = 0x0F; // all released = all bits 1
     jp->button_state = 0x0F;
+
+    jp->interrupts = interrupts;
 }
 
 uint8_t joypad_read(joypad_reg_t *jp) {
@@ -40,7 +42,7 @@ static key_loc_t resolve_key(joypad_reg_t *jp, joypad_key_t key) {
 
 // Joypad interrupt (IF bit 4) fires on a high->low transition of a selected
 // input line: i.e. a key goes down while its row is currently selected.
-void joypad_press(joypad_reg_t *jp, interrupt_regs_t *interrupts, joypad_key_t key) {
+void joypad_press(joypad_reg_t *jp, joypad_key_t key) {
     key_loc_t loc = resolve_key(jp, key);
 
     bool was_released = (*loc.row & loc.bit) != 0; // active-low: bit set = released
@@ -48,7 +50,7 @@ void joypad_press(joypad_reg_t *jp, interrupt_regs_t *interrupts, joypad_key_t k
 
     bool row_selected = !(jp->select_bits & loc.select_mask);
     if (row_selected && was_released)
-        interrupts_request(interrupts, INT_JOYPAD);
+        interrupts_request(jp->interrupts, INT_JOYPAD);
 }
 
 void joypad_release(joypad_reg_t *jp, joypad_key_t key) {

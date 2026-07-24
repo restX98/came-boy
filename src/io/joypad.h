@@ -30,15 +30,18 @@ typedef struct {
 
     uint8_t dpad_state;    // bit 0=Right, 1=Left, 2=Up,     3=Down
     uint8_t button_state;  // bit 0=A,     1=B,    2=Select, 3=Start
+
+    // Injected at init: the interrupt controller a keypress raises IRQs on.
+    interrupt_regs_t *interrupts;
 } joypad_reg_t;
 
-void joypad_init(joypad_reg_t *jp);
+void joypad_init(joypad_reg_t *jp, interrupt_regs_t *interrupts);
 
 // Called by io_reg for address $FF00
 uint8_t joypad_read(joypad_reg_t *jp);
 void joypad_write(joypad_reg_t *jp, uint8_t value);
 
-void joypad_press(joypad_reg_t *jp, interrupt_regs_t *interrupts, joypad_key_t key);
+void joypad_press(joypad_reg_t *jp, joypad_key_t key);
 void joypad_release(joypad_reg_t *jp, joypad_key_t key);
 
 #endif // JOYPAD_H
