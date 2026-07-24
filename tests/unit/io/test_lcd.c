@@ -29,6 +29,7 @@ void setUp(void) {
     suppress_logs();
 
     lcd = (lcd_regs_t){ 0 };
+    lcd.interrupts = &interrupts;
     interrupts = (interrupt_regs_t){ 0 };
     interrupts_request_stats = (interrupts_request_stats_t){ 0 };
 }
@@ -40,8 +41,10 @@ void tearDown(void) {
 // ---- lcd_init ----
 
 void test_lcd_init_sets_boot_values(void) {
-    lcd_init(&lcd);
+    lcd.interrupts = NULL;
+    lcd_init(&lcd, &interrupts);
 
+    TEST_ASSERT_EQUAL_PTR(&interrupts, lcd.interrupts);
     TEST_ASSERT_EQUAL_HEX8(0x91, lcd.ctrl.reg);
     TEST_ASSERT_EQUAL_HEX8(0x85, lcd.stat.reg);
     TEST_ASSERT_EQUAL_HEX8(0x00, lcd.scy);
@@ -90,25 +93,25 @@ void test_lcd_read_returns_registers(void) {
 // ---- lcd_write ----
 
 void test_lcd_write_stores_registers(void) {
-    lcd_write(&lcd, 0xFF40, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF40, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.ctrl.reg);
-    lcd_write(&lcd, 0xFF42, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF42, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.scy);
-    lcd_write(&lcd, 0xFF43, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF43, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.scx);
-    lcd_write(&lcd, 0xFF45, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF45, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.lyc);
-    lcd_write(&lcd, 0xFF46, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF46, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.dma);
-    lcd_write(&lcd, 0xFF47, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF47, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.bgp);
-    lcd_write(&lcd, 0xFF48, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF48, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.obp0);
-    lcd_write(&lcd, 0xFF49, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF49, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.obp1);
-    lcd_write(&lcd, 0xFF4A, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF4A, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.wy);
-    lcd_write(&lcd, 0xFF4B, 0xA5, &interrupts);
+    lcd_write(&lcd, 0xFF4B, 0xA5);
     TEST_ASSERT_EQUAL_HEX8(0xA5, lcd.wx);
 }
 
@@ -117,7 +120,7 @@ void test_lcd_write_stat_preserves_read_only_bits(void) {
     // bits 3-6 come from the write; bit 7 is forced to 1.
     lcd.stat.reg = 0x05; // read-only bits 0 and 2 set
 
-    lcd_write(&lcd, 0xFF41, 0xFF, &interrupts);
+    lcd_write(&lcd, 0xFF41, 0xFF);
 
     // (0x05 & 0x07) | (0xFF & 0x78) | 0x80 == 0x05 | 0x78 | 0x80 == 0xFD
     TEST_ASSERT_EQUAL_HEX8(0xFD, lcd.stat.reg);
@@ -127,7 +130,7 @@ void test_lcd_write_stat_ignores_low_bits_of_value(void) {
     lcd.stat.reg = 0x00;
     lcd.lyc = 0x01; // ly (0) != lyc so lcd_update_stat leaves the LYC=LY flag (bit 2) clear
 
-    lcd_write(&lcd, 0xFF41, 0x07, &interrupts); // low 3 bits should not be written
+    lcd_write(&lcd, 0xFF41, 0x07); // low 3 bits should not be written
 
     // (0x00 & 0x07) | (0x07 & 0x78) | 0x80 == 0x80
     TEST_ASSERT_EQUAL_HEX8(0x80, lcd.stat.reg);
@@ -136,7 +139,7 @@ void test_lcd_write_stat_ignores_low_bits_of_value(void) {
 void test_lcd_write_ly_is_read_only(void) {
     lcd.ly = 0xAB;
 
-    lcd_write(&lcd, 0xFF44, 0x55, &interrupts);
+    lcd_write(&lcd, 0xFF44, 0x55);
 
     TEST_ASSERT_EQUAL_HEX8(0xAB, lcd.ly);
 }
@@ -146,7 +149,7 @@ void test_lcd_write_ly_is_read_only(void) {
 void test_lcd_set_mode_changes_mode_and_returns_true(void) {
     lcd.stat.ppu_mode = PPU_MODE_HBLANK;
 
-    bool changed = lcd_set_mode(&lcd, PPU_MODE_OAM_SCAN, &interrupts);
+    bool changed = lcd_set_mode(&lcd, PPU_MODE_OAM_SCAN);
 
     TEST_ASSERT_TRUE(changed);
     TEST_ASSERT_EQUAL_UINT8(PPU_MODE_OAM_SCAN, lcd.stat.ppu_mode);
@@ -155,7 +158,7 @@ void test_lcd_set_mode_changes_mode_and_returns_true(void) {
 void test_lcd_set_mode_same_mode_returns_false_without_side_effects(void) {
     lcd.stat.ppu_mode = PPU_MODE_VBLANK;
 
-    bool changed = lcd_set_mode(&lcd, PPU_MODE_VBLANK, &interrupts);
+    bool changed = lcd_set_mode(&lcd, PPU_MODE_VBLANK);
 
     // Guard should short-circuit before touching the register or interrupts.
     TEST_ASSERT_FALSE(changed);
@@ -166,7 +169,7 @@ void test_lcd_set_mode_same_mode_returns_false_without_side_effects(void) {
 void test_lcd_set_mode_entering_vblank_requests_vblank_interrupt(void) {
     lcd.stat.ppu_mode = PPU_MODE_HBLANK;
 
-    lcd_set_mode(&lcd, PPU_MODE_VBLANK, &interrupts);
+    lcd_set_mode(&lcd, PPU_MODE_VBLANK);
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_INT(INT_VBLANK, interrupts_request_stats.interrupts[0]);
@@ -175,7 +178,7 @@ void test_lcd_set_mode_entering_vblank_requests_vblank_interrupt(void) {
 void test_lcd_set_mode_entering_non_vblank_requests_no_interrupt(void) {
     lcd.stat.ppu_mode = PPU_MODE_HBLANK;
 
-    lcd_set_mode(&lcd, PPU_MODE_DRAWING, &interrupts);
+    lcd_set_mode(&lcd, PPU_MODE_DRAWING);
 
     // No VBLANK (not mode 1) and no STAT source enabled -> nothing requested.
     TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
@@ -184,8 +187,8 @@ void test_lcd_set_mode_entering_non_vblank_requests_no_interrupt(void) {
 void test_lcd_set_mode_vblank_interrupt_fires_only_on_transition(void) {
     lcd.stat.ppu_mode = PPU_MODE_HBLANK;
 
-    lcd_set_mode(&lcd, PPU_MODE_VBLANK, &interrupts); // transition -> requests
-    lcd_set_mode(&lcd, PPU_MODE_VBLANK, &interrupts); // no-op -> nothing
+    lcd_set_mode(&lcd, PPU_MODE_VBLANK); // transition -> requests
+    lcd_set_mode(&lcd, PPU_MODE_VBLANK); // no-op -> nothing
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
 }
@@ -196,7 +199,7 @@ void test_lcd_set_mode_updates_stat_interrupt_line(void) {
     lcd.stat.ppu_mode = PPU_MODE_HBLANK;
     lcd.stat.mode2_int_sel = 1;
 
-    lcd_set_mode(&lcd, PPU_MODE_OAM_SCAN, &interrupts);
+    lcd_set_mode(&lcd, PPU_MODE_OAM_SCAN);
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_INT(INT_LCD, interrupts_request_stats.interrupts[0]);
@@ -208,7 +211,7 @@ void test_lcd_update_stat_sets_lyc_eq_ly_when_equal(void) {
     lcd.ly = 0x42;
     lcd.lyc = 0x42;
 
-    lcd_update_stat(&lcd, &interrupts);
+    lcd_update_stat(&lcd);
 
     TEST_ASSERT_TRUE(lcd.stat.lyc_eq_ly);
 }
@@ -218,7 +221,7 @@ void test_lcd_update_stat_clears_lyc_eq_ly_when_not_equal(void) {
     lcd.lyc = 0x43;
     lcd.stat.lyc_eq_ly = 1; // stale value that must be recomputed to 0
 
-    lcd_update_stat(&lcd, &interrupts);
+    lcd_update_stat(&lcd);
 
     TEST_ASSERT_FALSE(lcd.stat.lyc_eq_ly);
 }
@@ -228,7 +231,7 @@ void test_lcd_update_stat_requests_interrupt_on_lyc_coincidence(void) {
     lcd.lyc = 0x10;
     lcd.stat.lyc_int_sel = 1;
 
-    lcd_update_stat(&lcd, &interrupts);
+    lcd_update_stat(&lcd);
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_INT(INT_LCD, interrupts_request_stats.interrupts[0]);
@@ -240,7 +243,7 @@ void test_lcd_update_stat_no_lyc_interrupt_without_coincidence(void) {
     lcd.lyc = 0x11;
     lcd.stat.lyc_int_sel = 1;
 
-    lcd_update_stat(&lcd, &interrupts);
+    lcd_update_stat(&lcd);
 
     TEST_ASSERT_FALSE(lcd.stat.lyc_eq_ly);
     TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
@@ -251,7 +254,7 @@ void test_lcd_update_stat_requests_interrupt_on_mode_source(void) {
     lcd.stat.ppu_mode = PPU_MODE_HBLANK; // mode 0
     lcd.stat.mode0_int_sel = 1;
 
-    lcd_update_stat(&lcd, &interrupts);
+    lcd_update_stat(&lcd);
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_INT(INT_LCD, interrupts_request_stats.interrupts[0]);
@@ -263,7 +266,7 @@ void test_lcd_update_stat_mode1_interrupt_in_vblank(void) {
     lcd.stat.ppu_mode = PPU_MODE_VBLANK; // mode 1
     lcd.stat.mode1_int_sel = 1;
 
-    lcd_update_stat(&lcd, &interrupts);
+    lcd_update_stat(&lcd);
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
     TEST_ASSERT_EQUAL_INT(INT_LCD, interrupts_request_stats.interrupts[0]);
@@ -279,7 +282,7 @@ void test_lcd_update_stat_no_interrupt_in_drawing_mode(void) {
     lcd.stat.mode1_int_sel = 1;
     lcd.stat.mode2_int_sel = 1;
 
-    lcd_update_stat(&lcd, &interrupts);
+    lcd_update_stat(&lcd);
 
     TEST_ASSERT_EQUAL_size_t(0, interrupts_request_stats.call_count);
     TEST_ASSERT_FALSE(lcd.stat_line);
@@ -289,8 +292,8 @@ void test_lcd_update_stat_fires_only_on_rising_edge(void) {
     lcd.stat.ppu_mode = PPU_MODE_HBLANK;
     lcd.stat.mode0_int_sel = 1;
 
-    lcd_update_stat(&lcd, &interrupts); // low -> high: fires
-    lcd_update_stat(&lcd, &interrupts); // high -> high: no new interrupt
+    lcd_update_stat(&lcd); // low -> high: fires
+    lcd_update_stat(&lcd); // high -> high: no new interrupt
 
     TEST_ASSERT_EQUAL_size_t(1, interrupts_request_stats.call_count);
     TEST_ASSERT_TRUE(lcd.stat_line);
@@ -300,14 +303,14 @@ void test_lcd_update_stat_refires_after_line_goes_low(void) {
     lcd.stat.ppu_mode = PPU_MODE_HBLANK;
     lcd.stat.mode0_int_sel = 1;
 
-    lcd_update_stat(&lcd, &interrupts);   // rising edge: fires (count 1)
+    lcd_update_stat(&lcd);   // rising edge: fires (count 1)
 
     lcd.stat.ppu_mode = PPU_MODE_DRAWING; // condition no longer holds
-    lcd_update_stat(&lcd, &interrupts);   // line falls, no fire
+    lcd_update_stat(&lcd);   // line falls, no fire
     TEST_ASSERT_FALSE(lcd.stat_line);
 
     lcd.stat.ppu_mode = PPU_MODE_HBLANK;  // condition holds again
-    lcd_update_stat(&lcd, &interrupts);   // rising edge again: fires (count 2)
+    lcd_update_stat(&lcd);   // rising edge again: fires (count 2)
 
     TEST_ASSERT_EQUAL_size_t(2, interrupts_request_stats.call_count);
 }

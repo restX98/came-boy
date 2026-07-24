@@ -18,7 +18,6 @@ static uint8_t oam_buf[OAM_SIZE];
 typedef struct {
     lcd_regs_t *lcd;
     ppu_mode_t mode;
-    interrupt_regs_t *interrupts;
 } lcd_set_mode_call_t;
 
 typedef struct {
@@ -29,7 +28,7 @@ typedef struct {
 
 static lcd_set_mode_stats_t lcd_set_mode_stats;
 
-bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode, interrupt_regs_t *interrupts) {
+bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode) {
     if (lcd_set_mode_stats.call_count == 256) {
         assert(0 && "Exceeded maximum call count for lcd_set_mode_stats");
     }
@@ -37,7 +36,6 @@ bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode, interrupt_regs_t *interrupts
     lcd_set_mode_call_t *call = &lcd_set_mode_stats.calls[lcd_set_mode_stats.call_count];
     call->lcd = lcd;
     call->mode = mode;
-    call->interrupts = interrupts;
 
     lcd_set_mode_stats.call_count++;
 
@@ -46,7 +44,6 @@ bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode, interrupt_regs_t *interrupts
 
 typedef struct {
     lcd_regs_t *lcd;
-    interrupt_regs_t *interrupts;
 } lcd_update_stat_call_t;
 
 typedef struct {
@@ -56,14 +53,13 @@ typedef struct {
 
 static lcd_update_stat_stats_t lcd_update_stat_stats;
 
-void lcd_update_stat(lcd_regs_t *lcd, interrupt_regs_t *interrupts) {
+void lcd_update_stat(lcd_regs_t *lcd) {
     if (lcd_update_stat_stats.call_count == 256) {
         assert(0 && "Exceeded maximum call count for lcd_update_stat_stats");
     }
 
     lcd_update_stat_call_t *call = &lcd_update_stat_stats.calls[lcd_update_stat_stats.call_count];
     call->lcd = lcd;
-    call->interrupts = interrupts;
 
     lcd_update_stat_stats.call_count++;
 }
@@ -131,7 +127,6 @@ void test_ppu_step_disabled_forces_hblank_mode(void) {
     TEST_ASSERT_EQUAL_size_t(1, lcd_set_mode_stats.call_count);
     TEST_ASSERT_EQUAL_UINT8(PPU_MODE_HBLANK, lcd_set_mode_stats.calls[0].mode);
     TEST_ASSERT_EQUAL_PTR(&bus.io_reg.lcd, lcd_set_mode_stats.calls[0].lcd);
-    TEST_ASSERT_EQUAL_PTR(&bus.io_reg.interrupts, lcd_set_mode_stats.calls[0].interrupts);
 }
 
 // ---- ppu_step: visible-line mode machine ----

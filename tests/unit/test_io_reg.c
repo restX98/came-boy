@@ -394,7 +394,8 @@ typedef struct {
 
 static lcd_init_stats_t lcd_init_stats;
 
-void lcd_init(lcd_regs_t *lcd) {
+void lcd_init(lcd_regs_t *lcd, interrupt_regs_t *interrupts) {
+    (void)interrupts;
     if (lcd_init_stats.call_count == 10) {
         assert(0 && "Exceeded maximum call count for lcd_init_stats");
     }
@@ -436,7 +437,6 @@ typedef struct {
     lcd_regs_t *lcd;
     uint16_t addr;
     uint8_t value;
-    interrupt_regs_t *interrupts;
 } lcd_write_call_t;
 
 typedef struct {
@@ -446,7 +446,7 @@ typedef struct {
 
 static lcd_write_stats_t lcd_write_stats;
 
-void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *interrupts) {
+void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
     if (lcd_write_stats.call_count == 10) {
         assert(0 && "Exceeded maximum call count for lcd_write_stats");
     }
@@ -455,7 +455,6 @@ void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *
     call->lcd = lcd;
     call->addr = addr;
     call->value = value;
-    call->interrupts = interrupts;
 
     lcd_write_stats.call_count++;
 }
@@ -769,7 +768,6 @@ void test_io_reg_write_lcd(void) {
     TEST_ASSERT_EQUAL_PTR(&io_reg.lcd, lcd_write_stats.calls[0].lcd);
     TEST_ASSERT_EQUAL_UINT16(0xFF40, lcd_write_stats.calls[0].addr);
     TEST_ASSERT_EQUAL_UINT8(0x3C, lcd_write_stats.calls[0].value);
-    TEST_ASSERT_EQUAL_PTR(&io_reg.interrupts, lcd_write_stats.calls[0].interrupts);
 }
 
 void test_io_reg_write_oam_dma(void) {

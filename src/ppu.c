@@ -24,7 +24,7 @@ void ppu_init(ppu_t *ppu) {
 }
 
 static void set_ppu_mode(bus_t *bus, ppu_mode_t mode) {
-    if (!lcd_set_mode(&bus->io_reg.lcd, mode, &bus->io_reg.interrupts)) {
+    if (!lcd_set_mode(&bus->io_reg.lcd, mode)) {
         return;
     }
 
@@ -251,7 +251,7 @@ void ppu_step(ppu_t *ppu, bus_t *bus, int t_cycles) {
                 ppu->window_line = 0;
             }
 
-            lcd_update_stat(lcd, &bus->io_reg.interrupts);
+            lcd_update_stat(lcd);
 
             if (lcd->ly == VBLANK_START_LINE) {
                 set_ppu_mode(bus, PPU_MODE_VBLANK);

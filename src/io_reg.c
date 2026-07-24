@@ -51,7 +51,7 @@ void io_reg_init(io_reg_t *io_reg) {
     timer_init(&io_reg->timer, &io_reg->interrupts);
     audio_init(&io_reg->audio);
     oam_dma_init(&io_reg->oam_dma);
-    lcd_init(&io_reg->lcd);
+    lcd_init(&io_reg->lcd, &io_reg->interrupts);
 }
 
 uint8_t io_reg_read(io_reg_t *io_reg, uint16_t addr) {
@@ -136,7 +136,7 @@ static uint8_t read_lcd(io_reg_t *io_reg, uint16_t addr) {
 }
 
 static void write_lcd(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
-    lcd_write(&io_reg->lcd, addr, value, &io_reg->interrupts);
+    lcd_write(&io_reg->lcd, addr, value);
 }
 
 static uint8_t read_oam_dma(io_reg_t *io_reg, uint16_t addr) {

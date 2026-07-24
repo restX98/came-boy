@@ -55,14 +55,16 @@ typedef struct {
     uint8_t wx;         // 0xFF4B — Window X position plus 7
 
     bool stat_line;     // internal: true if STAT line is currently high (for edge detection)
+
+    interrupt_regs_t *interrupts; // injected: the VBlank/STAT line this LCD raises on
 } lcd_regs_t;
 
-void lcd_init(lcd_regs_t *lcd);
+void lcd_init(lcd_regs_t *lcd, interrupt_regs_t *interrupts);
 
 uint8_t lcd_read(lcd_regs_t *lcd, uint16_t addr);
-void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *interrupts);
+void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value);
 
-bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode, interrupt_regs_t *interrupts);
-void lcd_update_stat(lcd_regs_t *lcd, interrupt_regs_t *interrupts);
+bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode);
+void lcd_update_stat(lcd_regs_t *lcd);
 
 #endif // LCD_H

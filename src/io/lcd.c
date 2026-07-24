@@ -4,7 +4,8 @@
 
 #include "logger.h"
 
-void lcd_init(lcd_regs_t *lcd) {
+void lcd_init(lcd_regs_t *lcd, interrupt_regs_t *interrupts) {
+    lcd->interrupts = interrupts;
     lcd->ctrl.reg = 0x91;
     lcd->stat.reg = 0x85;
     lcd->scy = 0x00;
@@ -52,14 +53,14 @@ uint8_t lcd_read(lcd_regs_t *lcd, uint16_t addr) {
 
 }
 
-void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *interrupts) {
+void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value) {
     switch (addr) {
         case 0xFF40:
             lcd->ctrl.reg = value;
             break;
         case 0xFF41:
             lcd->stat.reg = (lcd->stat.reg & 0x07) | (value & 0x78) | 0x80;
-            lcd_update_stat(lcd, interrupts);
+            lcd_update_stat(lcd);
             break;
         case 0xFF42:
             lcd->scy = value;
@@ -72,7 +73,7 @@ void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *
             break;
         case 0xFF45:
             lcd->lyc = value;
-            lcd_update_stat(lcd, interrupts);
+            lcd_update_stat(lcd);
             break;
         case 0xFF46:
             lcd->dma = value;
@@ -98,20 +99,20 @@ void lcd_write(lcd_regs_t *lcd, uint16_t addr, uint8_t value, interrupt_regs_t *
     }
 }
 
-bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode, interrupt_regs_t *interrupts) {
+bool lcd_set_mode(lcd_regs_t *lcd, ppu_mode_t mode) {
     if (lcd->stat.ppu_mode == mode) {
         return false;
     }
     lcd->stat.ppu_mode = mode;
 
     if (mode == PPU_MODE_VBLANK) {
-        interrupts_request(interrupts, INT_VBLANK);
+        interrupts_request(lcd->interrupts, INT_VBLANK);
     }
-    lcd_update_stat(lcd, interrupts);
+    lcd_update_stat(lcd);
     return true;
 }
 
-void lcd_update_stat(lcd_regs_t *lcd, interrupt_regs_t *interrupts) {
+void lcd_update_stat(lcd_regs_t *lcd) {
     lcd->stat.lyc_eq_ly = (lcd->ly == lcd->lyc);
 
     bool line =
@@ -121,7 +122,7 @@ void lcd_update_stat(lcd_regs_t *lcd, interrupt_regs_t *interrupts) {
         (lcd->stat.mode2_int_sel && lcd->stat.ppu_mode == 2);
 
     if (line && !lcd->stat_line) {
-        interrupts_request(interrupts, INT_LCD);
+        interrupts_request(lcd->interrupts, INT_LCD);
     }
     lcd->stat_line = line;
 }
