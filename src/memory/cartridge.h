@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <time.h>
 
 #include "mem.h"
 
@@ -45,6 +46,16 @@ struct cartridge {
             uint8_t ram_bank;
             bool ram_enabled;
         } mbc5;
+        struct {
+            uint8_t rom_bank;      // 7-bit ROM bank (0x01-0x7F)
+            uint8_t ram_bank;      // 0x00-0x03 selects RAM, 0x08-0x0C selects an RTC register
+            bool ram_enabled;      // gates both RAM and RTC register access
+            bool has_rtc;          // cartridge carries a real-time clock
+            uint8_t latch;         // last value written to the latch register (0x6000-0x7FFF)
+            uint8_t rtc[5];        // live RTC counters: seconds, minutes, hours, day-low, day-high
+            uint8_t rtc_latched[5];// snapshot exposed to reads after a latch sequence
+            time_t rtc_last;       // wall-clock time the live counters were last advanced
+        } mbc3;
     } state;
 
     // header info

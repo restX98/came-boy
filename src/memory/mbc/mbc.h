@@ -6,6 +6,7 @@
 extern const mbc_interface_t no_mbc_ops;
 extern const mbc_interface_t mbc1_ops;
 extern const mbc_interface_t mbc2_ops;
+extern const mbc_interface_t mbc3_ops;
 extern const mbc_interface_t mbc5_ops;
 
 #endif // MBC_H
