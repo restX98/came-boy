@@ -11,6 +11,8 @@ static void audio_trigger_ch3(audio_regs_t *audio);
 static void audio_trigger_ch4(audio_regs_t *audio);
 
 static void audio_clock_length(audio_regs_t *audio);
+static void audio_length_enable_quirk(audio_regs_t *audio, uint16_t *counter, uint8_t channel_bit,
+                                       bool old_enabled, bool new_enabled, bool triggering);
 static void audio_clock_sweep(audio_regs_t *audio);
 static void audio_clock_envelope(audio_regs_t *audio);
 static void audio_frame_sequencer_step(audio_regs_t *audio);
@@ -186,12 +188,16 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
         case 0xFF13:
             audio->nr13 = value;
             break;
-        case 0xFF14:
+        case 0xFF14: {
+            bool old_enabled = audio->nr14 & 0x40;
             audio->nr14 = value | 0b00111000;
+            audio_length_enable_quirk(audio, &audio->ch1_length_counter, 0x01,
+                                       old_enabled, value & 0x40, value & 0x80);
             if (value & 0x80) {
                 audio_trigger_ch1(audio);
             }
             break;
+        }
         case 0xFF16:
             audio->nr21 = value;
             audio->ch2_length_counter = 64 - (value & 0x3F);
@@ -205,12 +211,16 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
         case 0xFF18:
             audio->nr23 = value;
             break;
-        case 0xFF19:
+        case 0xFF19: {
+            bool old_enabled = audio->nr24 & 0x40;
             audio->nr24 = value | 0b00111000;
+            audio_length_enable_quirk(audio, &audio->ch2_length_counter, 0x02,
+                                       old_enabled, value & 0x40, value & 0x80);
             if (value & 0x80) {
                 audio_trigger_ch2(audio);
             }
             break;
+        }
         case 0xFF1A:
             audio->nr30 = value;
             if (!audio_ch3_dac_on(audio)) {
@@ -227,12 +237,16 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
         case 0xFF1D:
             audio->nr33 = value;
             break;
-        case 0xFF1E:
+        case 0xFF1E: {
+            bool old_enabled = audio->nr34 & 0x40;
             audio->nr34 = value | 0b00111000;
+            audio_length_enable_quirk(audio, &audio->ch3_length_counter, 0x04,
+                                       old_enabled, value & 0x40, value & 0x80);
             if (value & 0x80) {
                 audio_trigger_ch3(audio);
             }
             break;
+        }
         case 0xFF20:
             audio->nr41 = value | 0b11000000;
             audio->ch4_length_counter = 64 - (value & 0x3F);
@@ -246,12 +260,16 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
         case 0xFF22:
             audio->nr43 = value;
             break;
-        case 0xFF23:
+        case 0xFF23: {
+            bool old_enabled = audio->nr44 & 0x40;
             audio->nr44 = value | 0b00111111;
+            audio_length_enable_quirk(audio, &audio->ch4_length_counter, 0x08,
+                                       old_enabled, value & 0x40, value & 0x80);
             if (value & 0x80) {
                 audio_trigger_ch4(audio);
             }
             break;
+        }
         case 0xFF24:
             audio->nr50 = value;
             break;
@@ -371,6 +389,9 @@ static void audio_trigger_ch1(audio_regs_t *audio) {
 
     if (audio->ch1_length_counter == 0) {
         audio->ch1_length_counter = 64;
+        if ((audio->nr14 & 0x40) && (audio->frame_seq_step % 2) == 1) {
+            audio->ch1_length_counter--;
+        }
     }
 
     audio->ch1_env_volume = (audio->nr12 >> 4) & 0x0F;
@@ -405,6 +426,9 @@ static void audio_trigger_ch2(audio_regs_t *audio) {
 
     if (audio->ch2_length_counter == 0) {
         audio->ch2_length_counter = 64;
+        if ((audio->nr24 & 0x40) && (audio->frame_seq_step % 2) == 1) {
+            audio->ch2_length_counter--;
+        }
     }
 
     audio->ch2_env_volume = (audio->nr22 >> 4) & 0x0F;
@@ -423,6 +447,9 @@ static void audio_trigger_ch3(audio_regs_t *audio) {
 
     if (audio->ch3_length_counter == 0) {
         audio->ch3_length_counter = 256;
+        if ((audio->nr34 & 0x40) && (audio->frame_seq_step % 2) == 1) {
+            audio->ch3_length_counter--;
+        }
     }
 
     uint16_t period = audio->nr33 | ((uint16_t)(audio->nr34 & 0x07) << 8);
@@ -439,6 +466,9 @@ static void audio_trigger_ch4(audio_regs_t *audio) {
 
     if (audio->ch4_length_counter == 0) {
         audio->ch4_length_counter = 64;
+        if ((audio->nr44 & 0x40) && (audio->frame_seq_step % 2) == 1) {
+            audio->ch4_length_counter--;
+        }
     }
 
     audio->ch4_env_volume = (audio->nr42 >> 4) & 0x0F;
@@ -475,6 +505,26 @@ static void audio_clock_length(audio_regs_t *audio) {
     audio_clock_one_length(audio, &audio->ch2_length_counter, audio->nr24, 0x02);
     audio_clock_one_length(audio, &audio->ch3_length_counter, audio->nr34, 0x04);
     audio_clock_one_length(audio, &audio->ch4_length_counter, audio->nr44, 0x08);
+}
+
+// DMG quirk: enabling the length counter (NRx4 bit 6 going 0 -> 1) during the
+// half of the frame sequencer period where frame_seq_step is odd triggers an
+// extra, immediate length clock (verified against gb-test-roms dmg_sound
+// 03-trigger, tests 2/3). The same condition also gates the extra re-clock
+// on trigger below.
+static void audio_length_enable_quirk(audio_regs_t *audio, uint16_t *counter, uint8_t channel_bit,
+                                       bool old_enabled, bool new_enabled, bool triggering) {
+    if (old_enabled || !new_enabled) {
+        return;
+    }
+    if ((audio->frame_seq_step % 2) != 1 || *counter == 0) {
+        return;
+    }
+
+    (*counter)--;
+    if (*counter == 0 && !triggering) {
+        audio->nr52 &= ~channel_bit;
+    }
 }
 
 // ---- Sweep, CH1 only (steps 2, 6) ----

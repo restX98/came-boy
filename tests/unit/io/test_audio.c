@@ -373,6 +373,65 @@ void test_audio_trigger_ch1_dac_off_does_not_set_active(void) {
     TEST_ASSERT_EQUAL_UINT8(0x00, audio.nr52 & 0x01);
 }
 
+// ---- length-enable quirk (NRx4 bit 6 going 0 -> 1), verified against
+// gb-test-roms dmg_sound 03-trigger ----
+
+void test_audio_write_nr14_enable_during_odd_step_clocks_length_immediately(void) {
+    audio.frame_seq_step = 1;
+    audio.ch1_length_counter = 5;
+    audio_write(&audio, 0xFF14, 0x40); // enable only, no trigger
+    TEST_ASSERT_EQUAL_UINT16(4, audio.ch1_length_counter);
+}
+
+void test_audio_write_nr14_enable_during_even_step_does_not_clock(void) {
+    audio.frame_seq_step = 0;
+    audio.ch1_length_counter = 5;
+    audio_write(&audio, 0xFF14, 0x40);
+    TEST_ASSERT_EQUAL_UINT16(5, audio.ch1_length_counter);
+}
+
+void test_audio_write_nr14_enable_quirk_disables_channel_on_reaching_zero(void) {
+    audio.frame_seq_step = 1;
+    audio.ch1_length_counter = 1;
+    audio.nr52 = 0x81; // powered on, CH1 active
+    audio_write(&audio, 0xFF14, 0x40); // enable only, no trigger
+    TEST_ASSERT_EQUAL_UINT16(0, audio.ch1_length_counter);
+    TEST_ASSERT_EQUAL_UINT8(0x00, audio.nr52 & 0x01);
+}
+
+void test_audio_write_nr14_enable_quirk_does_not_disable_when_also_triggered(void) {
+    audio.nr12 = 0xF0; // DAC on
+    audio.frame_seq_step = 1;
+    audio.ch1_length_counter = 1;
+    audio.nr52 = 0x81;
+    audio_write(&audio, 0xFF14, 0xC0); // enable + trigger together
+    // Enable quirk clocks 1 -> 0 (channel not disabled since triggering);
+    // trigger then reloads to max and re-clocks it once more (see
+    // test_audio_trigger_ch1_unfreezes_and_reclocks_length below).
+    TEST_ASSERT_EQUAL_UINT16(63, audio.ch1_length_counter);
+    TEST_ASSERT_EQUAL_UINT8(0x01, audio.nr52 & 0x01);
+}
+
+void test_audio_write_nr14_repeated_enable_write_does_not_reclock(void) {
+    audio.frame_seq_step = 1;
+    audio.nr14 = 0x40; // already enabled
+    audio.ch1_length_counter = 5;
+    audio_write(&audio, 0xFF14, 0x40); // still enabled, no 0 -> 1 transition
+    TEST_ASSERT_EQUAL_UINT16(5, audio.ch1_length_counter);
+}
+
+void test_audio_trigger_ch1_unfreezes_and_reclocks_length(void) {
+    // Length enable already set (no 0 -> 1 transition on this write) and the
+    // counter previously ran down to 0; triggering while enabled during an
+    // odd frame-sequencer step reloads to max and immediately re-clocks it.
+    audio.nr12 = 0xF0;
+    audio.nr14 = 0x40;
+    audio.frame_seq_step = 1;
+    audio.ch1_length_counter = 0;
+    audio_write(&audio, 0xFF14, 0xC0);
+    TEST_ASSERT_EQUAL_UINT16(63, audio.ch1_length_counter);
+}
+
 void test_audio_trigger_ch2_marks_active_in_nr52(void) {
     audio.nr22 = 0xF0;
     audio_write(&audio, 0xFF19, 0x80);
@@ -646,6 +705,14 @@ int main(void) {
     RUN_TEST(test_audio_trigger_ch1_disables_on_immediate_sweep_overflow);
     RUN_TEST(test_audio_trigger_ch1_reloads_period_timer);
     RUN_TEST(test_audio_trigger_ch1_dac_off_does_not_set_active);
+
+    RUN_TEST(test_audio_write_nr14_enable_during_odd_step_clocks_length_immediately);
+    RUN_TEST(test_audio_write_nr14_enable_during_even_step_does_not_clock);
+    RUN_TEST(test_audio_write_nr14_enable_quirk_disables_channel_on_reaching_zero);
+    RUN_TEST(test_audio_write_nr14_enable_quirk_does_not_disable_when_also_triggered);
+    RUN_TEST(test_audio_write_nr14_repeated_enable_write_does_not_reclock);
+    RUN_TEST(test_audio_trigger_ch1_unfreezes_and_reclocks_length);
+
     RUN_TEST(test_audio_trigger_ch2_marks_active_in_nr52);
     RUN_TEST(test_audio_trigger_ch3_marks_active_and_resets_wave_position);
     RUN_TEST(test_audio_trigger_ch3_reloads_length_when_zero);
