@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "log_helpers.h"
 
-#include "renderer/renderer.h"
+#include "frontend/renderer/renderer.h"
 
 // ---- Fake backend ----
 

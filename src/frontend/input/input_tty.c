@@ -1,4 +1,4 @@
-#include "input/input_tty.h"
+#include "frontend/input/input_tty.h"
 
 #include <fcntl.h>
 #include <stdbool.h>

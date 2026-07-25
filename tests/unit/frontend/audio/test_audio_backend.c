@@ -1,7 +1,7 @@
 #include "unity.h"
 #include "log_helpers.h"
 
-#include "audio/audio_backend.h"
+#include "frontend/audio/audio_backend.h"
 
 // ---- Fake backend ----
 

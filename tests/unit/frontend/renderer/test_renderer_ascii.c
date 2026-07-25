@@ -7,7 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "renderer/renderer_ascii.h"
+#include "frontend/renderer/renderer_ascii.h"
 #include "ppu.h" // LCD_WIDTH / LCD_HEIGHT
 
 #define HALF_BLOCK "▀" // ▀ upper half block

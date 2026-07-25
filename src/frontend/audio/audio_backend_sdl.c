@@ -1,4 +1,4 @@
-#include "audio/audio_backend_sdl.h"
+#include "frontend/audio/audio_backend_sdl.h"
 
 #include <SDL2/SDL.h>
 

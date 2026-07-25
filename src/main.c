@@ -2,14 +2,16 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "audio/audio_backend.h"
-#include "audio/audio_backend_sdl.h"
+#include "frontend/audio/audio_backend.h"
+#include "frontend/audio/audio_backend_sdl.h"
+#include "frontend/input/input.h"
+#include "frontend/input/input_sdl.h"
+#include "frontend/input/input_tty.h"
+#include "frontend/renderer/renderer.h"
+#include "frontend/renderer/renderer_ascii.h"
+#include "frontend/renderer/renderer_sdl.h"
 #include "gameboy.h"
-#include "input/input.h"
-#include "input/input_tty.h"
 #include "logger.h"
-#include "renderer/renderer.h"
-#include "renderer/renderer_ascii.h"
 
 static volatile sig_atomic_t running = 1;
 

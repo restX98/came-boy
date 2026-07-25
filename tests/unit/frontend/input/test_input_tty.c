@@ -10,7 +10,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "input/input_tty.h"
+#include "frontend/input/input_tty.h"
 
 // ---- Stubs / spies ---------------------------------------------------------
 // input_tty only depends on the joypad frontend, so stub it out and record the

@@ -1,4 +1,4 @@
-#include "audio/audio_backend.h"
+#include "frontend/audio/audio_backend.h"
 
 int audio_backend_init(audio_backend_t *b) {
     if (!b || !b->init) return 0;

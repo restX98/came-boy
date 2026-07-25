@@ -1,4 +1,4 @@
-#include "renderer/renderer.h"
+#include "frontend/renderer/renderer.h"
 
 int renderer_init(renderer_t *r) {
     if (!r || !r->init) return 0;

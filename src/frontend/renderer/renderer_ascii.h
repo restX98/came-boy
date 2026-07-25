@@ -1,7 +1,7 @@
 #ifndef RENDERER_ASCII_H
 #define RENDERER_ASCII_H
 
-#include "renderer/renderer.h"
+#include "frontend/renderer/renderer.h"
 
 // Build a renderer that draws the framebuffer into a text terminal using
 // half-block glyphs (▀): each character cell stacks two vertical pixels (top =
