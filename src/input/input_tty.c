@@ -56,9 +56,10 @@ static int input_tty_init(input_t *self) {
     return 0;
 }
 
-static void input_tty_poll(input_t *self, joypad_reg_t *jp) {
+static bool input_tty_poll(input_t *self, joypad_reg_t *jp) {
     tty_ctx_t *ctx = self->ctx;
     long t = now_ms();
+    bool quit = false;
 
     char c;
     while (read(ctx->fd, &c, 1) == 1) {
@@ -72,6 +73,9 @@ static void input_tty_poll(input_t *self, joypad_reg_t *jp) {
             case 'p': key = JOYPAD_B;      break;
             case 'v': key = JOYPAD_SELECT; break;
             case 'b': key = JOYPAD_START;  break;
+            case 27: // Escape
+                quit = true;
+                continue;
             default: continue;
         }
         joypad_press(jp, key);
@@ -83,6 +87,8 @@ static void input_tty_poll(input_t *self, joypad_reg_t *jp) {
     for (joypad_key_t key = 0; key < JOYPAD_KEY_COUNT; key++) {
         if (t - ctx->last_seen[key] > RELEASE_MS) joypad_release(jp, key);
     }
+
+    return quit;
 }
 
 static void input_tty_deinit(input_t *self) {

@@ -158,6 +158,21 @@ void test_input_tty_poll_decodes_keys(void) {
     in.deinit(&in);
 }
 
+void test_input_tty_poll_escape_requests_quit(void) {
+    open_pty();
+    input_t in = input_tty(pty_slave_path);
+    in.init(&in);
+
+    TEST_ASSERT_EQUAL_INT(1, (int)write(pty_master, "\x1b", 1));
+    msleep(5);
+
+    joypad_reg_t jp = { 0 };
+    TEST_ASSERT_TRUE(in.poll(&in, &jp));
+    TEST_ASSERT_EQUAL_size_t(0, press_calls); // Escape isn't a mapped joypad key
+
+    in.deinit(&in);
+}
+
 // ---- poll (auto-release) ----
 
 void test_input_tty_poll_auto_releases_after_timeout(void) {
@@ -215,6 +230,7 @@ int main(void) {
 
     RUN_TEST(test_input_tty_init_sets_raw_mode);
     RUN_TEST(test_input_tty_poll_decodes_keys);
+    RUN_TEST(test_input_tty_poll_escape_requests_quit);
     RUN_TEST(test_input_tty_poll_auto_releases_after_timeout);
     RUN_TEST(test_input_tty_deinit_restores_termios);
 

@@ -67,7 +67,9 @@ int main(int argc, char *argv[]) {
         }
 
         if (gb.ppu.frame_ready) {
-            input_poll(&input, &gb.bus.io_reg.joyp);
+            if (input_poll(&input, &gb.bus.io_reg.joyp)) {
+                running = 0; // window closed or Escape pressed (SDL frontend only)
+            }
             renderer_render(&renderer, gb.ppu.framebuffer);
             gb.ppu.frame_ready = false;
         }

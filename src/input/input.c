@@ -5,9 +5,9 @@ int input_init(input_t *in) {
     return in->init(in);
 }
 
-void input_poll(input_t *in, joypad_reg_t *jp) {
-    if (!in || !in->poll) return;
-    in->poll(in, jp);
+bool input_poll(input_t *in, joypad_reg_t *jp) {
+    if (!in || !in->poll) return false;
+    return in->poll(in, jp);
 }
 
 void input_deinit(input_t *in) {
