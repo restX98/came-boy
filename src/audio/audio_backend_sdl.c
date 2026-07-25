@@ -56,6 +56,19 @@ static int audio_backend_sdl_init(audio_backend_t *self) {
 static void audio_backend_sdl_flush(sdl_audio_ctx_t *ctx) {
     if (ctx->device == 0 || ctx->staging_count == 0) return;
 
+    // Nothing else in the emulator paces emulated time against the wall
+    // clock (no vsync, no frame limiter) — the audio device is the only
+    // fixed-rate consumer in the whole pipeline, so it doubles as the
+    // emulator's speed governor: block here until the device has drained
+    // enough of its queue, rather than letting it grow unbounded. Dropping
+    // queued audio (the previous approach) creates an audible click every
+    // time it happens, and happens continuously once the emulator outruns
+    // real time — which it does by default, having nothing else to pace it.
+    Uint32 max_queued_bytes = SDL_AUDIO_DEVICE_BUFFER_FRAMES * SDL_AUDIO_CHANNELS * sizeof(int16_t) * 4;
+    while (SDL_GetQueuedAudioSize(ctx->device) > max_queued_bytes) {
+        SDL_Delay(1);
+    }
+
     Uint32 bytes = (Uint32)(ctx->staging_count * SDL_AUDIO_CHANNELS * sizeof(int16_t));
     if (SDL_QueueAudio(ctx->device, ctx->staging, bytes) != 0) {
         LOG_WARN("audio_backend_sdl: SDL_QueueAudio failed: %s", SDL_GetError());
@@ -73,15 +86,6 @@ static void audio_backend_sdl_queue_sample(audio_backend_t *self, int16_t left, 
 
     if (ctx->staging_count == STAGING_BUFFER_FRAMES) {
         audio_backend_sdl_flush(ctx);
-    }
-
-    // If the emulator ever outruns real time (e.g. fast-forward), don't let
-    // SDL's internal queue grow unbounded — drop stale audio instead of
-    // letting latency creep up.
-    Uint32 queued_bytes = SDL_GetQueuedAudioSize(ctx->device);
-    Uint32 max_bytes = SDL_AUDIO_DEVICE_BUFFER_FRAMES * SDL_AUDIO_CHANNELS * sizeof(int16_t) * 4;
-    if (queued_bytes > max_bytes) {
-        SDL_ClearQueuedAudio(ctx->device);
     }
 }
 
