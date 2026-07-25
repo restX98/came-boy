@@ -569,6 +569,67 @@ void test_audio_tick_sweep_second_overflow_check_disables_without_rewriting(void
     TEST_ASSERT_EQUAL_UINT8(0x07, audio.nr14 & 0x07);
 }
 
+// ---- NR10 negate-mode exit quirk ----
+// gb-test-roms dmg_sound 05-sweep details, tests 4-6: clearing NR10's negate
+// bit after a sweep calculation actually ran in negate mode disables the
+// channel, even outside of a sweep clock; a fresh trigger resets the tracking.
+
+void test_audio_write_nr10_exiting_negate_after_calculation_disables_channel(void) {
+    audio.nr10 = 0x08; // negate mode, shift=0
+    audio.ch1_sweep_negate_used = true;
+    audio.nr52 = 0x81; // powered on, CH1 active
+
+    audio_write(&audio, 0xFF10, 0x00); // negate -> positive
+
+    TEST_ASSERT_EQUAL_UINT8(0x00, audio.nr52 & 0x01);
+}
+
+void test_audio_write_nr10_exiting_negate_without_calculation_does_not_disable(void) {
+    audio.nr10 = 0x08; // negate mode, but no calculation has run since trigger
+    audio.ch1_sweep_negate_used = false;
+    audio.nr52 = 0x81;
+
+    audio_write(&audio, 0xFF10, 0x00);
+
+    TEST_ASSERT_EQUAL_UINT8(0x01, audio.nr52 & 0x01);
+}
+
+void test_audio_write_nr10_staying_in_negate_mode_does_not_disable(void) {
+    audio.nr10 = 0x09; // negate mode, shift=1
+    audio.ch1_sweep_negate_used = true;
+    audio.nr52 = 0x81;
+
+    audio_write(&audio, 0xFF10, 0x0A); // still negate, shift changes 1 -> 2
+
+    TEST_ASSERT_EQUAL_UINT8(0x01, audio.nr52 & 0x01);
+}
+
+void test_audio_trigger_ch1_resets_negate_used_flag(void) {
+    audio.nr12 = 0xF0; // DAC on
+    audio.nr10 = 0x08;  // negate mode, shift=0, so trigger doesn't recalculate
+    audio.ch1_sweep_negate_used = true;
+
+    audio_write(&audio, 0xFF14, 0x80); // trigger
+
+    TEST_ASSERT_FALSE(audio.ch1_sweep_negate_used);
+}
+
+void test_audio_sweep_calculate_marks_negate_used_without_overflow(void) {
+    audio.nr10 = 0x19; // pace=1, negate=1, shift=1
+    audio.ch1_sweep_shadow = 0x100;
+    audio.ch1_sweep_timer = 1;
+    audio.ch1_sweep_enabled = true;
+    audio.ch1_sweep_negate_used = false;
+    audio.nr52 = 0x01;
+    audio.frame_seq_step = 2;
+    audio.frame_seq_prev_bit = true;
+
+    audio_tick(&audio, 4, 0x00, wave_ram);
+
+    TEST_ASSERT_TRUE(audio.ch1_sweep_negate_used);
+    TEST_ASSERT_EQUAL_UINT8(0x01, audio.nr52 & 0x01); // no overflow, stays active
+}
+
 // ---- audio_tick: sample clock ----
 
 void test_audio_tick_produces_sample_after_enough_cycles(void) {
@@ -750,6 +811,12 @@ int main(void) {
     RUN_TEST(test_audio_tick_sweep_updates_period_registers);
     RUN_TEST(test_audio_tick_sweep_disables_channel_on_overflow);
     RUN_TEST(test_audio_tick_sweep_second_overflow_check_disables_without_rewriting);
+
+    RUN_TEST(test_audio_write_nr10_exiting_negate_after_calculation_disables_channel);
+    RUN_TEST(test_audio_write_nr10_exiting_negate_without_calculation_does_not_disable);
+    RUN_TEST(test_audio_write_nr10_staying_in_negate_mode_does_not_disable);
+    RUN_TEST(test_audio_trigger_ch1_resets_negate_used_flag);
+    RUN_TEST(test_audio_sweep_calculate_marks_negate_used_without_overflow);
 
     RUN_TEST(test_audio_tick_produces_sample_after_enough_cycles);
     RUN_TEST(test_audio_tick_no_sample_before_enough_cycles);

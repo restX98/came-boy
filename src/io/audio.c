@@ -172,9 +172,17 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
     }
 
     switch (addr) {
-        case 0xFF10:
+        case 0xFF10: {
+            bool old_negate = (audio->nr10 >> 3) & 1;
             audio->nr10 = value;
+            bool new_negate = (value >> 3) & 1;
+            // Pan Docs: exiting negate mode after it was actually used in a
+            // sweep calculation since the last trigger disables the channel.
+            if (old_negate && !new_negate && audio->ch1_sweep_negate_used) {
+                audio->nr52 &= ~0x01;
+            }
             break;
+        }
         case 0xFF11:
             audio->nr11 = value;
             audio->ch1_length_counter = 64 - (value & 0x3F);
@@ -405,6 +413,7 @@ static void audio_trigger_ch1(audio_regs_t *audio) {
     uint8_t sweep_shift = audio->nr10 & 0x07;
     audio->ch1_sweep_timer = sweep_pace ? sweep_pace : 8;
     audio->ch1_sweep_enabled = (sweep_pace != 0) || (sweep_shift != 0);
+    audio->ch1_sweep_negate_used = false;
 
     // Pan Docs: an immediate overflow check runs on trigger if shift != 0,
     // which can disable the channel before the first sweep step ever fires.
@@ -535,6 +544,13 @@ static uint16_t audio_sweep_calculate(audio_regs_t *audio, uint8_t shift, bool *
     uint16_t new_period = subtract
         ? (uint16_t)(audio->ch1_sweep_shadow - delta)
         : (uint16_t)(audio->ch1_sweep_shadow + delta);
+
+    // Pan Docs obscure behavior: clearing NR10's negate bit after a
+    // calculation ran in negate mode (tracked here) disables the channel,
+    // even outside of a sweep clock — see the NR10 write handler.
+    if (subtract) {
+        audio->ch1_sweep_negate_used = true;
+    }
 
     *overflow = new_period > 2047;
     return new_period;

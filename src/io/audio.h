@@ -41,6 +41,7 @@ typedef struct {
     uint16_t ch1_sweep_shadow;
     uint8_t  ch1_sweep_timer;
     bool     ch1_sweep_enabled;
+    bool     ch1_sweep_negate_used; // a calculation ran in negate mode since the last trigger
     int32_t  ch1_period_timer; // T-cycles remaining until the next duty step
     uint8_t  ch1_duty_pos;     // 0-7, position within the duty waveform
 
