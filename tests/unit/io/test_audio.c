@@ -546,6 +546,29 @@ void test_audio_tick_sweep_disables_channel_on_overflow(void) {
     TEST_ASSERT_EQUAL_UINT8(0x00, audio.nr52 & 0x01);
 }
 
+void test_audio_tick_sweep_second_overflow_check_disables_without_rewriting(void) {
+    // Pan Docs / gb-test-roms dmg_sound 04-sweep test 5: after writing back a
+    // non-overflowing calculation, hardware immediately re-runs the overflow
+    // check against the just-written period. If *that* overflows, the
+    // channel is disabled anyway, but its (overflowing) result is discarded.
+    audio.frame_seq_step = 2;
+    audio.frame_seq_prev_bit = true;
+    audio.nr10 = 0x11;              // pace=1, subtract=0, shift=1
+    audio.ch1_sweep_shadow = 0x500; // first calc: 0x500 + 0x280 = 0x780 (no overflow)
+    audio.ch1_sweep_timer = 1;
+    audio.ch1_sweep_enabled = true;
+    audio.nr52 = 0x01;
+
+    audio_tick(&audio, 4, 0x00, wave_ram);
+
+    // Second calc: 0x780 + 0x3C0 = 0xB40, overflows -> disables the channel,
+    // but the shadow/period registers keep the first calc's result.
+    TEST_ASSERT_EQUAL_UINT8(0x00, audio.nr52 & 0x01);
+    TEST_ASSERT_EQUAL_UINT16(0x0780, audio.ch1_sweep_shadow);
+    TEST_ASSERT_EQUAL_UINT8(0x80, audio.nr13);
+    TEST_ASSERT_EQUAL_UINT8(0x07, audio.nr14 & 0x07);
+}
+
 // ---- audio_tick: sample clock ----
 
 void test_audio_tick_produces_sample_after_enough_cycles(void) {
@@ -726,6 +749,7 @@ int main(void) {
 
     RUN_TEST(test_audio_tick_sweep_updates_period_registers);
     RUN_TEST(test_audio_tick_sweep_disables_channel_on_overflow);
+    RUN_TEST(test_audio_tick_sweep_second_overflow_check_disables_without_rewriting);
 
     RUN_TEST(test_audio_tick_produces_sample_after_enough_cycles);
     RUN_TEST(test_audio_tick_no_sample_before_enough_cycles);

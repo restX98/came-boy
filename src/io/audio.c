@@ -570,9 +570,14 @@ static void audio_clock_sweep(audio_regs_t *audio) {
         audio->nr13 = new_period & 0xFF;
         audio->nr14 = (audio->nr14 & 0xF8) | ((new_period >> 8) & 0x07);
 
-        // Pan Docs: hardware runs a second overflow check here (on the
-        // just-written period) without writing back its result. Skipped for
-        // now; revisit if a sweep-heavy test ROM misbehaves.
+        // Pan Docs: hardware runs a second overflow check here using the
+        // just-written period, purely to catch an overflow — its calculated
+        // value is discarded, never written back.
+        bool second_overflow;
+        audio_sweep_calculate(audio, shift, &second_overflow);
+        if (second_overflow) {
+            audio->nr52 &= ~0x01;
+        }
     }
 }
 
