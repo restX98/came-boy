@@ -150,8 +150,8 @@ void test_input_tty_poll_decodes_keys(void) {
     TEST_ASSERT_EQUAL(JOYPAD_DOWN, pressed[1]);
     TEST_ASSERT_EQUAL(JOYPAD_LEFT, pressed[2]);
     TEST_ASSERT_EQUAL(JOYPAD_RIGHT, pressed[3]);
-    TEST_ASSERT_EQUAL(JOYPAD_A, pressed[4]);
-    TEST_ASSERT_EQUAL(JOYPAD_B, pressed[5]);
+    TEST_ASSERT_EQUAL(JOYPAD_B, pressed[4]); // 'l'
+    TEST_ASSERT_EQUAL(JOYPAD_A, pressed[5]); // 'p'
     TEST_ASSERT_EQUAL(JOYPAD_SELECT, pressed[6]);
     TEST_ASSERT_EQUAL(JOYPAD_START, pressed[7]);
 
