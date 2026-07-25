@@ -222,19 +222,19 @@ static void write_oam(bus_t *bus, uint16_t addr, uint8_t value) {
 
 static uint8_t read_not_usable(bus_t *bus, uint16_t addr) {
     if (!lcd_oam_accessible(&bus->io_reg.lcd)) {
-        LOG_WARN("Read from not usable address 0x%04X while OAM blocked", addr);
+        LOG_DEBUG("Read from not usable address 0x%04X while OAM blocked", addr);
         return 0xFF; // OAM blocked: bus returns 0xFF
     }
     // DMG behavior: returns 0x00 when OAM is accessible.
     // Note: real DMG hardware can trigger the OAM corruption bug here;
     // intentionally not emulated.
-    LOG_WARN("Read from not usable address: 0x%04X", addr);
+    LOG_DEBUG("Read from not usable address: 0x%04X", addr);
     return 0x00;
 }
 
 static void write_not_usable(bus_t *bus, uint16_t addr, uint8_t value) {
     (void)bus;
-    LOG_WARN("Ignored write to not usable address: 0x%04X (value 0x%02X)", addr, value);
+    LOG_DEBUG("Ignored write to not usable address: 0x%04X (value 0x%02X)", addr, value);
 }
 
 static uint8_t read_io_reg(bus_t *bus, uint16_t addr) {
