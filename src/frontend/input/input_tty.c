@@ -69,8 +69,8 @@ static bool input_tty_poll(input_t *self, joypad_reg_t *jp) {
             case 's': key = JOYPAD_DOWN;   break;
             case 'a': key = JOYPAD_LEFT;   break;
             case 'd': key = JOYPAD_RIGHT;  break;
-            case 'l': key = JOYPAD_A;      break;
-            case 'p': key = JOYPAD_B;      break;
+            case 'p': key = JOYPAD_A;      break;
+            case 'l': key = JOYPAD_B;      break;
             case 'v': key = JOYPAD_SELECT; break;
             case 'b': key = JOYPAD_START;  break;
             case 27: // Escape

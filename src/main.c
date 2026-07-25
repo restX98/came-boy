@@ -1,5 +1,7 @@
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "frontend/audio/audio_backend.h"
@@ -32,25 +34,43 @@ static void setup_signals(void) {
 int main(int argc, char *argv[]) {
     setup_signals();
 
+    const char *usage = "Usage: %s <rom> [--tty[=<path>]]";
+
     if (argc < 2) {
-        LOG_ERROR("Usage: %s <rom> [screen-tty]", argv[0]);
+        LOG_ERROR(usage, argv[0]);
         return -1;
     }
 
-    const char *screen_tty = (argc >= 3) ? argv[2] : NULL;
+    // SDL is the default frontend; --tty opts into the ASCII/terminal one,
+    // optionally pinning it to a specific tty (bare --tty falls back to
+    // stdout/stdin, same as passing no path did before this flag existed).
+    bool use_ascii_frontend = false;
+    const char *screen_tty = NULL;
+
+    if (argc >= 3) {
+        const char *arg = argv[2];
+        if (strncmp(arg, "--tty", 5) != 0 || (arg[5] != '\0' && arg[5] != '=')) {
+            LOG_ERROR(usage, argv[0]);
+            return -1;
+        }
+        use_ascii_frontend = true;
+        if (arg[5] == '=' && arg[6] != '\0') {
+            screen_tty = arg + 6;
+        }
+    }
 
     gameboy_t gb;
     if (gameboy_init(&gb, argv[1]) != 0) {
         return -1;
     }
 
-    renderer_t renderer = renderer_ascii(screen_tty);
+    renderer_t renderer = use_ascii_frontend ? renderer_ascii(screen_tty) : renderer_sdl();
     renderer_init(&renderer);
 
     audio_backend_t audio_backend = audio_backend_sdl();
     audio_backend_init(&audio_backend);
 
-    input_t input = input_tty(screen_tty);
+    input_t input = use_ascii_frontend ? input_tty(screen_tty) : input_sdl();
     input_init(&input);
 
     while (running) {
@@ -70,7 +90,7 @@ int main(int argc, char *argv[]) {
 
         if (gb.ppu.frame_ready) {
             if (input_poll(&input, &gb.bus.io_reg.joyp)) {
-                running = 0; // window closed or Escape pressed (SDL frontend only)
+                running = 0; // window closed or Escape pressed
             }
             renderer_render(&renderer, gb.ppu.framebuffer);
             gb.ppu.frame_ready = false;
