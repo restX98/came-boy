@@ -1,6 +1,6 @@
 CC      = gcc
-CFLAGS  = -std=gnu2x -Wall -Wextra -g -Isrc
-LDFLAGS =
+CFLAGS  := -std=gnu2x -Wall -Wextra -g -Isrc $(shell pkg-config --cflags sdl2)
+LDFLAGS := $(shell pkg-config --libs sdl2)
 
 SRC     = $(shell find src -name '*.c')
 OBJ     = $(SRC:src/%.c=build/%.o)

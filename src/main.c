@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "audio/audio_backend.h"
+#include "audio/audio_backend_sdl.h"
 #include "gameboy.h"
 #include "input/input.h"
 #include "input/input_tty.h"
@@ -43,6 +45,9 @@ int main(int argc, char *argv[]) {
     renderer_t renderer = renderer_ascii(screen_tty);
     renderer_init(&renderer);
 
+    audio_backend_t audio_backend = audio_backend_sdl();
+    audio_backend_init(&audio_backend);
+
     input_t input = input_tty(screen_tty);
     input_init(&input);
 
@@ -50,6 +55,15 @@ int main(int argc, char *argv[]) {
         if (gameboy_step(&gb) < 0) {
             LOG_ERROR("CPU halted, exiting");
             break;
+        }
+
+        if (gb.bus.io_reg.audio.sample_ready) {
+            audio_backend_queue_sample(
+                &audio_backend,
+                gb.bus.io_reg.audio.sample_left,
+                gb.bus.io_reg.audio.sample_right
+            );
+            gb.bus.io_reg.audio.sample_ready = false;
         }
 
         if (gb.ppu.frame_ready) {
@@ -60,6 +74,7 @@ int main(int argc, char *argv[]) {
     }
 
     input_deinit(&input);
+    audio_backend_deinit(&audio_backend);
     renderer_deinit(&renderer);
     gameboy_free(&gb);
 
