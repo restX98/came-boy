@@ -613,6 +613,18 @@ void test_io_reg_init_initializes_oam_dma(void) {
     TEST_ASSERT_EQUAL_PTR(&io_reg.oam_dma, oam_dma_init_stats.calls[0].oam_dma);
 }
 
+void test_io_reg_init_initializes_wave_pattern(void) {
+    memset(io_reg.wp_ram, 0xAA, sizeof(io_reg.wp_ram));
+
+    io_reg_init(&io_reg);
+
+    static const uint8_t wave_ram_powerup[16] = {
+        0x84, 0x40, 0x43, 0xAA, 0x2D, 0x78, 0x92, 0x3C,
+        0x60, 0x59, 0x59, 0xB0, 0x34, 0xB8, 0x2E, 0xDA
+    };
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(wave_ram_powerup, io_reg.wp_ram, sizeof(io_reg.wp_ram));
+}
+
 // ---- io_reg_read ----
 
 void test_io_reg_read_joypad(void) {
@@ -672,6 +684,14 @@ void test_io_reg_read_audio(void) {
     TEST_ASSERT_EQUAL_size_t(1, audio_read_stats.call_count);
     TEST_ASSERT_EQUAL_PTR(&io_reg.audio, audio_read_stats.calls[0].audio);
     TEST_ASSERT_EQUAL_UINT16(0xFF10, audio_read_stats.calls[0].addr);
+}
+
+void test_io_reg_read_wave_pattern(void) {
+    io_reg.wp_ram[0] = 0x3C;
+    io_reg.wp_ram[15] = 0x7E;
+
+    TEST_ASSERT_EQUAL_UINT8(0x3C, io_reg_read(&io_reg, 0xFF30));
+    TEST_ASSERT_EQUAL_UINT8(0x7E, io_reg_read(&io_reg, 0xFF3F));
 }
 
 void test_io_reg_read_lcd(void) {
@@ -761,6 +781,14 @@ void test_io_reg_write_audio(void) {
     TEST_ASSERT_EQUAL_UINT8(0x3C, audio_write_stats.calls[0].value);
 }
 
+void test_io_reg_write_wave_pattern(void) {
+    io_reg_write(&io_reg, 0xFF30, 0x3C);
+    io_reg_write(&io_reg, 0xFF3F, 0x7E);
+
+    TEST_ASSERT_EQUAL_UINT8(0x3C, io_reg.wp_ram[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x7E, io_reg.wp_ram[15]);
+}
+
 void test_io_reg_write_lcd(void) {
     io_reg_write(&io_reg, 0xFF40, 0x3C);
 
@@ -801,6 +829,7 @@ int main(void) {
     RUN_TEST(test_io_reg_init_initializes_audio);
     RUN_TEST(test_io_reg_init_initializes_lcd);
     RUN_TEST(test_io_reg_init_initializes_oam_dma);
+    RUN_TEST(test_io_reg_init_initializes_wave_pattern);
 
     RUN_TEST(test_io_reg_read_joypad);
     RUN_TEST(test_io_reg_read_serial_transfer);
@@ -808,6 +837,7 @@ int main(void) {
     RUN_TEST(test_io_reg_read_interrupts);
     RUN_TEST(test_io_reg_read_interrupt_enable);
     RUN_TEST(test_io_reg_read_audio);
+    RUN_TEST(test_io_reg_read_wave_pattern);
     RUN_TEST(test_io_reg_read_lcd);
     RUN_TEST(test_io_reg_read_oam_dma);
     RUN_TEST(test_io_reg_read_unimplemented_returns_0xFF);
@@ -818,6 +848,7 @@ int main(void) {
     RUN_TEST(test_io_reg_write_interrupts);
     RUN_TEST(test_io_reg_write_interrupt_enable);
     RUN_TEST(test_io_reg_write_audio);
+    RUN_TEST(test_io_reg_write_wave_pattern);
     RUN_TEST(test_io_reg_write_lcd);
     RUN_TEST(test_io_reg_write_oam_dma);
     RUN_TEST(test_io_reg_write_unimplemented_is_ignored);

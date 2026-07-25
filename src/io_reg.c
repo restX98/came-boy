@@ -1,6 +1,7 @@
 #include "io_reg.h"
 
 #include <stddef.h>
+#include <string.h>
 
 #include "logger.h"
 
@@ -52,6 +53,12 @@ void io_reg_init(io_reg_t *io_reg) {
     audio_init(&io_reg->audio);
     oam_dma_init(&io_reg->oam_dma);
     lcd_init(&io_reg->lcd, &io_reg->interrupts);
+
+    static const uint8_t wave_ram_powerup[16] = {
+        0x84, 0x40, 0x43, 0xAA, 0x2D, 0x78, 0x92, 0x3C,
+        0x60, 0x59, 0x59, 0xB0, 0x34, 0xB8, 0x2E, 0xDA
+    };
+    memcpy(io_reg->wp_ram, wave_ram_powerup, sizeof(io_reg->wp_ram));
 }
 
 uint8_t io_reg_read(io_reg_t *io_reg, uint16_t addr) {
@@ -121,14 +128,15 @@ static void write_audio(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_wave_pattern(io_reg_t *io_reg, uint16_t addr) {
-    (void)io_reg;
-    LOG_WARN("io_reg_read: unimplemented wave pattern register 0x%04X", addr);
-    return 0xFF;
+    // TODO: while CH3 is enabled and playing, DMG hardware only reliably
+    // exposes the byte the channel is currently reading. Revisit once CH3
+    // playback (sample stepping) is implemented.
+    return io_reg->wp_ram[addr - 0xFF30];
 }
+
 static void write_wave_pattern(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
-    (void)io_reg;
-    (void)value;
-    LOG_WARN("io_reg_write: unimplemented wave pattern register 0x%04X", addr);
+    // TODO: same CH3-active caveat as read_wave_pattern.
+    io_reg->wp_ram[addr - 0xFF30] = value;
 }
 
 static uint8_t read_lcd(io_reg_t *io_reg, uint16_t addr) {
