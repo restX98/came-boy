@@ -1,5 +1,6 @@
 #include "clock.h"
 
+#include "io/audio.h"
 #include "io/oam_dma.h"
 #include "io/timer.h"
 
@@ -12,4 +13,5 @@ void clock_tick(gb_clock_t *clock, int cycles) {
     ppu_step(clock->ppu, cycles);
     oam_dma_tick(clock->bus, cycles);
     timer_tick(&clock->bus->io_reg.timer, cycles);
+    audio_tick(&clock->bus->io_reg.audio, cycles, clock->bus->io_reg.timer.div);
 }

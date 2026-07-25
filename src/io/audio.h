@@ -1,6 +1,7 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef struct {
@@ -25,11 +26,52 @@ typedef struct {
     uint8_t nr42;       // 0xFF21 — Channel 4 volume & envelope
     uint8_t nr43;       // 0xFF22 — Channel 4 frequency & randomness
     uint8_t nr44;       // 0xFF23 — Channel 4 control
+
+    // Frame sequencer: a 512 Hz clock derived from falling edges of DIV
+    // register bit 4. Steps length counters (256 Hz), sweep (128 Hz), and
+    // envelope (64 Hz) across all channels.
+    uint8_t frame_seq_step;   // 0-7, wraps around
+    bool frame_seq_prev_bit;  // last-sampled DIV bit 4, for edge detection
+
+    // ---- Internal runtime state (not memory-mapped) ----
+    // Channel 1 (pulse + sweep)
+    uint16_t ch1_length_counter;
+    uint8_t  ch1_env_volume;
+    uint8_t  ch1_env_timer;
+    uint16_t ch1_sweep_shadow;
+    uint8_t  ch1_sweep_timer;
+    bool     ch1_sweep_enabled;
+
+    // Channel 2 (pulse)
+    uint16_t ch2_length_counter;
+    uint8_t  ch2_env_volume;
+    uint8_t  ch2_env_timer;
+
+    // Channel 3 (wave) — length counter counts up to 256, not 64
+    uint16_t ch3_length_counter;
+
+    // Channel 4 (noise)
+    uint16_t ch4_length_counter;
+    uint8_t  ch4_env_volume;
+    uint8_t  ch4_env_timer;
+
+    // ---- Sample clock ----
+    // Downsamples the CPU clock (4194304 Hz) to the output sample rate via a
+    // drift-free fractional accumulator, staging one stereo sample at a time
+    // — mirrors ppu_t's framebuffer/frame_ready handshake consumed in main.c.
+    int32_t sample_cycle_acc;
+    bool sample_ready;
+    int16_t sample_left;
+    int16_t sample_right;
 } audio_regs_t;
 
 void audio_init(audio_regs_t *audio);
 
 uint8_t audio_read(audio_regs_t *audio, uint16_t addr);
 void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value);
+
+// Advances the frame sequencer and the sample clock. `cycles` is the elapsed
+// T-cycles for this call; `div_register` is the current value of DIV (0xFF04).
+void audio_tick(audio_regs_t *audio, int cycles, uint8_t div_register);
 
 #endif // AUDIO_H
