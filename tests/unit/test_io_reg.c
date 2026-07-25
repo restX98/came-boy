@@ -694,6 +694,17 @@ void test_io_reg_read_wave_pattern(void) {
     TEST_ASSERT_EQUAL_UINT8(0x7E, io_reg_read(&io_reg, 0xFF3F));
 }
 
+void test_io_reg_read_wave_pattern_redirects_to_current_byte_while_ch3_active(void) {
+    io_reg.audio.nr52 = 0x04; // CH3 active
+    io_reg.audio.ch3_wave_pos = 30; // reading wp_ram[15]
+    io_reg.wp_ram[0] = 0x3C;
+    io_reg.wp_ram[15] = 0x7E;
+
+    // Regardless of the address asked for, only the byte CH3 is currently
+    // reading is reliably exposed.
+    TEST_ASSERT_EQUAL_UINT8(0x7E, io_reg_read(&io_reg, 0xFF30));
+}
+
 void test_io_reg_read_lcd(void) {
     lcd_read_stats.calls[0].return_value = 0x3C;
 
@@ -789,6 +800,17 @@ void test_io_reg_write_wave_pattern(void) {
     TEST_ASSERT_EQUAL_UINT8(0x7E, io_reg.wp_ram[15]);
 }
 
+void test_io_reg_write_wave_pattern_redirects_to_current_byte_while_ch3_active(void) {
+    io_reg.audio.nr52 = 0x04; // CH3 active
+    io_reg.audio.ch3_wave_pos = 30; // writing wp_ram[15]
+
+    // Regardless of the address asked for, only the byte CH3 is currently
+    // reading is reliably written.
+    io_reg_write(&io_reg, 0xFF30, 0x7E);
+
+    TEST_ASSERT_EQUAL_UINT8(0x7E, io_reg.wp_ram[15]);
+}
+
 void test_io_reg_write_lcd(void) {
     io_reg_write(&io_reg, 0xFF40, 0x3C);
 
@@ -838,6 +860,7 @@ int main(void) {
     RUN_TEST(test_io_reg_read_interrupt_enable);
     RUN_TEST(test_io_reg_read_audio);
     RUN_TEST(test_io_reg_read_wave_pattern);
+    RUN_TEST(test_io_reg_read_wave_pattern_redirects_to_current_byte_while_ch3_active);
     RUN_TEST(test_io_reg_read_lcd);
     RUN_TEST(test_io_reg_read_oam_dma);
     RUN_TEST(test_io_reg_read_unimplemented_returns_0xFF);
@@ -849,6 +872,7 @@ int main(void) {
     RUN_TEST(test_io_reg_write_interrupt_enable);
     RUN_TEST(test_io_reg_write_audio);
     RUN_TEST(test_io_reg_write_wave_pattern);
+    RUN_TEST(test_io_reg_write_wave_pattern_redirects_to_current_byte_while_ch3_active);
     RUN_TEST(test_io_reg_write_lcd);
     RUN_TEST(test_io_reg_write_oam_dma);
     RUN_TEST(test_io_reg_write_unimplemented_is_ignored);

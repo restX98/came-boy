@@ -128,14 +128,22 @@ static void write_audio(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
 }
 
 static uint8_t read_wave_pattern(io_reg_t *io_reg, uint16_t addr) {
-    // TODO: while CH3 is enabled and playing, DMG hardware only reliably
-    // exposes the byte the channel is currently reading. Revisit once CH3
-    // playback (sample stepping) is implemented.
+    // While CH3 is enabled, DMG hardware only reliably exposes the byte the
+    // channel is currently reading, regardless of which address was asked
+    // for; addressed access to the rest of wave RAM is only reliable while
+    // CH3 is stopped.
+    if (io_reg->audio.nr52 & 0x04) {
+        return io_reg->wp_ram[io_reg->audio.ch3_wave_pos / 2];
+    }
     return io_reg->wp_ram[addr - 0xFF30];
 }
 
 static void write_wave_pattern(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
-    // TODO: same CH3-active caveat as read_wave_pattern.
+    // Same CH3-active caveat as read_wave_pattern.
+    if (io_reg->audio.nr52 & 0x04) {
+        io_reg->wp_ram[io_reg->audio.ch3_wave_pos / 2] = value;
+        return;
+    }
     io_reg->wp_ram[addr - 0xFF30] = value;
 }
 

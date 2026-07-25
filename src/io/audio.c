@@ -16,6 +16,27 @@ static void audio_clock_envelope(audio_regs_t *audio);
 static void audio_frame_sequencer_step(audio_regs_t *audio);
 static uint16_t audio_sweep_calculate(audio_regs_t *audio, uint8_t shift, bool *overflow);
 
+static void audio_step_ch1(audio_regs_t *audio, int cycles);
+static void audio_step_ch2(audio_regs_t *audio, int cycles);
+static void audio_step_ch3(audio_regs_t *audio, int cycles);
+static void audio_step_ch4(audio_regs_t *audio, int cycles);
+
+static bool audio_ch1_dac_on(const audio_regs_t *audio);
+static bool audio_ch2_dac_on(const audio_regs_t *audio);
+static bool audio_ch3_dac_on(const audio_regs_t *audio);
+static bool audio_ch4_dac_on(const audio_regs_t *audio);
+
+static bool audio_ch1_connected(const audio_regs_t *audio);
+static bool audio_ch2_connected(const audio_regs_t *audio);
+static bool audio_ch3_connected(const audio_regs_t *audio);
+static bool audio_ch4_connected(const audio_regs_t *audio);
+
+static uint8_t audio_ch1_sample(const audio_regs_t *audio);
+static uint8_t audio_ch2_sample(const audio_regs_t *audio);
+static uint8_t audio_ch3_sample(const audio_regs_t *audio, const uint8_t *wave_ram);
+static uint8_t audio_ch4_sample(const audio_regs_t *audio);
+static void audio_mix_sample(const audio_regs_t *audio, const uint8_t *wave_ram, int16_t *out_left, int16_t *out_right);
+
 void audio_init(audio_regs_t *audio) {
     audio->nr10 = 0x80;
     audio->nr11 = 0xBF;
@@ -48,16 +69,24 @@ void audio_init(audio_regs_t *audio) {
     audio->ch1_sweep_shadow = 0;
     audio->ch1_sweep_timer = 0;
     audio->ch1_sweep_enabled = false;
+    audio->ch1_period_timer = 0;
+    audio->ch1_duty_pos = 0;
 
     audio->ch2_length_counter = 0;
     audio->ch2_env_volume = 0;
     audio->ch2_env_timer = 0;
+    audio->ch2_period_timer = 0;
+    audio->ch2_duty_pos = 0;
 
     audio->ch3_length_counter = 0;
+    audio->ch3_period_timer = 0;
+    audio->ch3_wave_pos = 0;
 
     audio->ch4_length_counter = 0;
     audio->ch4_env_volume = 0;
     audio->ch4_env_timer = 0;
+    audio->ch4_period_timer = 0;
+    audio->ch4_lfsr = 0x7FFF;
 
     audio->sample_cycle_acc = 0;
     audio->sample_ready = false;
@@ -116,6 +145,30 @@ uint8_t audio_read(audio_regs_t *audio, uint16_t addr) {
 }
 
 void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
+    // While powered off, only NR52 itself is writable — except that DMG
+    // hardware still lets a write to NRx1 reload the length counter, even
+    // though the register byte itself stays 0 (and reads back as 0, like
+    // every other register while off).
+    if (!(audio->nr52 & 0x80) && addr != 0xFF26) {
+        switch (addr) {
+            case 0xFF11:
+                audio->ch1_length_counter = 64 - (value & 0x3F);
+                break;
+            case 0xFF16:
+                audio->ch2_length_counter = 64 - (value & 0x3F);
+                break;
+            case 0xFF1B:
+                audio->ch3_length_counter = 256 - value;
+                break;
+            case 0xFF20:
+                audio->ch4_length_counter = 64 - (value & 0x3F);
+                break;
+            default:
+                break;
+        }
+        return;
+    }
+
     switch (addr) {
         case 0xFF10:
             audio->nr10 = value | 0b10000000;
@@ -126,6 +179,9 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
             break;
         case 0xFF12:
             audio->nr12 = value;
+            if (!audio_ch1_dac_on(audio)) {
+                audio->nr52 &= ~0x01;
+            }
             break;
         case 0xFF13:
             audio->nr13 = value;
@@ -142,6 +198,9 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
             break;
         case 0xFF17:
             audio->nr22 = value;
+            if (!audio_ch2_dac_on(audio)) {
+                audio->nr52 &= ~0x02;
+            }
             break;
         case 0xFF18:
             audio->nr23 = value;
@@ -154,6 +213,9 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
             break;
         case 0xFF1A:
             audio->nr30 = value | 0b01111111;
+            if (!audio_ch3_dac_on(audio)) {
+                audio->nr52 &= ~0x04;
+            }
             break;
         case 0xFF1B:
             audio->nr31 = value;
@@ -177,6 +239,9 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
             break;
         case 0xFF21:
             audio->nr42 = value;
+            if (!audio_ch4_dac_on(audio)) {
+                audio->nr52 &= ~0x08;
+            }
             break;
         case 0xFF22:
             audio->nr43 = value;
@@ -196,12 +261,36 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
         case 0xFF26: {
             // Only bit 7 (master enable) is writable. Bits 0-3 are read-only
             // status flags reflecting live channel state; bits 4-6 always
-            // read as 1. Powering off silences all channels immediately.
+            // read as 1. Powering off silences all channels immediately and
+            // clears every other audio register (Pan Docs); wave RAM (owned
+            // by io_reg_t, not audio_regs_t) and the internal length
+            // counters are unaffected.
             bool audio_on = value & 0x80;
             uint8_t status = audio_on ? (audio->nr52 & 0x0F) : 0x00;
             audio->nr52 = status | 0b01110000 | (audio_on ? 0x80 : 0x00);
-            // TODO: powering off should also clear/lock most other audio
-            // registers until re-enabled; not modeled yet.
+
+            if (!audio_on) {
+                audio->nr10 = 0;
+                audio->nr11 = 0;
+                audio->nr12 = 0;
+                audio->nr13 = 0;
+                audio->nr14 = 0;
+                audio->nr21 = 0;
+                audio->nr22 = 0;
+                audio->nr23 = 0;
+                audio->nr24 = 0;
+                audio->nr30 = 0;
+                audio->nr31 = 0;
+                audio->nr32 = 0;
+                audio->nr33 = 0;
+                audio->nr34 = 0;
+                audio->nr41 = 0;
+                audio->nr42 = 0;
+                audio->nr43 = 0;
+                audio->nr44 = 0;
+                audio->nr50 = 0;
+                audio->nr51 = 0;
+            }
             break;
         }
         default:
@@ -210,7 +299,7 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
     }
 }
 
-void audio_tick(audio_regs_t *audio, int cycles, uint8_t div_register) {
+void audio_tick(audio_regs_t *audio, int cycles, uint8_t div_register, const uint8_t *wave_ram) {
     bool bit = (div_register >> 4) & 1;
 
     if (audio->frame_seq_prev_bit && !bit) {
@@ -219,18 +308,19 @@ void audio_tick(audio_regs_t *audio, int cycles, uint8_t div_register) {
 
     audio->frame_seq_prev_bit = bit;
 
+    audio_step_ch1(audio, cycles);
+    audio_step_ch2(audio, cycles);
+    audio_step_ch3(audio, cycles);
+    audio_step_ch4(audio, cycles);
+
     // Drift-free downsampling from the CPU clock to the output sample rate
     // (Bresenham-style fractional accumulator).
     audio->sample_cycle_acc += cycles * AUDIO_SAMPLE_RATE_HZ;
     while (audio->sample_cycle_acc >= CPU_CLOCK_HZ) {
         audio->sample_cycle_acc -= CPU_CLOCK_HZ;
 
-        // TODO: mix real channel output (CH1-4 through NR50/NR51/NR52) once
-        // channel signal generation exists. Silence for now — this proves
-        // the sample-rate plumbing end-to-end, nothing more.
         audio->sample_ready = true;
-        audio->sample_left = 0;
-        audio->sample_right = 0;
+        audio_mix_sample(audio, wave_ram, &audio->sample_left, &audio->sample_right);
     }
 }
 
@@ -255,6 +345,25 @@ static void audio_frame_sequencer_step(audio_regs_t *audio) {
     audio->frame_seq_step = (audio->frame_seq_step + 1) % 8;
 }
 
+// ---- DAC status: NRx2's (or NR30's) upper bits gate whether a channel can
+// produce sound at all, independent of the channel-active status in NR52. ----
+
+static bool audio_ch1_dac_on(const audio_regs_t *audio) {
+    return (audio->nr12 & 0xF8) != 0;
+}
+
+static bool audio_ch2_dac_on(const audio_regs_t *audio) {
+    return (audio->nr22 & 0xF8) != 0;
+}
+
+static bool audio_ch3_dac_on(const audio_regs_t *audio) {
+    return (audio->nr30 & 0x80) != 0;
+}
+
+static bool audio_ch4_dac_on(const audio_regs_t *audio) {
+    return (audio->nr42 & 0xF8) != 0;
+}
+
 // ---- Triggers (NRx4 bit 7) ----
 
 static void audio_trigger_ch1(audio_regs_t *audio) {
@@ -269,6 +378,7 @@ static void audio_trigger_ch1(audio_regs_t *audio) {
 
     uint16_t period = audio->nr13 | ((uint16_t)(audio->nr14 & 0x07) << 8);
     audio->ch1_sweep_shadow = period;
+    audio->ch1_period_timer = (2048 - period) * 4;
 
     uint8_t sweep_pace = (audio->nr10 >> 4) & 0x07;
     uint8_t sweep_shift = audio->nr10 & 0x07;
@@ -285,9 +395,9 @@ static void audio_trigger_ch1(audio_regs_t *audio) {
         }
     }
 
-    // TODO: if NR12's volume+direction bits are all zero, the DAC is off and
-    // trigger should not actually re-enable the channel. Not modeled yet
-    // since channel output doesn't exist.
+    if (!audio_ch1_dac_on(audio)) {
+        audio->nr52 &= ~0x01;
+    }
 }
 
 static void audio_trigger_ch2(audio_regs_t *audio) {
@@ -299,6 +409,13 @@ static void audio_trigger_ch2(audio_regs_t *audio) {
 
     audio->ch2_env_volume = (audio->nr22 >> 4) & 0x0F;
     audio->ch2_env_timer = audio->nr22 & 0x07;
+
+    uint16_t period = audio->nr23 | ((uint16_t)(audio->nr24 & 0x07) << 8);
+    audio->ch2_period_timer = (2048 - period) * 4;
+
+    if (!audio_ch2_dac_on(audio)) {
+        audio->nr52 &= ~0x02;
+    }
 }
 
 static void audio_trigger_ch3(audio_regs_t *audio) {
@@ -308,7 +425,13 @@ static void audio_trigger_ch3(audio_regs_t *audio) {
         audio->ch3_length_counter = 256;
     }
 
-    // TODO: reset wave RAM read position to 0 once CH3 sample playback exists.
+    uint16_t period = audio->nr33 | ((uint16_t)(audio->nr34 & 0x07) << 8);
+    audio->ch3_period_timer = (2048 - period) * 2;
+    audio->ch3_wave_pos = 0;
+
+    if (!audio_ch3_dac_on(audio)) {
+        audio->nr52 &= ~0x04;
+    }
 }
 
 static void audio_trigger_ch4(audio_regs_t *audio) {
@@ -321,7 +444,16 @@ static void audio_trigger_ch4(audio_regs_t *audio) {
     audio->ch4_env_volume = (audio->nr42 >> 4) & 0x0F;
     audio->ch4_env_timer = audio->nr42 & 0x07;
 
-    // TODO: reset LFSR to all-1s once CH4 noise generation exists.
+    audio->ch4_lfsr = 0x7FFF;
+
+    uint8_t divisor_code = audio->nr43 & 0x07;
+    uint8_t shift = (audio->nr43 >> 4) & 0x0F;
+    uint16_t divisor = divisor_code == 0 ? 8 : (uint16_t)divisor_code * 16;
+    audio->ch4_period_timer = (int32_t)divisor << shift;
+
+    if (!audio_ch4_dac_on(audio)) {
+        audio->nr52 &= ~0x08;
+    }
 }
 
 // ---- Length counters (steps 0, 2, 4, 6) ----
@@ -424,4 +556,154 @@ static void audio_clock_envelope(audio_regs_t *audio) {
     audio_clock_one_envelope(&audio->ch1_env_volume, &audio->ch1_env_timer, audio->nr12);
     audio_clock_one_envelope(&audio->ch2_env_volume, &audio->ch2_env_timer, audio->nr22);
     audio_clock_one_envelope(&audio->ch4_env_volume, &audio->ch4_env_timer, audio->nr42);
+}
+
+// ---- Waveform generators ----
+// Each channel has a period timer counted down in T-cycles; when it reaches
+// zero it reloads from the channel's current period and advances the
+// channel's waveform position by one step.
+
+static const uint8_t duty_table[4][8] = {
+    { 0, 0, 0, 0, 0, 0, 0, 1 }, // 12.5%
+    { 1, 0, 0, 0, 0, 0, 0, 1 }, // 25%
+    { 1, 0, 0, 0, 0, 1, 1, 1 }, // 50%
+    { 0, 1, 1, 1, 1, 1, 1, 0 }, // 75%
+};
+
+static void audio_step_ch1(audio_regs_t *audio, int cycles) {
+    audio->ch1_period_timer -= cycles;
+    while (audio->ch1_period_timer <= 0) {
+        uint16_t period = audio->nr13 | ((uint16_t)(audio->nr14 & 0x07) << 8);
+        audio->ch1_period_timer += (2048 - period) * 4;
+        audio->ch1_duty_pos = (audio->ch1_duty_pos + 1) & 0x07;
+    }
+}
+
+static void audio_step_ch2(audio_regs_t *audio, int cycles) {
+    audio->ch2_period_timer -= cycles;
+    while (audio->ch2_period_timer <= 0) {
+        uint16_t period = audio->nr23 | ((uint16_t)(audio->nr24 & 0x07) << 8);
+        audio->ch2_period_timer += (2048 - period) * 4;
+        audio->ch2_duty_pos = (audio->ch2_duty_pos + 1) & 0x07;
+    }
+}
+
+static void audio_step_ch3(audio_regs_t *audio, int cycles) {
+    audio->ch3_period_timer -= cycles;
+    while (audio->ch3_period_timer <= 0) {
+        uint16_t period = audio->nr33 | ((uint16_t)(audio->nr34 & 0x07) << 8);
+        audio->ch3_period_timer += (2048 - period) * 2;
+        audio->ch3_wave_pos = (audio->ch3_wave_pos + 1) & 0x1F;
+    }
+}
+
+static void audio_step_ch4(audio_regs_t *audio, int cycles) {
+    audio->ch4_period_timer -= cycles;
+    while (audio->ch4_period_timer <= 0) {
+        uint8_t divisor_code = audio->nr43 & 0x07;
+        uint8_t shift = (audio->nr43 >> 4) & 0x0F;
+        uint16_t divisor = divisor_code == 0 ? 8 : (uint16_t)divisor_code * 16;
+        audio->ch4_period_timer += (int32_t)divisor << shift;
+
+        uint16_t xor_bit = (audio->ch4_lfsr & 1) ^ ((audio->ch4_lfsr >> 1) & 1);
+        audio->ch4_lfsr = (audio->ch4_lfsr >> 1) | (xor_bit << 14);
+        if (audio->nr43 & 0x08) { // 7-bit width mode
+            audio->ch4_lfsr = (audio->ch4_lfsr & ~((uint16_t)1 << 6)) | (xor_bit << 6);
+        }
+    }
+}
+
+// ---- Per-channel DAC connection and raw digital sample (0-15) ----
+//
+// A channel only reaches the mixer while its DAC is on (and, for CH3, its
+// output level isn't Mute). A disconnected DAC contributes nothing to the
+// mix — it must not be confused with a connected DAC currently outputting a
+// digital 0, which is a real (if quiet) analog value.
+
+static bool audio_ch1_connected(const audio_regs_t *audio) {
+    return (audio->nr52 & 0x01) && audio_ch1_dac_on(audio);
+}
+
+static bool audio_ch2_connected(const audio_regs_t *audio) {
+    return (audio->nr52 & 0x02) && audio_ch2_dac_on(audio);
+}
+
+static bool audio_ch3_connected(const audio_regs_t *audio) {
+    return (audio->nr52 & 0x04) && audio_ch3_dac_on(audio) && ((audio->nr32 >> 5) & 0x03) != 0;
+}
+
+static bool audio_ch4_connected(const audio_regs_t *audio) {
+    return (audio->nr52 & 0x08) && audio_ch4_dac_on(audio);
+}
+
+static uint8_t audio_ch1_sample(const audio_regs_t *audio) {
+    uint8_t duty = (audio->nr11 >> 6) & 0x03;
+    return duty_table[duty][audio->ch1_duty_pos] ? audio->ch1_env_volume : 0;
+}
+
+static uint8_t audio_ch2_sample(const audio_regs_t *audio) {
+    uint8_t duty = (audio->nr21 >> 6) & 0x03;
+    return duty_table[duty][audio->ch2_duty_pos] ? audio->ch2_env_volume : 0;
+}
+
+static uint8_t audio_ch3_sample(const audio_regs_t *audio, const uint8_t *wave_ram) {
+    uint8_t byte = wave_ram[audio->ch3_wave_pos / 2];
+    uint8_t nibble = (audio->ch3_wave_pos % 2 == 0) ? (byte >> 4) : (byte & 0x0F);
+    uint8_t level = (audio->nr32 >> 5) & 0x03; // only called when connected, so != 0
+    return nibble >> (level - 1);
+}
+
+static uint8_t audio_ch4_sample(const audio_regs_t *audio) {
+    bool high = !(audio->ch4_lfsr & 1);
+    return high ? audio->ch4_env_volume : 0;
+}
+
+// ---- Mixing: per-channel DAC output through NR51 panning, summed and
+// scaled by NR50 master volume ----
+
+static void audio_mix_sample(const audio_regs_t *audio, const uint8_t *wave_ram, int16_t *out_left, int16_t *out_right) {
+    if (!(audio->nr52 & 0x80)) { // master audio off
+        *out_left = 0;
+        *out_right = 0;
+        return;
+    }
+
+    bool connected[4] = {
+        audio_ch1_connected(audio),
+        audio_ch2_connected(audio),
+        audio_ch3_connected(audio),
+        audio_ch4_connected(audio),
+    };
+    uint8_t sample[4] = {
+        connected[0] ? audio_ch1_sample(audio) : 0,
+        connected[1] ? audio_ch2_sample(audio) : 0,
+        connected[2] ? audio_ch3_sample(audio, wave_ram) : 0,
+        connected[3] ? audio_ch4_sample(audio) : 0,
+    };
+
+    float left = 0.0f;
+    float right = 0.0f;
+    for (int ch = 0; ch < 4; ch++) {
+        if (!connected[ch]) {
+            continue;
+        }
+        // DAC maps a 4-bit sample (0-15) onto the analog range [-1, 1].
+        float dac_out = ((float)sample[ch] / 7.5f) - 1.0f;
+        if (audio->nr51 & (0x10 << ch)) {
+            left += dac_out;
+        }
+        if (audio->nr51 & (0x01 << ch)) {
+            right += dac_out;
+        }
+    }
+
+    uint8_t left_vol = (audio->nr50 >> 4) & 0x07;
+    uint8_t right_vol = audio->nr50 & 0x07;
+    left *= (float)(left_vol + 1) / 8.0f;
+    right *= (float)(right_vol + 1) / 8.0f;
+
+    // Each side sums up to 4 channels in [-1, 1]; scale down so a full mix
+    // doesn't clip int16 range.
+    *out_left = (int16_t)(left * (32767.0f / 4.0f));
+    *out_right = (int16_t)(right * (32767.0f / 4.0f));
 }

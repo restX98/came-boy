@@ -41,19 +41,27 @@ typedef struct {
     uint16_t ch1_sweep_shadow;
     uint8_t  ch1_sweep_timer;
     bool     ch1_sweep_enabled;
+    int32_t  ch1_period_timer; // T-cycles remaining until the next duty step
+    uint8_t  ch1_duty_pos;     // 0-7, position within the duty waveform
 
     // Channel 2 (pulse)
     uint16_t ch2_length_counter;
     uint8_t  ch2_env_volume;
     uint8_t  ch2_env_timer;
+    int32_t  ch2_period_timer;
+    uint8_t  ch2_duty_pos;
 
     // Channel 3 (wave) — length counter counts up to 256, not 64
     uint16_t ch3_length_counter;
+    int32_t  ch3_period_timer;
+    uint8_t  ch3_wave_pos; // 0-31, nibble index into wave RAM
 
     // Channel 4 (noise)
     uint16_t ch4_length_counter;
     uint8_t  ch4_env_volume;
     uint8_t  ch4_env_timer;
+    int32_t  ch4_period_timer;
+    uint16_t ch4_lfsr; // 15-bit linear feedback shift register
 
     // ---- Sample clock ----
     // Downsamples the CPU clock (4194304 Hz) to the output sample rate via a
@@ -70,8 +78,10 @@ void audio_init(audio_regs_t *audio);
 uint8_t audio_read(audio_regs_t *audio, uint16_t addr);
 void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value);
 
-// Advances the frame sequencer and the sample clock. `cycles` is the elapsed
-// T-cycles for this call; `div_register` is the current value of DIV (0xFF04).
-void audio_tick(audio_regs_t *audio, int cycles, uint8_t div_register);
+// Advances the frame sequencer, per-channel waveform generators, and the
+// sample clock. `cycles` is the elapsed T-cycles for this call; `div_register`
+// is the current value of DIV (0xFF04); `wave_ram` is the 16-byte Wave
+// Pattern RAM ($FF30-$FF3F), owned by io_reg_t, read here for Channel 3.
+void audio_tick(audio_regs_t *audio, int cycles, uint8_t div_register, const uint8_t *wave_ram);
 
 #endif // AUDIO_H

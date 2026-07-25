@@ -79,6 +79,32 @@ void timer_tick(timer_regs_t *timer, int cycles) {
     timer_tick_stats.call_count++;
 }
 
+typedef struct {
+    audio_regs_t *audio;
+    int cycles;
+    uint8_t div_register;
+    const uint8_t *wave_ram;
+} audio_tick_call_t;
+
+typedef struct {
+    size_t call_count;
+    audio_tick_call_t calls[10];
+} audio_tick_stats_t;
+
+static audio_tick_stats_t audio_tick_stats;
+
+void audio_tick(audio_regs_t *audio, int cycles, uint8_t div_register, const uint8_t *wave_ram) {
+    if (audio_tick_stats.call_count == 10) {
+        assert(0 && "Exceeded maximum call count for audio_tick_stats");
+    }
+    audio_tick_call_t *call = &audio_tick_stats.calls[audio_tick_stats.call_count];
+    call->audio = audio;
+    call->cycles = cycles;
+    call->div_register = div_register;
+    call->wave_ram = wave_ram;
+    audio_tick_stats.call_count++;
+}
+
 void setUp(void) {
     suppress_logs();
 
@@ -89,6 +115,7 @@ void setUp(void) {
     ppu_step_stats = (ppu_step_stats_t){ 0 };
     oam_dma_tick_stats = (oam_dma_tick_stats_t){ 0 };
     timer_tick_stats = (timer_tick_stats_t){ 0 };
+    audio_tick_stats = (audio_tick_stats_t){ 0 };
 }
 
 void tearDown(void) {
@@ -136,6 +163,19 @@ void test_clock_tick_advances_timer_with_bus_timer_and_cycles(void) {
     TEST_ASSERT_EQUAL_INT(20, timer_tick_stats.calls[0].cycles);
 }
 
+void test_clock_tick_advances_audio_with_cycles_div_register_and_wave_ram(void) {
+    clock_init(&clk, &ppu, &bus);
+    bus.io_reg.timer.div = 0x3C; // timer_tick is mocked, so set it directly
+
+    clock_tick(&clk, 20);
+
+    TEST_ASSERT_EQUAL_size_t(1, audio_tick_stats.call_count);
+    TEST_ASSERT_EQUAL_PTR(&bus.io_reg.audio, audio_tick_stats.calls[0].audio);
+    TEST_ASSERT_EQUAL_INT(20, audio_tick_stats.calls[0].cycles);
+    TEST_ASSERT_EQUAL_UINT8(0x3C, audio_tick_stats.calls[0].div_register);
+    TEST_ASSERT_EQUAL_PTR(bus.io_reg.wp_ram, audio_tick_stats.calls[0].wave_ram);
+}
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -144,6 +184,7 @@ int main(void) {
     RUN_TEST(test_clock_tick_advances_ppu_with_cycles);
     RUN_TEST(test_clock_tick_advances_oam_dma_with_bus_and_cycles);
     RUN_TEST(test_clock_tick_advances_timer_with_bus_timer_and_cycles);
+    RUN_TEST(test_clock_tick_advances_audio_with_cycles_div_register_and_wave_ram);
 
     return UNITY_END();
 }
