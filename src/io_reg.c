@@ -124,24 +124,31 @@ static uint8_t read_audio(io_reg_t *io_reg, uint16_t addr) {
 }
 
 static void write_audio(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
-    audio_write(&io_reg->audio, addr, value);
+    audio_write(&io_reg->audio, addr, value, io_reg->wp_ram);
 }
 
 static uint8_t read_wave_pattern(io_reg_t *io_reg, uint16_t addr) {
-    // While CH3 is enabled, DMG hardware only reliably exposes the byte the
-    // channel is currently reading, regardless of which address was asked
-    // for; addressed access to the rest of wave RAM is only reliable while
-    // CH3 is stopped.
+    // While CH3 is enabled, DMG hardware only exposes wave RAM at all in the
+    // narrow window where the wave unit itself just advanced to a new
+    // sample (ch3_just_ticked) — and even then, only the byte it's
+    // currently reading, regardless of which address was asked for. Any
+    // other access while CH3 is on reads back $FF.
     if (io_reg->audio.nr52 & 0x04) {
-        return io_reg->wp_ram[io_reg->audio.ch3_wave_pos / 2];
+        if (io_reg->audio.ch3_just_ticked) {
+            return io_reg->wp_ram[io_reg->audio.ch3_wave_pos / 2];
+        }
+        return 0xFF;
     }
     return io_reg->wp_ram[addr - 0xFF30];
 }
 
 static void write_wave_pattern(io_reg_t *io_reg, uint16_t addr, uint8_t value) {
-    // Same CH3-active caveat as read_wave_pattern.
+    // Same CH3-active access window as read_wave_pattern; writes outside it
+    // are silently dropped.
     if (io_reg->audio.nr52 & 0x04) {
-        io_reg->wp_ram[io_reg->audio.ch3_wave_pos / 2] = value;
+        if (io_reg->audio.ch3_just_ticked) {
+            io_reg->wp_ram[io_reg->audio.ch3_wave_pos / 2] = value;
+        }
         return;
     }
     io_reg->wp_ram[addr - 0xFF30] = value;

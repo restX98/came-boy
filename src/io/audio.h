@@ -56,6 +56,10 @@ typedef struct {
     uint16_t ch3_length_counter;
     int32_t  ch3_period_timer;
     uint8_t  ch3_wave_pos; // 0-31, nibble index into wave RAM
+    // True only for the audio_tick call in which the wave unit actually
+    // advanced ch3_wave_pos — the CPU access window onto wave RAM while CH3
+    // is running is gated by this, not by CH3 simply being on.
+    bool     ch3_just_ticked;
 
     // Channel 4 (noise)
     uint16_t ch4_length_counter;
@@ -77,7 +81,9 @@ typedef struct {
 void audio_init(audio_regs_t *audio);
 
 uint8_t audio_read(audio_regs_t *audio, uint16_t addr);
-void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value);
+// `wave_ram` is Wave Pattern RAM ($FF30-$FF3F), owned by io_reg_t — mutated
+// here only by the CH3 retrigger-while-on corruption glitch (see audio.c).
+void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value, uint8_t *wave_ram);
 
 // Advances the frame sequencer, per-channel waveform generators, and the
 // sample clock. `cycles` is the elapsed T-cycles for this call; `div_register`

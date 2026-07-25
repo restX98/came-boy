@@ -370,7 +370,8 @@ typedef struct {
 
 static audio_write_stats_t audio_write_stats;
 
-void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
+void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value, uint8_t *wave_ram) {
+    (void)wave_ram;
     if (audio_write_stats.call_count == 10) {
         assert(0 && "Exceeded maximum call count for audio_write_stats");
     }
@@ -697,12 +698,22 @@ void test_io_reg_read_wave_pattern(void) {
 void test_io_reg_read_wave_pattern_redirects_to_current_byte_while_ch3_active(void) {
     io_reg.audio.nr52 = 0x04; // CH3 active
     io_reg.audio.ch3_wave_pos = 30; // reading wp_ram[15]
+    io_reg.audio.ch3_just_ticked = true; // CPU access lands in the wave unit's read window
     io_reg.wp_ram[0] = 0x3C;
     io_reg.wp_ram[15] = 0x7E;
 
     // Regardless of the address asked for, only the byte CH3 is currently
     // reading is reliably exposed.
     TEST_ASSERT_EQUAL_UINT8(0x7E, io_reg_read(&io_reg, 0xFF30));
+}
+
+void test_io_reg_read_wave_pattern_returns_0xFF_outside_access_window_while_ch3_active(void) {
+    io_reg.audio.nr52 = 0x04; // CH3 active
+    io_reg.audio.ch3_wave_pos = 30; // reading wp_ram[15]
+    io_reg.audio.ch3_just_ticked = false; // CPU access misses the wave unit's read window
+    io_reg.wp_ram[15] = 0x7E;
+
+    TEST_ASSERT_EQUAL_UINT8(0xFF, io_reg_read(&io_reg, 0xFF30));
 }
 
 void test_io_reg_read_lcd(void) {
@@ -803,12 +814,24 @@ void test_io_reg_write_wave_pattern(void) {
 void test_io_reg_write_wave_pattern_redirects_to_current_byte_while_ch3_active(void) {
     io_reg.audio.nr52 = 0x04; // CH3 active
     io_reg.audio.ch3_wave_pos = 30; // writing wp_ram[15]
+    io_reg.audio.ch3_just_ticked = true; // CPU access lands in the wave unit's read window
 
     // Regardless of the address asked for, only the byte CH3 is currently
     // reading is reliably written.
     io_reg_write(&io_reg, 0xFF30, 0x7E);
 
     TEST_ASSERT_EQUAL_UINT8(0x7E, io_reg.wp_ram[15]);
+}
+
+void test_io_reg_write_wave_pattern_is_ignored_outside_access_window_while_ch3_active(void) {
+    io_reg.audio.nr52 = 0x04; // CH3 active
+    io_reg.audio.ch3_wave_pos = 30; // writing wp_ram[15]
+    io_reg.audio.ch3_just_ticked = false; // CPU access misses the wave unit's read window
+    io_reg.wp_ram[15] = 0x11;
+
+    io_reg_write(&io_reg, 0xFF30, 0x7E);
+
+    TEST_ASSERT_EQUAL_UINT8(0x11, io_reg.wp_ram[15]);
 }
 
 void test_io_reg_write_lcd(void) {
@@ -861,6 +884,7 @@ int main(void) {
     RUN_TEST(test_io_reg_read_audio);
     RUN_TEST(test_io_reg_read_wave_pattern);
     RUN_TEST(test_io_reg_read_wave_pattern_redirects_to_current_byte_while_ch3_active);
+    RUN_TEST(test_io_reg_read_wave_pattern_returns_0xFF_outside_access_window_while_ch3_active);
     RUN_TEST(test_io_reg_read_lcd);
     RUN_TEST(test_io_reg_read_oam_dma);
     RUN_TEST(test_io_reg_read_unimplemented_returns_0xFF);
@@ -873,6 +897,7 @@ int main(void) {
     RUN_TEST(test_io_reg_write_audio);
     RUN_TEST(test_io_reg_write_wave_pattern);
     RUN_TEST(test_io_reg_write_wave_pattern_redirects_to_current_byte_while_ch3_active);
+    RUN_TEST(test_io_reg_write_wave_pattern_is_ignored_outside_access_window_while_ch3_active);
     RUN_TEST(test_io_reg_write_lcd);
     RUN_TEST(test_io_reg_write_oam_dma);
     RUN_TEST(test_io_reg_write_unimplemented_is_ignored);

@@ -7,7 +7,7 @@
 
 static void audio_trigger_ch1(audio_regs_t *audio);
 static void audio_trigger_ch2(audio_regs_t *audio);
-static void audio_trigger_ch3(audio_regs_t *audio);
+static void audio_trigger_ch3(audio_regs_t *audio, uint8_t *wave_ram);
 static void audio_trigger_ch4(audio_regs_t *audio);
 
 static void audio_clock_length(audio_regs_t *audio);
@@ -83,6 +83,7 @@ void audio_init(audio_regs_t *audio) {
     audio->ch3_length_counter = 0;
     audio->ch3_period_timer = 0;
     audio->ch3_wave_pos = 0;
+    audio->ch3_just_ticked = false;
 
     audio->ch4_length_counter = 0;
     audio->ch4_env_volume = 0;
@@ -146,7 +147,7 @@ uint8_t audio_read(audio_regs_t *audio, uint16_t addr) {
     }
 }
 
-void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
+void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value, uint8_t *wave_ram) {
     // While powered off, only NR52 itself is writable — except that DMG
     // hardware still lets a write to NRx1 reload the length counter, even
     // though the register byte itself stays 0 (and reads back as 0, like
@@ -251,7 +252,7 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
             audio_length_enable_quirk(audio, &audio->ch3_length_counter, 0x04,
                                        old_enabled, value & 0x40, value & 0x80);
             if (value & 0x80) {
-                audio_trigger_ch3(audio);
+                audio_trigger_ch3(audio, wave_ram);
             }
             break;
         }
@@ -291,9 +292,18 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
             // clears every other audio register (Pan Docs); wave RAM (owned
             // by io_reg_t, not audio_regs_t) and the internal length
             // counters are unaffected.
+            bool was_on = audio->nr52 & 0x80;
             bool audio_on = value & 0x80;
             uint8_t status = audio_on ? (audio->nr52 & 0x0F) : 0x00;
             audio->nr52 = status | 0b01110000 | (audio_on ? 0x80 : 0x00);
+
+            // Pan Docs/gb-test-roms dmg_sound 07: powering on resets the
+            // frame sequencer step, but not the DIV edge-detector driving
+            // it — the time until the next step still depends on DIV's
+            // live phase, not a fixed 8192-cycle reload.
+            if (audio_on && !was_on) {
+                audio->frame_seq_step = 0;
+            }
 
             if (!audio_on) {
                 audio->nr10 = 0;
@@ -451,7 +461,28 @@ static void audio_trigger_ch2(audio_regs_t *audio) {
     }
 }
 
-static void audio_trigger_ch3(audio_regs_t *audio) {
+static void audio_trigger_ch3(audio_regs_t *audio, uint8_t *wave_ram) {
+    // Pan Docs/gb-test-roms dmg_sound 10-wave trigger while on: retriggering
+    // CH3 while it's already running, right as the wave unit is about to
+    // advance to its next sample, corrupts wave RAM instead of cleanly
+    // restarting it. Our M-cycle (4 T-cycle) tick granularity can't resolve
+    // hardware's true single-T-cycle window, so this fires whenever the
+    // pending tick would land within the same M-cycle as the retrigger.
+    bool was_enabled = audio->nr52 & 0x04;
+    bool about_to_tick = audio->ch3_period_timer <= 4;
+    if (was_enabled && about_to_tick) {
+        uint8_t pos_byte = audio->ch3_wave_pos / 2;
+        if (pos_byte < 4) {
+            wave_ram[0] = wave_ram[pos_byte];
+        } else {
+            uint8_t group_start = pos_byte & ~0x03;
+            wave_ram[0] = wave_ram[group_start];
+            wave_ram[1] = wave_ram[group_start + 1];
+            wave_ram[2] = wave_ram[group_start + 2];
+            wave_ram[3] = wave_ram[group_start + 3];
+        }
+    }
+
     audio->nr52 |= 0x04;
 
     if (audio->ch3_length_counter == 0) {
@@ -661,10 +692,12 @@ static void audio_step_ch2(audio_regs_t *audio, int cycles) {
 
 static void audio_step_ch3(audio_regs_t *audio, int cycles) {
     audio->ch3_period_timer -= cycles;
+    audio->ch3_just_ticked = false;
     while (audio->ch3_period_timer <= 0) {
         uint16_t period = audio->nr33 | ((uint16_t)(audio->nr34 & 0x07) << 8);
         audio->ch3_period_timer += (2048 - period) * 2;
         audio->ch3_wave_pos = (audio->ch3_wave_pos + 1) & 0x1F;
+        audio->ch3_just_ticked = true;
     }
 }
 
