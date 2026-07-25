@@ -56,11 +56,9 @@ void test_audio_init_sets_boot_values(void) {
 // ---- audio_read ----
 
 void test_audio_read_returns_raw_registers(void) {
-    audio.nr10 = 0xA5; // 0xFF10
+    audio.nr10 = 0xA5; // 0xFF10 — bit 7 already set, so the read mask is a no-op here
     audio.nr12 = 0xA5; // 0xFF12
     audio.nr22 = 0xA5; // 0xFF17
-    audio.nr30 = 0xA5; // 0xFF1A
-    audio.nr32 = 0xA5; // 0xFF1C
     audio.nr42 = 0xA5; // 0xFF21
     audio.nr43 = 0xA5; // 0xFF22
     audio.nr50 = 0xA5; // 0xFF24
@@ -70,8 +68,6 @@ void test_audio_read_returns_raw_registers(void) {
     TEST_ASSERT_EQUAL_HEX8(0xA5, audio_read(&audio, 0xFF10));
     TEST_ASSERT_EQUAL_HEX8(0xA5, audio_read(&audio, 0xFF12));
     TEST_ASSERT_EQUAL_HEX8(0xA5, audio_read(&audio, 0xFF17));
-    TEST_ASSERT_EQUAL_HEX8(0xA5, audio_read(&audio, 0xFF1A));
-    TEST_ASSERT_EQUAL_HEX8(0xA5, audio_read(&audio, 0xFF1C));
     TEST_ASSERT_EQUAL_HEX8(0xA5, audio_read(&audio, 0xFF21));
     TEST_ASSERT_EQUAL_HEX8(0xA5, audio_read(&audio, 0xFF22));
     TEST_ASSERT_EQUAL_HEX8(0xA5, audio_read(&audio, 0xFF24));
@@ -81,18 +77,27 @@ void test_audio_read_returns_raw_registers(void) {
 
 void test_audio_read_applies_read_masks(void) {
     // Each stored bit sits outside its register's mask, so the result is the
-    // stored value OR'd with the always-set bits.
+    // stored value OR'd with the always-set bits. These bits must always read
+    // high — even right after NR52 clears the underlying byte to 0 on
+    // power-off — so the mask is applied here rather than baked in at write
+    // time.
+    audio.nr10 = 0x00; // 0xFF10 — value | 0x80
     audio.nr11 = 0x40; // 0xFF11 — value | 0x3F
     audio.nr14 = 0x40; // 0xFF14 — value | 0xBF
     audio.nr21 = 0x40; // 0xFF16 — value | 0x3F
     audio.nr24 = 0x40; // 0xFF19 — value | 0xBF
+    audio.nr30 = 0x00; // 0xFF1A — value | 0x7F
+    audio.nr32 = 0x00; // 0xFF1C — value | 0x9F
     audio.nr34 = 0x40; // 0xFF1E — value | 0xBF
     audio.nr44 = 0x40; // 0xFF23 — value | 0xBF
 
+    TEST_ASSERT_EQUAL_HEX8(0x80, audio_read(&audio, 0xFF10));
     TEST_ASSERT_EQUAL_HEX8(0x7F, audio_read(&audio, 0xFF11));
     TEST_ASSERT_EQUAL_HEX8(0xFF, audio_read(&audio, 0xFF14));
     TEST_ASSERT_EQUAL_HEX8(0x7F, audio_read(&audio, 0xFF16));
     TEST_ASSERT_EQUAL_HEX8(0xFF, audio_read(&audio, 0xFF19));
+    TEST_ASSERT_EQUAL_HEX8(0x7F, audio_read(&audio, 0xFF1A));
+    TEST_ASSERT_EQUAL_HEX8(0x9F, audio_read(&audio, 0xFF1C));
     TEST_ASSERT_EQUAL_HEX8(0xFF, audio_read(&audio, 0xFF1E));
     TEST_ASSERT_EQUAL_HEX8(0xFF, audio_read(&audio, 0xFF23));
 }
@@ -150,16 +155,14 @@ void test_audio_write_stores_raw_registers(void) {
 
 void test_audio_write_applies_or_masks(void) {
     // Writing 0x00 leaves only the register's forced (always-set) bits.
-    audio_write(&audio, 0xFF10, 0x00);
-    TEST_ASSERT_EQUAL_HEX8(0x80, audio.nr10);
+    // NR10/NR30/NR32 are not included here: their forced-high bits are
+    // applied on read (see test_audio_read_applies_read_masks) rather than
+    // baked into the stored byte, so they keep reading correctly even after
+    // NR52 zeroes the raw register on power-off.
     audio_write(&audio, 0xFF14, 0x00);
     TEST_ASSERT_EQUAL_HEX8(0x38, audio.nr14);
     audio_write(&audio, 0xFF19, 0x00);
     TEST_ASSERT_EQUAL_HEX8(0x38, audio.nr24);
-    audio_write(&audio, 0xFF1A, 0x00);
-    TEST_ASSERT_EQUAL_HEX8(0x7F, audio.nr30);
-    audio_write(&audio, 0xFF1C, 0x00);
-    TEST_ASSERT_EQUAL_HEX8(0x9F, audio.nr32);
     audio_write(&audio, 0xFF1E, 0x00);
     TEST_ASSERT_EQUAL_HEX8(0x38, audio.nr34);
     audio_write(&audio, 0xFF20, 0x00);

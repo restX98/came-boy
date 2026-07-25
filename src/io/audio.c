@@ -97,7 +97,7 @@ void audio_init(audio_regs_t *audio) {
 uint8_t audio_read(audio_regs_t *audio, uint16_t addr) {
     switch (addr) {
         case 0xFF10:
-            return audio->nr10;
+            return audio->nr10 | 0b10000000;
         case 0xFF11:
             return audio->nr11 | 0b00111111;
         case 0xFF12:
@@ -115,11 +115,11 @@ uint8_t audio_read(audio_regs_t *audio, uint16_t addr) {
         case 0xFF19:
             return audio->nr24 | 0b10111111;
         case 0xFF1A:
-            return audio->nr30;
+            return audio->nr30 | 0b01111111;
         case 0xFF1B:
             return 0xFF; // read-only, always returns 0xFF
         case 0xFF1C:
-            return audio->nr32;
+            return audio->nr32 | 0b10011111;
         case 0xFF1D:
             return 0xFF; // read-only, always returns 0xFF
         case 0xFF1E:
@@ -171,7 +171,7 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
 
     switch (addr) {
         case 0xFF10:
-            audio->nr10 = value | 0b10000000;
+            audio->nr10 = value;
             break;
         case 0xFF11:
             audio->nr11 = value;
@@ -212,7 +212,7 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
             }
             break;
         case 0xFF1A:
-            audio->nr30 = value | 0b01111111;
+            audio->nr30 = value;
             if (!audio_ch3_dac_on(audio)) {
                 audio->nr52 &= ~0x04;
             }
@@ -222,7 +222,7 @@ void audio_write(audio_regs_t *audio, uint16_t addr, uint8_t value) {
             audio->ch3_length_counter = 256 - value;
             break;
         case 0xFF1C:
-            audio->nr32 = value | 0b10011111;
+            audio->nr32 = value;
             break;
         case 0xFF1D:
             audio->nr33 = value;
